@@ -1,0 +1,27 @@
+// data/resources.json と同じ内容。file:// で開いても読めるように js にも置いている（変更するときは両方そろえる）。
+window.OF = window.OF || {};
+window.OF.resources = {
+  "note": "相談先は研究者が最新の情報を確認し、所属大学の学生相談室などを追加してから実験で使うこと。",
+  "items": [
+    {
+      "name": "よりそいホットライン（24時間・無料）",
+      "tel": "0120-279-338",
+      "url": "https://www.since2011.net/yorisoi/"
+    },
+    {
+      "name": "こころの健康相談統一ダイヤル",
+      "tel": "0570-064-556",
+      "url": "https://www.mhlw.go.jp/kokoro/consult.html"
+    },
+    {
+      "name": "いのちの電話",
+      "tel": "0570-783-556",
+      "url": "https://www.inochinodenwa.org/"
+    },
+    {
+      "name": "（ここに所属大学の学生相談室を追加）",
+      "tel": "",
+      "url": ""
+    }
+  ]
+};
