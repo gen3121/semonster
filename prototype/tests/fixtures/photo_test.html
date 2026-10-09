@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>photo avatar test page</title>
+<style>
+  body { font-family: "BIZ UDPGothic", sans-serif; margin: 16px; background: #fff; color: #222; }
+  .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .av { width: 240px; } .av svg { width: 100%; height: auto; }
+  pre { font-size: 12px; background: #f4f4f4; padding: 8px; max-width: 480px; white-space: pre-wrap; }
+  #status { font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>写真アバター テストページ</h1>
+<input type="file" id="file" accept="image/*">
+<p id="status">待機中</p>
+<div class="row">
+  <div><div>パーツのみ（基準）</div><div class="av" id="avBase"></div></div>
+  <div><div>写真から反映</div><div class="av" id="avPhoto"></div></div>
+  <pre id="out"></pre>
+</div>
+<script>window.OF = window.OF || {};</script>
+<script src="../../js/avatar.js"></script>
+<script src="../../js/photo.js"></script>
+<script>
+  const A = window.OF.avatar, P = window.OF.photo;
+  const base = { hairStyle: 'bob', shirt: '#5B8DEF', pin: '#E8457C' };
+  document.getElementById('avBase').innerHTML = A.svg(base, 'neutral');
+  document.getElementById('file').addEventListener('change', async (ev) => {
+    const st = document.getElementById('status'), out = document.getElementById('out');
+    st.textContent = '処理中'; out.textContent = '';
+    try {
+      const params = await P.fromFile(ev.target.files[0]);
+      const av = A.fromPhotoParams(params, base);
+      document.getElementById('avPhoto').innerHTML = A.svg(av, 'neutral');
+      out.textContent = JSON.stringify({ params, avatar: av }, null, 1);
+      window.__result = { ok: true, params, avatar: av };
+      st.textContent = '完了';
+    } catch (e) {
+      window.__result = { ok: false, code: e.code, name: e.name, message: e.message };
+      out.textContent = (P.ERROR_MESSAGES_JA[e.code] || e.message) + '\n' + e.code;
+      st.textContent = 'エラー ' + e.code;
+    }
+  });
+</script>
+</body>
+</html>

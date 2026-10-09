@@ -3,7 +3,7 @@
 質問紙（予備調査215名で使った項目）をそのまま軸にした、会話型の試作アプリです。
 
 - そのまま使う：`index.html` をダブルクリック（サーバー不要。AI読み取り・写真アバターは使えません）
-- AI読み取りと写真アバターも使う：`cd server && npm install && ANTHROPIC_API_KEY=... node proxy.js` を起動し、`http://localhost:8787/` を開く（詳細は `server/README.md`）
+- AI読み取りと写真アバターも使う：`bash tools/vendor_mediapipe.sh`（顔の特徴点の部品を入れる・初回のみ）→ `cd server && npm install && ANTHROPIC_API_KEY=... node proxy.js` を起動し、`http://localhost:8787/` を開く（詳細は `server/README.md`、`PHOTO_AVATAR.md`）
 
 データは端末の中（localStorage）にだけ保存します。自由な文章そのものは保存せず、読み取った回答の数字だけを残します。
 
@@ -55,11 +55,21 @@ AI読み取りは、同意画面で選んだ人だけ、サーバーが使える
 
 ```bash
 node --test tests/unit.test.js                                             # 単体テスト（24件）
+node --test tests/photo.test.js                                            # 写真アバターの計算部分（27件）
 (cd server && npm install && node --test)                                  # サーバー（偽のAIクライアントで34件）
 PLAYWRIGHT_MODULE=<playwright の場所> node tests/e2e.js <出力先>             # ブラウザ（Chromium）での通し確認とスクリーンショット
+PLAYWRIGHT_MODULE=<...> node tests/e2e_http.js <顔写真.png> <出力先>         # http での写真アバター → AI読み取りの入口（偽のAI）
+PLAYWRIGHT_MODULE=<...> node tests/photo_e2e.js <顔写真.png> <出力先>        # 写真アバター単体（通信・保存・エラー）
 ```
+顔写真はリポジトリに置いていません（試験には scikit-image の宇宙飛行士の画像を使いました）。
+
+## 写真から作るアバター（`js/photo.js`、詳細は `PHOTO_AVATAR.md`）
+
+顔の特徴点（MediaPipe Face Mesh、npm から取り込み、通信なしで動く）から、肌の色・髪の色・顔の比率（顔幅・あご・目の間隔・目の高さ）を出して似顔アバターに反映します。写真は端末内で処理して破棄し、保存も送信もしません（通信・保存・後始末は `tests/photo_e2e.js` で確認）。結果は必ずパーツ選択で直せます。髪型は特徴点から分からないので、本人が選びます。`http(s)` で配信したときだけ使えます（`file://` では写真ボタンを出しません）。
 
 ## まだ確かめていないもの・仮のもの
+
+- **写真アバター**：試したのは1枚の実写（宇宙飛行士の画像）と合成画像だけです。実機のカメラ、スマホ（iOS Safari）、肌の色や人種ごとの精度、実際のメガネは未検証です。照明で肌の色が変わります（暗い写真は濃い肌色に見える）。顔の比率の基準値は仮です。
 
 - **AI読み取りは、実際のAPIでは一度も動かしていません**（この環境にキーがありません）。偽のクライアントでの試験のみです。最初の実機確認の手順は `server/README.md`。
 - 質問紙の選択肢の文言（「とても当てはまる」など）は、フォームの原文が手元になく仮です（`js/instrument.js` の `labelsConfirmed`）。

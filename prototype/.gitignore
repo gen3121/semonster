@@ -1,0 +1,3 @@
+# tools/vendor_mediapipe.sh が再生成する（Apache-2.0 のバイナリ。コミットしない）
+vendor/
+node_modules/

@@ -84,11 +84,12 @@
       msg.textContent = '読み取っています…';
       try {
         const params = await P2.fromFile(f);
-        Object.assign(av, A.fromPhotoParams(params, av));
+        const merged = A.fromPhotoParams(params, av); delete merged.photoApplied;   // 表示用の印は保存しない
+        Object.assign(av, merged);
         s.avatarSource = 'photo';
-        msg.textContent = '写真から似顔絵を作りました（写真は破棄しました）。' + (params.warnings && params.warnings.length ? '※ ' + params.warnings.join(' ') : '') + ' 髪型などは、下のボタンで選んでください。';
+        msg.textContent = '写真から似顔絵を作りました（写真は破棄しました）。' + ((params.warnings || []).filter((w) => w !== 'hairstyle_not_derived').map((w) => (P2.WARNING_MESSAGES_JA && P2.WARNING_MESSAGES_JA[w]) || '').filter(Boolean).map((t) => '※ ' + t).join(' ')) + ' 髪型などは、下のボタンで選んでください。';
         done();
-      } catch (e) { msg.textContent = PHOTO_ERR[e && e.code] || '写真を読み取れませんでした。パーツ選択でお作りください。'; }
+      } catch (e) { msg.textContent = (P2.ERROR_MESSAGES_JA && P2.ERROR_MESSAGES_JA[e && e.code]) || PHOTO_ERR[e && e.code] || '写真を読み取れませんでした。パーツ選択でお作りください。'; }
       input.value = '';
     });
     return h('div', { class: 'card', 'data-photo': '1' }, h('b', {}, '写真から作る（任意）'), h('div', { style: 'margin-top:6px' }, h('button', { class: 'btn small secondary', id: 'photo-btn', onclick: () => input.click() }, '写真をえらぶ／撮る'), input), msg);
