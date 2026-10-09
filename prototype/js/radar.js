@@ -2,7 +2,7 @@
 (function () {
   const api = {};
   api.svg = function (axes, { max = 100, color = '#E8457C', size = 280, rings = [1 / 3, 2 / 3, 1], fmt = (v) => String(v) } = {}) {
-    const n = axes.length, c = size / 2, R = size / 2 - 52;
+    const n = axes.length, c = size / 2, R = size / 2 - 52, pad = 44;   // 左右の余白は、長い軸ラベルが切れないように
     const pt = (i, f) => { const a = -Math.PI / 2 + (2 * Math.PI * i) / n; return [c + R * f * Math.cos(a), c + R * f * Math.sin(a)]; };
     const poly = (f) => axes.map((_, i) => pt(i, f).map((x) => x.toFixed(1)).join(',')).join(' ');
     let g = rings.map((f) => `<polygon points="${poly(f)}" fill="none" stroke="#D5DEE8" stroke-width="1"/>`).join('');
@@ -16,7 +16,7 @@
       const [x, y] = pt(i, 1.2); const anchor = x < c - 8 ? 'end' : x > c + 8 ? 'start' : 'middle';
       return `<text x="${x.toFixed(1)}" y="${(y - 2).toFixed(1)}" text-anchor="${anchor}" font-size="13" fill="#0B3C6E" font-weight="bold">${a.label}</text><text x="${x.toFixed(1)}" y="${(y + 14).toFixed(1)}" text-anchor="${anchor}" font-size="13" fill="#24303F">${a.value == null ? '—' : fmt(a.value)}</text>`;
     }).join('');
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" role="img" aria-label="レーダーチャート：${axes.map((a) => `${a.label} ${a.value == null ? '未入力' : fmt(a.value)}`).join('、')}" style="width:100%;max-width:${size}px;display:block;margin:0 auto">${g}</svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-pad} 0 ${size + 2 * pad} ${size}" role="img" aria-label="レーダーチャート：${axes.map((a) => `${a.label} ${a.value == null ? '未入力' : fmt(a.value)}`).join('、')}" style="width:100%;max-width:${size + 2 * pad}px;display:block;margin:0 auto">${g}</svg>`;
   };
   if (typeof module !== 'undefined') module.exports = api; else window.OF.radar = api;
 })();

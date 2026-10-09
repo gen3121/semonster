@@ -1,4 +1,4 @@
-// 実際のブラウザ（Chromium）で、file:// で開いて通しで操作する。使い方: node tests/e2e.js [スクリーンショットの出力先]
+// 実際のブラウザ（Chromium）で、file:// で開いて通しで操作する。使い方: PLAYWRIGHT_MODULE=<場所> node tests/e2e.js [スクリーンショットの出力先]
 const path = require('path');
 const fs = require('fs');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -10,6 +10,27 @@ const URL = 'file://' + path.resolve(__dirname, '..', 'index.html');
 let n = 0;
 const shot = async (page, name) => { await page.screenshot({ path: path.join(OUT, `${String(++n).padStart(2, '0')}_${name}.png`) }); };
 const step = (m) => console.log('•', m);
+const state = (page) => page.evaluate(() => JSON.parse(JSON.stringify(window.OF.app.state)));
+
+// いま出ている質問に、ボタンで答える（値の指定がなければ 4／選択肢は2番目）。確認カードが出ていればOK
+async function answerAll(page, until, pick = {}) {
+  for (let i = 0; i < 200; i++) {
+    if (await until()) return;
+    if (await page.locator('#confirm-ok').count()) { await page.locator('#confirm-ok').click(); continue; }
+    const chips = page.locator('.composer .chips .chip[data-v]');
+    if (!(await chips.count())) return;
+    const q = await page.locator('.bubble.bot').last().innerText();
+    const id = (await page.evaluate((t) => { const I = window.OF.instrument.ITEMS; return Object.keys(I).find((k) => t.includes(I[k].text)); }, q));
+    const want = pick[id];
+    if (want != null) await page.locator(`.composer .chips .chip[data-v="${want}"]`).click();
+    else await chips.nth((await page.locator('.composer .chips .chip[data-v="4"]').count()) ? 3 : 1).click();
+  }
+  throw new Error('終わらない');
+}
+const who5 = async (page, labels = ['いつも', 'ほとんどいつも', '半分以上の期間', '半分以上の期間', '半分以下の期間']) => {
+  await page.getByText('気分を5つ聞かせてください').waitFor();
+  for (const c of labels) await page.locator('.composer .chip', { hasText: new RegExp(`^${c}$`) }).click();
+};
 
 (async () => {
   const browser = await chromium.launch();
@@ -19,140 +40,148 @@ const step = (m) => console.log('•', m);
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 
-  // ---------- 初回設定
-  await page.goto(URL);
-  await page.getByRole('button', { name: '同意して始める' }).click();
-  for (let i = 1; i <= 10; i++) await page.locator('.q').nth(i - 1).locator('.scale button').nth(i % 7).click();
-  await shot(page, 'tipi');
-  await page.getByRole('button', { name: 'つぎへ' }).click();
-  await page.locator('.q', { hasText: 'ライブ・イベント' }).getByRole('button', { name: '増やしたい' }).click();
-  await page.locator('.q', { hasText: 'SNS' }).first().getByRole('button', { name: '減らしたい' }).click();
-  assert.equal(await page.getByRole('button', { name: 'つぎへ' }).isDisabled(), true, '金額・時間が未入力ならつぎへ進めない');
-  await page.locator('[data-lim=budgetYenMonth]').nth(2).click();
-  await page.locator('[data-lim=hoursPerDay]').nth(2).click();
-  await shot(page, 'wishes');
-  await page.getByRole('button', { name: 'つぎへ' }).click();
-  await page.getByRole('button', { name: 'ふたつ結び' }).click();
-  await page.getByRole('button', { name: 'あり' }).click();
-  await shot(page, 'avatar');
-  await page.getByRole('button', { name: 'はじめる' }).click();
-  step('初回設定を通過');
-
-  // ---------- 1日目は最初に WHO-5（会話の中で5問）
-  await page.getByText('気分を5つ聞かせてください').waitFor();
-  for (const c of ['いつも', 'ほとんどいつも', '半分以上の期間', '半分以上の期間', '半分以下の期間']) await page.locator('.chips .chip', { hasText: new RegExp('^' + c + '$') }).click();
-  await page.getByText('こんばんは。今日の推し活').waitFor();
-  assert.equal((await page.evaluate(() => window.OF.app.state)).who5[0].raw, 17, 'WHO-5 素点 5+4+3+3+2');
-  step('WHO-5（開始時）を会話で回答 → 素点17');
-
-  // ---------- 会話での記録（1日目）
-  const send = async (t) => { await page.locator('#inp').fill(t); await page.locator('#send').click(); };
-  await send('夜に配信を2時間くらい見て、そのあとXもだらだら1時間。グッズは買ってない。寝るの遅くなった。');
-  // 取れなかった「ライブ」だけ聞かれ、続けて評価を聞かれる
-  await page.getByText('ライブや現場には、行った？').waitFor();
-  await page.getByRole('button', { name: '行ってない' }).click();
-  await page.getByText('楽しさと疲れを、1〜5で教えてください').waitFor();
-  await send('うーん');
-  await page.getByText('うまく読み取れませんでした').waitFor();
-  await page.getByRole('button', { name: '4と2' }).click();
-  await page.getByText('こう受け取りました').waitFor();
-  const sumText = await page.locator('[data-summary]').last().innerText();
-  assert.match(sumText, /配信・動画\s+2時間/); assert.match(sumText, /SNS\s+1時間/); assert.match(sumText, /楽しさ \/ 疲れ\s+4 \/ 2/);
-  await shot(page, 'chat_confirm');
-  // 直す: 睡眠
-  await send('睡眠は少し');
-  await page.getByText('直しました').waitFor();
-  await page.locator('#ok').click();
-  await page.getByText('記録しました（1日目）').waitFor();
-  const st = await page.evaluate(() => window.OF.app.state);
-  assert.equal(st.logs.length, 1);
-  const l = st.logs[0];
-  assert.deepEqual([l.live, l.goodsYen, l.streamMin, l.snsMin, l.sleepImpact, l.joy, l.fatigue], [0, 0, 120, 60, 1, 4, 2]);
-  await shot(page, 'chat_done');
-  step('会話で記録 → 聞き返し → 確認 → 修正 → 保存');
-
-  // 群Aの期間は「記録」と「設定」だけ
-  const tabs = await page.locator('nav.tabs button').allInnerTexts();
-  assert.deepEqual(tabs, ['記録', '設定']);
-
-  // ---------- 安全層
-  await page.evaluate(() => { window.OF.store.save(window.OF.app.state); });
-  await page.evaluate(() => { const s = window.OF.app.state; s.devOffsetDays = 1; window.OF.store.save(s); });
-  await page.reload();
-  await send('今日は何もしたくない、もう消えたい');
-  await page.getByText('今日の記録は、ここまでで大丈夫です').waitFor();
-  assert.ok(await page.getByText('0120-279-338').isVisible());
-  assert.equal(await page.locator('#inp').count(), 0, '強いつらさのあとは入力欄を出さない');
-  await shot(page, 'safety');
-  const st2 = await page.evaluate(() => window.OF.app.state);
-  assert.equal(st2.logs.length, 1, '強い言葉のときは記録を保存しない');
-  assert.equal(st2.distress.length, 1);
-  step('安全層：相談先を表示し、記録は保存しない');
-
-  // ---------- デモデータ（開発モード）で 群C の画面
+  // ---------- 同意 → アバター
   await page.goto(URL + '?dev=1');
-  await page.locator('nav.tabs button[data-tab=me]').click();
-  await page.locator('[data-group=C]').click();
-  await page.getByRole('button', { name: 'デモ14日分を入れる' }).click();
-  const tabs2 = await page.locator('nav.tabs button').allInnerTexts();
-  assert.deepEqual(tabs2, ['記録', '今週の提案', 'いまの状態', 'ミラー', '設定']);
+  assert.equal(await page.locator('#ai-opt').isDisabled(), true, 'file:// ではAI読み取りは選べない');
+  await shot(page, 'consent');
+  await page.locator('#consent-yes').click();
+  assert.equal(await page.locator('#photo-btn').count(), 0, 'file:// では写真ボタンを出さない');
+  await page.locator('[data-opt=hairStyle] .chip', { hasText: 'ふたつ結び' }).click();
+  await page.locator('[data-opt=glasses] .chip', { hasText: 'あり' }).click();
+  await shot(page, 'avatar');
+  await page.locator('#avatar-done').click();
+  step('同意とアバターを通過');
 
-  await page.locator('nav.tabs button[data-tab=plan]').click();
-  await page.locator('[data-opt]').first().waitFor();
-  const nOpts = await page.locator('[data-opt]').count();
-  assert.ok(nOpts >= 1 && nOpts <= 3);
+  // ---------- 初回インタビュー：WHO-5 → 質問紙の全項目
+  await who5(page);
+  assert.equal((await state(page)).who5[0].raw, 17, 'WHO-5 素点 5+4+3+3+2');
+  await page.getByText('(1/39)').waitFor();
+  // 文章で答える → 確認 → 直す
+  await page.locator('#inp').fill('やや当てはまる');
+  await page.locator('#send').click();
+  await page.locator('#confirm').waitFor();
+  await shot(page, 'confirm');
+  await page.locator('[data-item=av_empathy] .chip[data-v="5"]').click();
+  await page.locator('#confirm-ok').click();
+  let st = await state(page);
+  assert.equal(st.survey.draft.answers.av_empathy, 5);
+  assert.equal(st.survey.draft.src.av_empathy, 'rules+edit');
+  // 読み取れない文 → ボタンへ誘導
+  await page.locator('#inp').fill('うーん');
+  await page.locator('#send').click();
+  await page.getByText('うまく読み取れませんでした').waitFor();
+  step('文章 → 確認カードで直して確定、読み取れない文はボタンへ誘導');
+
+  // 途中で閉じて再開
+  await page.reload();
+  await page.getByText('前回の続きから始めます').waitFor();
+  assert.equal((await state(page)).survey.draft.answers.av_empathy, 5);
+  step('途中で閉じても続きから再開');
+
+  // 残りをボタンで（お金の質問は文章でも）
+  await answerAll(page, async () => (await page.locator('.bubble.bot').last().innerText()).includes('1か月の平均手取り'));
+  await page.locator('#inp').fill('月12万円くらい');
+  await page.locator('#send').click();
+  await page.locator('[data-item=income] .chip[aria-pressed=true]').waitFor();
+  assert.equal(await page.locator('[data-item=income] .chip[aria-pressed=true]').innerText(), '10〜15万円');
+  await page.locator('#confirm-ok').click();
+  await answerAll(page, async () => !!(await state(page)).survey.baseline);
+  st = await state(page);
+  assert.equal(Object.keys(st.survey.baseline.answers).length, 39);
+  assert.equal(st.survey.baseline.src.income, 'rules');
+  assert.equal(st.survey.draft, null);
+  await shot(page, 'baseline-done');
+  step('初回の39項目に回答（ボタン・文章の混在）→ 保存');
+  assert.deepEqual(await page.locator('nav.tabs button').allInnerTexts(), ['会話', '設定'], '2週間は記録のみ（群Aと同じ画面）');
+
+  // ---------- 開発用：2回分のチェックインを入れて、群Cの画面へ
+  await page.locator('[data-tab=me]').click();
+  await page.locator('#dev-demo').click();
+  assert.deepEqual(await page.locator('nav.tabs button').allInnerTexts(), ['会話', '今週の提案', 'いまの状態', 'ミラー', '設定']);
+  await page.locator('[data-tab=checkin]').click();
+  await page.getByText('今日の会話はありません').waitFor();
+
+  // 見送りの理由
+  await page.locator('[data-tab=plan]').click();
+  const nOpt = await page.locator('[data-opt]').count();
+  assert.ok(nOpt >= 1 && nOpt <= 3, `提案は1〜3案（${nOpt}）`);
+  assert.match(await page.locator('[data-opt="0"]').innerText(), /見込み（0〜100の点数での差）：推し疲れ/);
   await shot(page, 'plan');
-  await page.locator('[data-opt]').first().getByRole('button', { name: 'これを1週間ためす' }).click();
-  await page.locator('[data-opt].sel').waitFor();
+  await page.locator('#skip').click();
+  await page.locator('#skip-reasons').waitFor();
+  await page.locator('[data-reason=busy]').click();
+  st = await state(page);
+  assert.equal(st.proposals[0].skipped, true); assert.equal(st.proposals[0].skipReason, 'busy');
+  step('見送り＋理由コードを保存（見送ってもチェックインは続く）');
 
-  await page.locator('nav.tabs button[data-tab=mirror]').click();
-  await page.locator('.col.a').waitFor();
-  const aTxt = await page.locator('.col.a').innerText(), bTxt = await page.locator('.col.b').innerText();
-  assert.match(aTxt, /今のまま/); assert.match(bTxt, /提案どおり/); assert.match(aTxt + bTxt, /20人中\d+人が疲れ高め/);
-  const fa = +(/推し疲れ\s*([\d.]+)/.exec(aTxt)[1]), fb = +(/推し疲れ\s*([\d.]+)/.exec(bTxt)[1]);
-  assert.ok(fb < fa, '提案どおりの方が疲れの見込みが低い');
+  // 作り直して、1案を選ぶ
+  await page.locator('[data-tab=me]').click();
+  await page.locator('#dev-demo').click();
+  await page.locator('[data-tab=plan]').click();
+  await page.locator('[data-opt="0"] button', { hasText: 'これを1週間ためす' }).click();
+  st = await state(page);
+  assert.equal(st.proposals[0].chosen, 0);
+  assert.ok(st.proposals[0].forecast.B.BO.lo <= st.proposals[0].forecast.B.BO.hi);
+
+  // ミラー
+  await page.locator('[data-tab=mirror]').click();
+  assert.equal(await page.locator('[data-path=A] .dots i').count(), 20);
+  assert.equal(await page.locator('[data-path=B] .dots i').count(), 20);
   await shot(page, 'mirror');
-  step(`みらいミラー：疲れの見込み 今のまま ${fa} → 提案どおり ${fb}`);
 
-  // ---------- いまの状態（レーダーと数値・根拠）
-  await page.locator('nav.tabs button[data-tab=state]').click();
-  await page.locator('[data-section=stress] svg').waitFor();
-  const stress = +(await page.locator('#stress-num').innerText());
-  const who5 = +(await page.locator('#who5-num').innerText());
-  assert.ok(stress >= 0 && stress <= 100); assert.equal(who5, 56, 'WHO-5 素点14 × 4');
-  assert.equal(await page.locator('[data-section=stress] svg text').count() >= 10, true, 'レーダーの軸ラベルと値');
-  await shot(page, 'state_top');
-  // 根拠は最初は閉じていて、ボタンで開く
-  const why = page.locator('#why-stress');
-  assert.equal(await why.isHidden(), true);
-  await page.locator('[data-why=stress]').click();
-  assert.equal(await why.isVisible(), true);
-  const whyText = await why.innerText();
-  assert.match(whyText, /計算式/); assert.match(whyText, /あなたの入力値と計算/); assert.match(whyText, /注意・限界/);
-  await page.locator('[data-why=stress]').scrollIntoViewIfNeeded();
-  await shot(page, 'state_why_stress');
-  await page.locator('[data-why=ax-money]').click();
-  const mt = await page.locator('#why-ax-money').innerText();
-  assert.match(mt, /使ってよい額：月 30,000円/);
-  await page.locator('[data-why=who5]').click();
-  assert.match(await page.locator('#why-who5').innerText(), /3 ＋ 3 ＋ 2 ＋ 3 ＋ 3 ＝ 14（素点）[\s\S]*14 × 4 ＝ 56/);
-  await page.locator('[data-why=who5]').scrollIntoViewIfNeeded();
-  await shot(page, 'state_why_who5');
-  // 表示された数字と、根拠の中の計算結果が一致する
-  const stressWhy = await page.locator('#why-stress').innerText();
-  assert.ok(stressWhy.includes(`＝ ${stress}`), '総合値が根拠の計算結果と一致');
-  step(`いまの状態：ストレス ${stress}/100、WHO-5 ${who5}/100、根拠ボタンで計算式・入力値・限界が開く`);
+  // いまの状態（数値は手計算：推し疲れ (3+3+4+4)/4=3.5 → 63、効果 (4+3+2+2)/4=2.75 → 44、費用 2÷(12.5−7.5)=40%）
+  await page.locator('[data-tab=state]').click();
+  assert.equal(await page.locator('#bo-num').innerText(), '63');
+  assert.equal(await page.locator('#wb-num').innerText(), '44');
+  assert.equal(await page.locator('#money-num').innerText(), '40');
+  assert.equal(await page.locator('[data-section=bo] svg').count(), 1, 'レーダーチャート');
+  assert.equal(await page.locator('#why-bo').isHidden(), true);
+  await page.locator('[data-why=bo]').click();
+  assert.equal(await page.locator('#why-bo').isVisible(), true);
+  assert.match(await page.locator('#why-bo').innerText(), /計算式[\s\S]*予備調査215名/);
+  await shot(page, 'state-open');
+  await page.locator('[data-why=ax-b_sleep]').click();
+  assert.match(await page.locator('#why-ax-b_sleep').innerText(), /あなたの回答：3/);
+  step('いまの状態：数値が手計算と一致、根拠ボタンで計算式・入力値が開く');
 
-  // 群A・Bの画面には「いまの状態」を出さない
-  await page.locator('nav.tabs button[data-tab=me]').click();
-  await page.locator('[data-group=B]').click();
-  assert.deepEqual(await page.locator('nav.tabs button').allInnerTexts(), ['記録', '今週の提案', '設定']);
-  await page.locator('nav.tabs button[data-tab=plan]').click();
-  const planB = await page.locator('main').innerText();
-  assert.ok(!/充実\s*\d\.\d|20人中/.test(planB), '群Bの提案には予測値を出さない');
-  step('群Bの画面：提案の文章だけで、予測値・状態画面は出ない');
+  // ---------- 1週間進めて、チェックイン → 実行の確認 → 理由
+  await page.locator('[data-tab=me]').click();
+  await page.locator('#dev-d7').click();
+  await page.locator('[data-tab=checkin]').click();
+  await page.getByText('3回目のチェックインです').waitFor();
+  await answerAll(page, async () => (await state(page)).survey.weekly.length === 3);
+  await page.getByText('実行できましたか？').waitFor();
+  await page.locator('.composer .chip', { hasText: 'できなかった' }).click();
+  await page.locator('.composer .chip', { hasText: '時間がなかった' }).click();
+  st = await state(page);
+  assert.equal(st.proposals[0].exec, 0); assert.equal(st.proposals[0].execReason, 'time');
+  await shot(page, 'exec');
+  await page.locator('[data-tab=mirror]').click();
+  await page.locator('[data-check]').first().waitFor();
+  const exp = JSON.parse(await page.evaluate(() => window.OF.store.exportData(window.OF.app.state)));
+  assert.equal(exp.weekly.length, 3); assert.equal(exp.proposals[0].execReason, 'time');
+  assert.ok(!JSON.stringify(exp).includes('"text"'), '書き出しに本文はない');
+  step('1週間後：チェックイン → 実行できなかった理由を保存 → 答え合わせ → 書き出し');
 
-  assert.deepEqual(errors, [], 'ブラウザのエラーなし: ' + errors.join(' | '));
-  console.log('\nE2E OK  スクリーンショット →', OUT);
+  // ---------- 安全層：強い言葉
+  const ctx2 = await browser.newContext({ viewport: { width: 390, height: 780 } });
+  const p2 = await ctx2.newPage();
+  p2.on('pageerror', (e) => errors.push(e.message));
+  await p2.goto(URL);
+  await p2.locator('#consent-yes').click();
+  await p2.locator('#avatar-done').click();
+  await who5(p2, ['まったくない', 'まったくない', 'まったくない', 'ほんのたまに', 'ほんのたまに']);
+  await p2.locator('.res').waitFor();                                            // WHO-5 素点2 → 相談先
+  await p2.locator('#inp').fill('もう消えたい');
+  await p2.locator('#send').click();
+  await p2.getByText('いま、話せる場所があります').waitFor();
+  const s2 = await state(p2);
+  assert.ok(s2.distress.some((d) => d.kind === 'who5-low') && s2.distress.some((d) => d.kind === 'text-severe'));
+  assert.equal(await p2.locator('#inp').count(), 0, '強い言葉のあとは入力欄を閉じる');
+  await shot(p2, 'safety');
+  step('安全層：WHO-5低得点・強い言葉で相談先を表示し、会話を止める');
+
+  assert.deepEqual(errors, [], 'コンソールエラーなし: ' + errors.join(' / '));
   await browser.close();
-})().catch((e) => { console.error('\nE2E FAILED:', e.message); process.exit(1); });
+  console.log(`OK（スクリーンショット ${n} 枚 → ${OUT}）`);
+})().catch((e) => { console.error(e); process.exit(1); });

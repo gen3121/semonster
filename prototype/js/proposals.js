@@ -1,33 +1,27 @@
-// 提案づくり: 5活動のうち最大2つを ±1段階動かした候補を予測し、本人の希望を守る案だけを残して3案にする。
+// 提案づくり: 4つの頻度のうち最大2つを ±1段階動かした候補を、モデルで比べる。
+// 「理想のほうが多い」と答えた活動は減らさず、「理想のほうが少ない」活動は増やさない。
+// 数値は、予備調査の関連にもとづく見込み（効果の保証ではない）。
 (function () {
   const M = typeof module !== 'undefined' ? require('./model.js') : window.OF.model;
+  const I = typeof module !== 'undefined' ? require('./instrument.js') : window.OF.instrument;
   const api = {};
 
-  const MESSAGES = {
-    live: { up: 'ライブ・現場を、もう1段階ふやす', down: 'ライブ・現場を、1段階へらす' },
-    goods: { up: 'グッズ・課金の枠を、1段階ふやす', down: 'グッズは「まとめ買いの日」を決めて、使う額を1段階へらす' },
-    stream: { up: '配信・動画を、1段階ふやす', down: '配信は、リアルタイムを減らしてアーカイブで見る（1段階へらす）' },
-    sns: { up: 'SNSを、1段階ふやす', down: '夜のSNS・タイムラインを、1段階へらす' },
-    late: { up: '夜更かしの日を、1段階ふやす', down: '夜更かしの日を、1段階へらす（寝る時刻の目標を決める）' },
-  };
-  api.describe = (changes) => changes.map((c) => MESSAGES[c.key][c.dir > 0 ? 'up' : 'down']);
+  api.wishes = (ans) => Object.fromEntries(I.ACTIVITIES.map((a) => [a.key, ans[a.ideal] > ans[a.cur] ? 'more' : ans[a.ideal] < ans[a.cur] ? 'less' : 'same']));
 
-  // wishes: { live:'more'|'same'|'less', ... }
-  api.candidates = function (habit, wishes) {
-    const acts = M.ACTIVITIES;
-    const step = (key, dir) => {
-      const lv = acts.find((a) => a.key === key).levels.length - 1;
-      const next = habit.levels[key] + dir;
-      return next < 0 || next > lv ? null : next;
-    };
-    const allowed = (key, dir) => {
-      const w = (wishes && wishes[key]) || 'same';
-      if (dir < 0 && w === 'more') return false;   // 増やしたい活動は減らさない
-      if (dir > 0 && w === 'less') return false;   // 減らしたい活動は増やさない
-      return step(key, dir) != null;
-    };
+  api.describe = (changes) => changes.map((c) => {
+    const a = I.ACTIVITIES.find((x) => x.key === c.key);
+    return `${a.label}の頻度を、1段階${c.dir > 0 ? 'ふやす' : 'へらす'}`;
+  });
+
+  api.candidates = function (x, wishes) {
     const singles = [];
-    for (const a of acts) for (const dir of [-1, 1]) if (allowed(a.key, dir)) singles.push({ key: a.key, dir });
+    for (const a of I.ACTIVITIES) for (const dir of [-1, 1]) {
+      const w = wishes[a.key] || 'same', next = x[a.cur] + dir;
+      if (next < 1 || next > 5) continue;
+      if (dir < 0 && w === 'more') continue;
+      if (dir > 0 && w === 'less') continue;
+      singles.push({ key: a.key, dir });
+    }
     const out = [];
     for (let i = 0; i < singles.length; i++) {
       out.push([singles[i]]);
@@ -36,41 +30,37 @@
     return out;
   };
 
-  api.apply = function (habit, changes) {
-    const levels = { ...habit.levels };
-    for (const c of changes) levels[c.key] += c.dir;
-    return levels;
+  api.apply = (x, changes) => {
+    const y = { ...x };
+    for (const c of changes) y[I.ACTIVITIES.find((a) => a.key === c.key).cur] += c.dir;
+    return y;
   };
 
-  api.generate = function (logs, today, wishes) {
-    const habit = M.habitFromLogs(logs, today, 14);
-    const base = M.forecast(logs, today, habit.levels);
-    const evald = api.candidates(habit, wishes).map((ch) => {
-      const f = M.forecast(logs, today, api.apply(habit, ch));
-      return { changes: ch, joy: f.joy.mean, fatigue: f.fatigue.mean, dJoy: f.joy.mean - base.joy.mean, dFatigue: f.fatigue.mean - base.fatigue.mean };
-    }).filter((c) => c.dFatigue < -0.02);       // 疲れが下がる案だけ
-    // パレート最適（疲れが低く、楽しさが高いほど良い）
-    const front = evald.filter((a) => !evald.some((b) => b !== a && b.fatigue <= a.fatigue && b.joy >= a.joy && (b.fatigue < a.fatigue || b.joy > a.joy)));
+  api.generate = function (survey, ans) {
+    const x = M.inputs(survey);
+    if (!x) return { x: null, options: [], candidateCount: 0 };
+    const wishes = api.wishes(survey.baseline.answers);
+    const evald = api.candidates(x, wishes).map((ch) => {
+      const x2 = api.apply(x, ch);
+      const wb = M.diff(x, x2, 'WB'), bo = M.diff(x, x2, 'BO');
+      return { changes: ch, dWB: wb.delta, dBO: bo.delta, seWB: wb.se, seBO: bo.se };
+    }).filter((c) => c.dBO < -0.005);                 // 推し疲れが下がる見込みの案だけ
+    const front = evald.filter((a) => !evald.some((b) => b !== a && b.dBO <= a.dBO && b.dWB >= a.dWB && (b.dBO < a.dBO || b.dWB > a.dWB)));
     const pool = front.length ? front : evald;
     const pick = [];
-    const sig = (c) => c.changes.map((x) => x.key + x.dir).sort().join();
+    const sig = (c) => c.changes.map((k) => k.key + k.dir).sort().join();
     const take = (label, id, sorter, filter = () => true) => {
-      // まずパレート最適な案から、なければ疲れが下がる案すべてから、まだ選んでいない案を取る
       for (const set of [pool, evald]) {
-        const c = [...set].filter((x) => filter(x) && !pick.some((p) => sig(p) === sig(x))).sort(sorter)[0];
+        const c = [...set].filter((v) => filter(v) && !pick.some((p) => sig(p) === sig(v))).sort(sorter)[0];
         if (c) { pick.push({ id, label, ...c, texts: api.describe(c.changes) }); return; }
       }
     };
-    // ③ 回復重視: 疲れが最も下がる（楽しさは少し下がってもよい）
-    take('③ 回復重視型', 'recover', (a, b) => a.fatigue - b.fatigue);
-    // ① 楽しさキープ: 楽しさがほぼ下がらず、楽しさの予測が最も高い
-    take('① 楽しさキープ型', 'keep', (a, b) => b.joy - a.joy, (c) => c.dJoy >= -0.05);
-    // ② バランス: 楽しさの変化 − 疲れの変化 が最大
-    take('② バランス型', 'balance', (a, b) => (b.dJoy - b.dFatigue) - (a.dJoy - a.dFatigue));
-    pick.sort((x, y) => x.label.localeCompare(y.label));
-    return { habit, base, options: pick, candidateCount: evald.length };
+    take('③ 回復重視型', 'recover', (a, b) => a.dBO - b.dBO);                                   // 推し疲れが最も下がる
+    take('① 楽しさキープ型', 'keep', (a, b) => b.dWB - a.dWB, (c) => c.dWB >= -0.03);           // 幸福度がほぼ下がらない
+    take('② バランス型', 'balance', (a, b) => (b.dWB - b.dBO) - (a.dWB - a.dBO));
+    pick.sort((p, q) => p.label.localeCompare(q.label));
+    return { x, wishes, options: pick, candidateCount: evald.length };
   };
 
-  if (typeof module !== 'undefined') module.exports = api;
-  else window.OF.proposals = api;
+  if (typeof module !== 'undefined') module.exports = api; else window.OF.proposals = api;
 })();

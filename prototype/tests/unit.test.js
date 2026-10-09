@@ -1,140 +1,277 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const I = require('../js/instrument.js');
+const T = require('../js/topics.js');
 const X = require('../js/extract.js');
+const R = require('../js/reader.js');
+const IV = require('../js/interview.js');
 const S = require('../js/safety.js');
 const M = require('../js/model.js');
 const P = require('../js/proposals.js');
-const T = require('../js/tipi.js');
+const TP = require('../js/tipi.js');
 const W = require('../js/who5.js');
 const U = require('../js/util.js');
 const SD = require('../js/state.js');
 const RD = require('../js/radar.js');
+const ST = require('../js/store.js');
 
-const pick = (r) => ({ live: r.live, goods: r.goodsYen, stream: r.streamMin, sns: r.snsMin, sleep: r.sleepImpact });
-
-test('extract: 配信とSNSの時間を振り分ける', () => {
-  assert.deepEqual(pick(X.extractLog('夜に配信を2時間くらい見て、そのあとXもだらだら1時間。グッズは買ってない。寝るの遅くなった。')),
-    { live: null, goods: 0, stream: 120, sns: 60, sleep: 1 });
-  assert.deepEqual(pick(X.extractLog('配信2時間とSNS30分。ちゃんと寝た。')), { live: null, goods: null, stream: 120, sns: 30, sleep: 0 });
+// ---------------------------------------------------------------- 質問紙の定義
+test('instrument: 初回は39項目、毎週は12項目で、話題の項目と一致する', () => {
+  assert.equal(I.BLOCKS.baseline.length, 39);
+  assert.equal(I.BLOCKS.weekly.length, 12);
+  for (const k of ['baseline', 'weekly']) {
+    const ids = T.SEQ[k].flatMap((t) => T.itemsOf(t));
+    assert.deepEqual([...ids].sort(), [...I.BLOCKS[k]].sort());
+    assert.equal(new Set(ids).size, ids.length, '項目が2つの話題に重ならない');
+  }
+  for (const f of M.MODEL.features) assert.ok(f === 'avatar' || I.ITEMS[f], f + ' が質問紙の項目にある');
+  assert.equal(I.TIPI.length, 10);
 });
-test('extract: ライブ配信はライブ参加として数えない', () => {
-  const r = X.extractLog('ライブ配信を3時間見た。スパチャ5千円。深夜2時まで起きてた');
-  assert.equal(r.live, null); assert.equal(r.streamMin, 180); assert.equal(r.goodsYen, 5000); assert.equal(r.sleepImpact, 1);
-});
-test('extract: 現場に行った・金額の単位・漢数字', () => {
-  const r = X.extractLog('ライブに行ってきた！グッズに8千円使った。帰りが遅くて寝不足');
-  assert.equal(r.live, 1); assert.equal(r.goodsYen, 8000); assert.equal(r.sleepImpact, 1);
-  assert.equal(X.extractLog('三千円課金した。二時間配信見てた').goodsYen, 3000);
-  assert.equal(X.extractLog('グッズに1.5万円使った').goodsYen, 15000);
-  assert.equal(X.extractLog('現場には行ってない').live, 0);
-  assert.equal(X.extractLog('徹夜で配信を見た').sleepImpact, 2);
-});
-test('extract: 楽しさ・疲れは口調から推定せず、明示された数字だけ', () => {
-  const r = X.extractLog('すごく楽しかったけど、めちゃくちゃ疲れた');
-  assert.equal(r.joy, null); assert.equal(r.fatigue, null);
-  const r2 = X.extractLog('楽しさ4 疲れ2');
-  assert.equal(r2.joy, 4); assert.equal(r2.fatigue, 2);
-});
-test('extract: 何も取れない文は全部 null（聞き返しになる）', () => {
-  const r = X.extractLog('今日は何もしてない');
-  assert.deepEqual(pick(r), { live: null, goods: null, stream: null, sns: null, sleep: null });
-  assert.deepEqual(X.missingFields(r), ['sleep', 'time', 'goods', 'live']);
-});
-test('parseAnswer: 各項目の返事', () => {
-  assert.deepEqual(X.parseAnswer('rating', '4と2'), { value: { joy: 4, fatigue: 2 } });
-  assert.deepEqual(X.parseAnswer('sleep', '少し'), { value: 1 });
-  assert.deepEqual(X.parseAnswer('sleep', 'かなり'), { value: 2 });
-  assert.deepEqual(X.parseAnswer('live', '行ってない'), { value: 0 });
-  assert.deepEqual(X.parseAnswer('live', '行った'), { value: 1 });
-  assert.deepEqual(X.parseAnswer('goods', '5千円くらい'), { value: 5000 });
-  assert.deepEqual(X.parseAnswer('goods', '0円'), { value: 0 });
-  assert.deepEqual(X.parseAnswer('time', '配信2時間、SNS1時間'), { value: { stream: 120, sns: 60 } });
-  assert.deepEqual(X.parseAnswer('time', '2時間と30分'), { value: { stream: 120, sns: 30 } });
-  assert.deepEqual(X.parseAnswer('time', 'どっちも見てない'), { value: { stream: 0, sns: 0 } });
-  assert.deepEqual(X.parseAnswer('facet', '義務感'), { value: 'duty' });
-  assert.deepEqual(X.parseAnswer('sleep', 'わからない'), { unknown: true });
-  assert.equal(X.parseAnswer('rating', 'うーん'), null);
+test('instrument: 選択式の項目は上限が昇順で、最後が上の端', () => {
+  for (const id of ['income', 'expense', 'spend', 'free_wd', 'free_hd']) {
+    const v = I.ITEMS[id].options.filter((o) => o[1] != null);
+    const his = v.map((o) => o[2]);
+    assert.equal(his[his.length - 1], null, id);
+    his.slice(0, -1).forEach((x, i) => { if (i) assert.ok(x > his[i - 1], id); });
+  }
 });
 
-test('safety: 強い言葉・つらさ・連続する強い疲れ・WHO-5', () => {
+// ---------------------------------------------------------------- 規則での読み取り
+test('extract: 尺度の言葉を1〜5に読む（あいまいなら null）', () => {
+  const a = (t) => X.parseLikert('agree', t), f = (t) => X.parseLikert('freq', t);
+  assert.deepEqual(a('4'), { value: 4 });
+  assert.deepEqual(a('やや当てはまる'), { value: 4 });
+  assert.deepEqual(a('あまり当てはまらない'), { value: 2 });
+  assert.deepEqual(a('全然ない'), { value: 1 });
+  assert.deepEqual(a('かなりある'), { value: 5 });
+  assert.deepEqual(a('どちらでもない'), { value: 3 });
+  assert.equal(a('ないです'), null, '「ない」だけでは 1 か 2 か決めない');
+  assert.equal(a('うーん'), null);
+  assert.deepEqual(a('わからない'), { unknown: true });
+  assert.deepEqual(f('ほとんどしない'), { value: 1 });
+  assert.deepEqual(f('毎日'), { value: 5 });
+  assert.deepEqual(f('たまに行く'), { value: 3 });
+  assert.deepEqual(f('とてもよくする'), { value: 5 });
+  assert.deepEqual(f('よくする'), { value: 4 });
+  assert.equal(f('3日'), null);
+});
+test('extract: お金・時間は範囲のどこに入るかで選ぶ。境目は上の範囲', () => {
+  const c = (id, t) => X.parseChoice(I.ITEMS[id], t);
+  assert.deepEqual(c('income', '月12万円くらい'), { value: '10〜15万円' });
+  assert.deepEqual(c('income', '10万'), { value: '10〜15万円' });
+  assert.deepEqual(c('spend', '3000円'), { value: '5,000円未満' });
+  assert.deepEqual(c('spend', '0円'), { value: '0円' });
+  assert.deepEqual(c('spend', '2万円'), { value: '1万円〜3万円' });
+  assert.deepEqual(c('expense', 'なし'), { value: '負担なし' });
+  assert.deepEqual(c('free_wd', '90分'), { value: '2〜3時間' });
+  assert.deepEqual(c('free_hd', '6時間'), { value: '6時間以上' });
+  assert.deepEqual(c('income', '答えたくない'), { value: '回答しない' });
+  assert.equal(c('spend', '12'), null, '単位のない数字は決めない');
+});
+
+// ---------------------------------------------------------------- AI読み取りの受け取り側
+test('reader: サーバーの返事を検証する（範囲外・未知の項目・選択肢の番号）', () => {
+  const ok = R.normalizeResponse('burden', { ok: true, answers: { b_sleep: { value: 4, evidence: '夜更かし' }, b_money: { value: 9, evidence: 'x' }, b_duty: { value: null }, b_envy: { value: 2.5 }, zzz: { value: 3 } } });
+  assert.deepEqual(Object.keys(ok), ['b_sleep']);
+  assert.equal(ok.b_sleep.src, 'llm');
+  const lim = R.normalizeResponse('limits', { ok: true, answers: { income: { value: 2, evidence: '12万' }, spend: { value: 99 } } });
+  assert.equal(lim.income.value, '10〜15万円');
+  assert.equal(lim.spend, undefined);
+  assert.equal(R.normalizeResponse('burden', { ok: false }), null);
+});
+const fakeFetch = (json, status = 200) => async () => ({ ok: status === 200, status, json: async () => json });
+test('reader: 失敗（HTTPエラー・通信エラー）は理由つきで空を返す', async () => {
+  assert.equal((await R.readTopic('burden', 'x', { fetch: fakeFetch({}, 502) })).fallback, 'http_502');
+  assert.equal((await R.readTopic('burden', 'x', { fetch: async () => { throw new Error('down'); } })).fallback, 'network');
+  assert.equal((await R.readTopic('burden', 'x', { fetch: fakeFetch({ ok: true }) })).fallback, 'bad_response');
+});
+
+// ---------------------------------------------------------------- 会話の進行
+const ALL3 = (iv, id, v) => IV.tap(iv, id, v);
+test('interview: ボタンだけで初回の39項目を答えきる。ボタンの値は tap として確定する', () => {
+  const iv = IV.create('baseline');
+  let guard = 0;
+  while (!IV.done(iv) && guard++ < 100) {
+    const v = IV.view(iv);
+    assert.equal(v.kind, 'ask');
+    IV.tap(iv, v.item.id, v.item.type === 'choice' ? v.item.options[1][0] : 4);
+  }
+  assert.equal(Object.keys(iv.answers).length, 39);
+  assert.ok(Object.values(iv.src).every((x) => x === 'tap'));
+});
+test('interview: 文章で答えると確認を通る。直すと +edit が付く', async () => {
+  const iv = IV.create('weekly');                       // 最初は現状の頻度（音楽・動画）
+  assert.equal(IV.view(iv).item.id, 'cur_media');
+  const r = await IV.text(iv, 'ほとんどしない');
+  assert.equal(r.ok, true);
+  assert.equal(IV.view(iv).kind, 'confirm');
+  assert.equal(iv.answers.cur_media, undefined, '確認の前は確定しない');
+  IV.edit(iv, 'cur_media', 2);
+  IV.confirm(iv);
+  assert.equal(iv.answers.cur_media, 2);
+  assert.equal(iv.src.cur_media, 'rules+edit');
+  const r2 = await IV.text(iv, 'うーん');
+  assert.equal(r2.ok, false);
+  assert.equal(IV.view(iv).item.id, 'cur_live', '読み取れなければ同じ項目のまま');
+});
+test('interview: AI読み取りで話題をまとめて埋める → 確認 → 残りだけを1つずつ聞く', async () => {
+  const iv = IV.create('weekly', { llm: true, answers: { cur_media: 4, cur_live: 3, cur_goods: 3, cur_sns: 4 } });
+  assert.equal(IV.view(iv).kind, 'open');               // 話題 burden の自由記述
+  const fetch = fakeFetch({ ok: true, answers: { b_sleep: { value: 5, evidence: '徹夜' }, b_money: { value: 2, evidence: 'お金は大丈夫' }, b_duty: { value: null, evidence: null }, b_envy: { value: null, evidence: null } } });
+  const r = await IV.text(iv, '徹夜で配信を見た。お金は大丈夫', { fetch });
+  assert.equal(r.ok, true);
+  const v = IV.view(iv);
+  assert.equal(v.kind, 'confirm');
+  assert.deepEqual(v.rows.map((x) => x.id), ['b_sleep', 'b_money']);
+  IV.edit(iv, 'b_money', 3);
+  IV.confirm(iv);
+  assert.deepEqual([iv.src.b_sleep, iv.src.b_money], ['llm', 'llm+edit']);
+  const nxt = IV.view(iv);
+  assert.equal(nxt.kind, 'ask'); assert.equal(nxt.item.id, 'b_duty');
+});
+test('interview: AI読み取りが失敗したら、ひとつずつ聞く方へ戻る', async () => {
+  const iv = IV.create('weekly', { llm: true, answers: { cur_media: 4, cur_live: 3, cur_goods: 3, cur_sns: 4 } });
+  const r = await IV.text(iv, '寝不足', { fetch: fakeFetch({}, 503) });
+  assert.equal(r.ok, false); assert.equal(r.hint, 'fallback');
+  assert.equal(IV.view(iv).kind, 'ask');
+});
+test('interview: 途中から再開できる／毎週は12項目だけ', () => {
+  const iv = IV.create('baseline', { answers: Object.fromEntries(I.BLOCKS.baseline.slice(0, 35).map((id) => [id, 3])) });
+  assert.equal(IV.progress(iv).done, 35);
+  const wk = IV.create('weekly');
+  assert.equal(IV.progress(wk).total, 12);
+});
+
+// ---------------------------------------------------------------- 安全層
+test('safety: 強い言葉・負担が続く・WHO-5', () => {
   assert.equal(S.detectText('もう消えたい'), 'severe');
   assert.equal(S.detectText('今日は楽しかった'), null);
   assert.equal(S.detectText('もう無理'), 'heavy');
-  assert.equal(S.detectStreak([{ fatigue: 5 }, { fatigue: 5 }, { fatigue: 5 }]), true);
-  assert.equal(S.detectStreak([{ fatigue: 5 }, { fatigue: 4 }, { fatigue: 5 }]), false);
+  assert.equal(S.detectBurden([3, 4.5, 5]), true);
+  assert.equal(S.detectBurden([5, 4]), false);
+  assert.equal(S.detectBurden([5]), false);
   assert.equal(S.detectWho5(12), true); assert.equal(S.detectWho5(13), false);
 });
 
-const mkLogs = (n, over = {}) => Array.from({ length: n }, (_, i) => ({ date: U.addDays('2026-11-02', i), live: 0, goodsYen: 500, streamMin: 150, snsMin: 180, sleepImpact: 1, joy: 4, fatigue: 3.8, ...over }));
-test('model: 記録が増えると予測の幅がせまくなる', () => {
-  const lv = M.habitFromLogs(mkLogs(14), '2026-11-15').levels;
-  const sd = (n) => M.forecast(mkLogs(n), U.addDays('2026-11-02', n - 1), lv).fatigue.sd;
-  assert.ok(sd(1) > sd(7) && sd(7) > sd(14) && sd(14) > sd(28));
+// ---------------------------------------------------------------- 予測モデル
+const ANS = { ...Object.fromEntries(I.BLOCKS.baseline.map((id) => [id, 3])), cur_media: 4, cur_live: 3, cur_goods: 3, cur_sns: 5, ideal_media: 4, ideal_live: 4, ideal_goods: 3, ideal_sns: 3,
+  b_sleep: 4, b_money: 3, b_duty: 4, b_envy: 4, w_ikigai: 4, w_confidence: 3, w_schedule: 2, w_create: 2,
+  income: '10〜15万円', expense: '5〜10万円', spend: '1万円〜3万円', free_wd: '2〜3時間', free_hd: '4〜5時間' };
+const survey = (n = 2, over = {}) => ({ baseline: { date: '2026-11-02', answers: { ...ANS } }, weekly: Array.from({ length: n }, (_, i) => ({ date: U.addDays('2026-11-02', 7 * (i + 1)), answers: { ...ANS, ...over } })), draft: null });
+
+test('model: 予測の平均は 切片＋係数×入力 で、画面に出す式と一致する', () => {
+  const x = M.inputs(survey());
+  assert.ok(x);
+  for (const y of ['WB', 'BO']) {
+    const o = M.MODEL.outcomes[y];
+    const manual = o.intercept + M.MODEL.features.reduce((s, f) => s + o.coef[f] * x[f], 0);
+    assert.ok(Math.abs(M.predictMean(x, y) - manual) < 1e-12);
+  }
+  assert.equal(x.avatar, 3);
 });
-test('model: 80%区間が平均を含み、1〜5に収まる。20点は昇順に並ぶ', () => {
-  const lg = mkLogs(14), lv = M.habitFromLogs(lg, '2026-11-15').levels;
-  const f = M.forecast(lg, '2026-11-15', lv);
-  for (const o of ['joy', 'fatigue']) { assert.ok(f[o].lo <= f[o].mean && f[o].mean <= f[o].hi); assert.ok(f[o].lo >= 1 && f[o].hi <= 5); }
-  assert.equal(f.fatigue.dots.length, 20);
-  assert.ok(f.highCount >= 0 && f.highCount <= 20);
+test('model: 80%の幅は平均を含み1〜5に収まる。チェックインが増えると個人差の不確かさが減る', () => {
+  const x = M.inputs(survey());
+  const f = M.forecast(survey(2), x);
+  for (const y of ['WB', 'BO']) { assert.ok(f[y].lo <= f[y].mean && f[y].mean <= f[y].hi); assert.ok(f[y].lo >= 1 && f[y].hi <= 5); assert.equal(f[y].dots.length, 20); }
+  const sd = (n) => M.forecast(survey(n), x).BO.sd;
+  assert.ok(sd(1) > sd(3) && sd(3) > sd(6));
 });
-test('model: 個人差の更新は、実際が予測より疲れているほど上に動く', () => {
-  const lo = M.forecast(mkLogs(14, { fatigue: 2 }), '2026-11-15', M.habitFromLogs(mkLogs(14), '2026-11-15').levels).fatigue.mean;
-  const hi = M.forecast(mkLogs(14, { fatigue: 5 }), '2026-11-15', M.habitFromLogs(mkLogs(14), '2026-11-15').levels).fatigue.mean;
+test('model: 実際の回答が予測より重いほど、個人差の補正が上に動く', () => {
+  const x = M.inputs(survey(2));
+  const lo = M.forecast(survey(3, { b_sleep: 1, b_money: 1, b_duty: 1, b_envy: 1 }), x).BO.mean;
+  const hi = M.forecast(survey(3, { b_sleep: 5, b_money: 5, b_duty: 5, b_envy: 5 }), x).BO.mean;
   assert.ok(hi > lo + 0.3);
 });
-test('proposals: 増やしたいは減らさない・減らしたいは増やさない／疲れが下がる案だけ／3案までで重複なし', () => {
-  const lg = mkLogs(14, { live: 0, sleepImpact: 1 });
-  const wishes = { live: 'more', goods: 'same', stream: 'more', sns: 'less', late: 'same' };
-  const r = P.generate(lg, '2026-11-15', wishes);
+test('model: 頻度の差は向きを入れ替えると符号が逆で、ずれの大きさ(se)は同じ', () => {
+  const x = M.inputs(survey()), x2 = { ...x, cur_sns: x.cur_sns - 1 };
+  const a = M.diff(x, x2, 'BO'), b = M.diff(x2, x, 'BO');
+  assert.ok(Math.abs(a.delta + b.delta) < 1e-12);
+  assert.ok(Math.abs(a.se - b.se) < 1e-12 && a.se > 0);
+});
+test('proposals: 理想より少なくならない・理想より多くならない／負担が下がる案だけ／3案までで重複なし', () => {
+  const sv = survey();
+  const r = P.generate(sv);
   assert.ok(r.options.length >= 1 && r.options.length <= 3);
-  const ids = new Set();
+  const wishes = P.wishes(sv.baseline.answers);       // ライブは理想のほうが多い、SNSは理想のほうが少ない
+  assert.equal(wishes.live, 'more'); assert.equal(wishes.sns, 'less');
+  const sigs = new Set();
   for (const o of r.options) {
-    assert.ok(o.dFatigue < 0, o.label);
+    assert.ok(o.dBO < 0, o.label);
     for (const c of o.changes) { if (wishes[c.key] === 'more') assert.ok(c.dir > 0); if (wishes[c.key] === 'less') assert.ok(c.dir < 0); }
-    const sig = o.changes.map((c) => c.key + c.dir).sort().join(); assert.ok(!ids.has(sig)); ids.add(sig);
     assert.ok(o.changes.length <= 2);
+    const sig = o.changes.map((c) => c.key + c.dir).sort().join(); assert.ok(!sigs.has(sig)); sigs.add(sig);
   }
 });
+
+// ---------------------------------------------------------------- 性格・WHO-5
 test('tipi / who5 の得点', () => {
-  const sc = T.score([7, 1, 7, 1, 7, 1, 7, 1, 7, 1]);
-  assert.deepEqual(sc, { extraversion: 7, agreeableness: 7, conscientiousness: 7, neuroticism: 1, openness: 7 }); // 神経症傾向 = (項目4 + 反転した項目9) / 2 = (1 + 1) / 2
+  assert.deepEqual(TP.score([5, 1, 5, 1, 5, 1, 5, 1, 5, 1]), { extraversion: 5, agreeableness: 5, conscientiousness: 5, neuroticism: 1, openness: 5 });
+  assert.equal(TP.fromAnswers({}), null);
   assert.equal(W.raw([5, 5, 5, 5, 5]), 25); assert.equal(W.raw([0, 0, 0, 0, 0]), 0);
 });
 
-const sampleState = (over = {}) => ({
-  logs: Array.from({ length: 14 }, (_, i) => ({ date: U.addDays('2026-11-02', i), live: 0, goodsYen: i % 7 >= 5 ? 6000 : 500, streamMin: 150, snsMin: 180, sleepImpact: i % 7 < 5 ? 1 : 0, joy: 4, fatigue: 4, mainFatigue: i % 2 ? 'duty' : 'sleep' })),
-  limits: { budgetYenMonth: 30000, hoursPerDay: 4 }, who5: [{ date: '2026-11-15', raw: 11, answers: [2, 2, 2, 3, 2] }], ...over });
-test('state: 各軸の値が、画面に出す計算式どおりに手計算と一致する', () => {
-  const r = SD.compute(sampleState(), '2026-11-15');
-  const ax = Object.fromEntries(r.axes.map((a) => [a.key, a.value]));
-  assert.equal(ax.sleep, 36);                       // 平均0.714 / 2 * 100
-  assert.equal(ax.money, 100);                      // 週14,500円 / 7,000円 → 上限100
-  assert.equal(ax.time, 100);                       // 5.5h / 4h → 上限100
-  assert.equal(ax.fatigue, 75);                     // (4-1)/4*100
-  assert.equal(ax.feeling, 50);                     // 7/14
-  assert.equal(r.stress.value, Math.round((36 + 100 + 100 + 75 + 50) / 5));
-  assert.equal(r.joy.value, 75);
-  assert.equal(r.who5.value, 44);                   // 11 * 4
+// ---------------------------------------------------------------- いまの状態
+test('state: 各軸と指標が、画面に出す計算式どおりに手計算と一致する', () => {
+  const s = { survey: survey(2), who5: [{ date: '2026-11-15', raw: 11, answers: [2, 2, 2, 3, 2] }] };
+  const r = SD.compute(s, '2026-11-16');
+  const ax = Object.fromEntries([...r.bo.axes, ...r.wb.axes].map((a) => [a.key, a.value]));
+  assert.deepEqual(ax, { b_sleep: 75, b_money: 50, b_duty: 75, b_envy: 75, w_ikigai: 75, w_confidence: 50, w_schedule: 25, w_create: 25 });
+  assert.equal(r.bo.value, Math.round((75 + 50 + 75 + 75) / 4));      // 68.75 → 69
+  assert.equal(r.wb.value, 44);                                        // (4+3+2+2)/4=2.75 → 43.75
+  assert.equal(r.money.value, 40);                                     // 2 ÷ (12.5 − 7.5) × 100
+  assert.equal(r.who5.value, 44);                                      // 11 × 4
+  for (const a of [...r.bo.axes, ...r.wb.axes]) assert.ok(a.percentile >= 0 && a.percentile <= 100);
 });
-test('state: 入力が足りない軸は null、4軸未満なら総合は出さない。根拠の文には実際の入力値が入る', () => {
-  const r = SD.compute(sampleState({ limits: null }), '2026-11-15');
-  assert.equal(r.axes.find((a) => a.key === 'money').value, null);
-  assert.equal(r.axes.find((a) => a.key === 'time').value, null);
-  assert.equal(r.stress.value, null);
-  const r2 = SD.compute(sampleState(), '2026-11-15');
-  assert.ok(r2.axes.find((a) => a.key === 'money').inputs.some((t) => t.includes('14,500円')));
-  assert.ok(r2.who5.inputs.some((t) => t.includes('2 ＋ 2 ＋ 2 ＋ 3 ＋ 2 ＝ 11')));
-  for (const a of [...r2.axes, r2.stress, r2.joy, r2.who5]) { assert.ok(a.formula && a.note && a.inputs.length); }
+test('state: 順位(%)は予備調査の分布から、独立に数え直した値と一致する', () => {
+  const r = SD.compute({ survey: survey(0), who5: [] }, '2026-11-02');
+  const sorted = M.NORMS.indices.BO.sorted;
+  const expect = Math.round(sorted.filter((v) => v <= 3.75 + 1e-9).length / sorted.length * 100);
+  assert.equal(r.bo.percentile, expect);
+  assert.ok(r.bo.inputs.some((t) => t.includes('3.8') || t.includes('3.75')));
+  for (const b of [r.bo, r.wb, r.money]) assert.ok(b.formula && b.note && b.inputs.length);
 });
-test('state: 記録が3日未満なら ready=false。直近14日より前の記録は使わない', () => {
-  assert.equal(SD.compute({ ...sampleState(), logs: sampleState().logs.slice(0, 2) }, '2026-11-03').ready, false);
-  const r = SD.compute(sampleState(), '2026-12-10');
-  assert.equal(r.days, 0);
+test('state: 回答が足りない指標は null。最初の会話の前は ready=false', () => {
+  const sv = survey(0); delete sv.baseline.answers.b_sleep;
+  assert.equal(SD.compute({ survey: sv, who5: [] }, '2026-11-02').bo.value, null);
+  assert.equal(SD.compute({ survey: { baseline: null, weekly: [] }, who5: [] }, '2026-11-02').ready, false);
+  const sv2 = survey(0); sv2.baseline.answers.income = '回答しない';
+  assert.equal(SD.compute({ survey: sv2, who5: [] }, '2026-11-02').money.value, null);
 });
+
+// ---------------------------------------------------------------- 保存・日程
+test('store: チェックインの時期・提案の週・WHO-5の時期・群の切り替え', () => {
+  const s = { startDate: '2026-11-02', survey: { baseline: null, weekly: [] }, who5: [], devOffsetDays: 0, group: 'C' };
+  s.devOffsetDays = U.daysBetween(new Date().toISOString().slice(0, 10), '2026-11-02');
+  const at = (d) => { s.devOffsetDays = U.daysBetween(U.ymd(new Date()), U.addDays('2026-11-02', d)); };
+  at(0);
+  assert.equal(ST.dueCheckin(s), 'baseline');
+  s.survey.baseline = { answers: {} };
+  assert.equal(ST.dueCheckin(s), null);
+  at(7); assert.equal(ST.dueCheckin(s), 'weekly');
+  s.survey.weekly.push({}); assert.equal(ST.dueCheckin(s), null);
+  assert.equal(ST.planWeek(s), null);
+  s.survey.weekly.push({}); assert.equal(ST.planWeek(s), 0);
+  s.survey.weekly.push({}, {}, {}); assert.equal(ST.planWeek(s), 3);
+  s.survey.weekly.push({}); assert.equal(ST.planWeek(s), null, '提案は4回分まで');
+  at(13); assert.equal(ST.effectiveGroup(s), 'A');
+  at(14); assert.equal(ST.effectiveGroup(s), 'C');
+  at(0); assert.equal(ST.whoDue(s), 0);
+  s.who5.push({ due: 0 }); assert.equal(ST.whoDue(s), undefined);
+  at(15); assert.equal(ST.whoDue(s), 14);
+});
+test('store: 書き出しに自由な文章（本文）は含まれない。見送り・実行の理由コードは含まれる', () => {
+  const s = { id: 'PTEST', group: 'B', startDate: '2026-11-02', aiReading: true, avatarSource: 'parts', survey: survey(2), who5: [], distress: [],
+    proposals: [{ week: 0, createdDate: '2026-11-16', chosen: null, skipped: true, skipReason: 'busy', exec: null, options: [{ id: 'keep', texts: ['SNSの頻度を、1段階へらす'], dWB: -0.01, dBO: -0.1, label: 'x', changes: [] }] }] };
+  const j = JSON.parse(ST.exportData(s));
+  assert.equal(j.proposals[0].skipReason, 'busy');
+  assert.ok(j.baseline.answers.b_sleep === 4 && j.weekly.length === 2);
+  assert.ok(!JSON.stringify(j).includes('text":"'));
+});
+
+// ---------------------------------------------------------------- 図
 test('radar: 値のない軸があると多角形を描かず、ラベルに値が入る', () => {
   const full = RD.svg([{ label: 'A', value: 50 }, { label: 'B', value: 80 }, { label: 'C', value: 20 }]);
   assert.ok(full.includes('<polygon') && full.includes('>80<'));
   const part = RD.svg([{ label: 'A', value: 50 }, { label: 'B', value: null }, { label: 'C', value: 20 }]);
-  assert.ok(part.includes('—') && part.split('<polygon').length === 4); // グリッド3本のみ
+  assert.ok(part.includes('—') && part.split('<polygon').length === 4);
 });

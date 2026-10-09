@@ -1,101 +1,95 @@
-// 予測モデル（試作用）。
-// ★ 係数は予備調査の実測値ではなく、試作を動かすための仮の値（PLACEHOLDER）。
-//   実験前に、予備調査215名から作った v1.0 の係数に data/model_v1.json を差し替えること。
-// 個人補正は、モデルの予測と本人の記録のずれを正規分布で更新する（ベイズ更新）。
+// 予測モデル v1.0（予備調査215名のリッジ回帰。係数は data/model_v1.json、作り方は analysis/README.md）。
+// 入力: 現状の頻度4つ・アバター意識（3項目の平均）・スイッチ5項目。出力: 幸福度（WB）・推し疲れ（BO）の指標（1〜5）。
+// ※ 横断データの「関連」にもとづく見込みで、頻度を変えたときの効果ではない。
+// 個人差の更新: 本人の回答とモデルのずれを、正規分布（事前）で更新する。個人内の週ごとの揺れ(SIGMA_W)は予備調査では測れておらず、仮の値。
 (function () {
   const U = typeof module !== 'undefined' ? require('./util.js') : window.OF.util;
+  const I = typeof module !== 'undefined' ? require('./instrument.js') : window.OF.instrument;
+  const D = typeof module !== 'undefined' ? require('./data.js') : window.OF.data;
   const api = {};
+  api.MODEL = D.model;
+  api.NORMS = D.norms;
+  api.SIGMA_W = 0.4;           // 仮: 個人内の週ごとの揺れ（1〜5の指標）
+  api.OUTCOMES = ['WB', 'BO'];
 
-  // 5つの活動を 0〜4（現場は 0〜3）の段階にして使う
-  api.ACTIVITIES = [
-    { key: 'live', label: 'ライブ・現場', unit: '回/週', levels: [0, 1, 2, 3], wish: 'ライブ・イベント' },
-    { key: 'goods', label: 'グッズ・課金', unit: '円/週', levels: [0, 3000, 8000, 15000, 25000], wish: 'グッズ・課金' },
-    { key: 'stream', label: '配信・動画', unit: '時間/日', levels: [0, 1, 2, 3, 5], wish: '配信・動画' },
-    { key: 'sns', label: 'SNS', unit: '時間/日', levels: [0, 1, 2, 3, 5], wish: 'SNS' },
-    { key: 'late', label: '夜更かし', unit: '日/週', levels: [0, 1, 2, 4, 6], wish: '夜更かし' },
-  ];
+  api.to100 = (x) => (x - 1) / 4 * 100;
+  api.mean = (xs) => U.mean(xs);
 
-  api.PARAMS = {
-    placeholder: true,
-    version: 'prototype-placeholder-0',
-    mean: { live: 1, goods: 1.5, stream: 1.5, sns: 1.5, late: 1 }, // 段階の平均（仮）
-    sd: { live: 1, goods: 1.2, stream: 1.2, sns: 1.2, late: 1.2 },
-    joy: { intercept: 3.6, b: { live: 0.22, goods: 0.05, stream: 0.18, sns: 0.02, late: -0.04 }, sigma: 0.71 },
-    fatigue: { intercept: 2.9, b: { live: 0.10, goods: 0.14, stream: 0.08, sns: 0.16, late: 0.30 }, sigma: 0.92 },
-    tau: { joy: 0.5, fatigue: 0.6 },   // 個人差の事前の大きさ（仮）
-    weekFactor: 0.75,                  // 週平均の揺れ = 日ごとの誤差 × この値（仮）
-    highFatigue: 3.5,                  // 「疲れ高め」の境目
+  // 回答（id→1〜5）から指標を作る
+  api.index = (answers, ids) => {
+    const v = ids.map((id) => answers[id]).filter((x) => x != null);
+    return v.length === ids.length ? U.mean(v) : null;
   };
+  api.indices = (answers) => ({ WB: api.index(answers, I.WB_ITEMS), BO: api.index(answers, I.BO_ITEMS) });
 
-  // 値 → いちばん近い段階
-  api.toLevel = function (key, value) {
-    const lv = api.ACTIVITIES.find((a) => a.key === key).levels;
-    let best = 0, bd = Infinity;
-    lv.forEach((x, i) => { const d = Math.abs(x - value); if (d < bd) { bd = d; best = i; } });
-    return best;
-  };
-
-  // 直近 window 日の記録 → 習慣（5活動の段階）
-  api.habitFromLogs = function (logs, today, window = 14) {
-    const from = U.addDays(today, -(window - 1));
-    const L = logs.filter((l) => l.date >= from && l.date <= today);
-    const days = Math.max(1, L.length);
-    const sum = (f) => L.reduce((s, l) => s + (f(l) || 0), 0);
-    const liveWeek = sum((l) => l.live) / days * 7;
-    const goodsWeek = sum((l) => l.goodsYen) / days * 7;
-    const streamH = sum((l) => l.streamMin) / days / 60;
-    const snsH = sum((l) => l.snsMin) / days / 60;
-    const lateWeek = L.filter((l) => l.sleepImpact > 0).length / days * 7;
-    return {
-      n: L.length,
-      values: { live: liveWeek, goods: goodsWeek, stream: streamH, sns: snsH, late: lateWeek },
-      levels: {
-        live: api.toLevel('live', liveWeek), goods: api.toLevel('goods', goodsWeek), stream: api.toLevel('stream', streamH),
-        sns: api.toLevel('sns', snsH), late: api.toLevel('late', lateWeek),
-      },
-    };
-  };
-
-  api.predictMean = function (levels, outcome, params = api.PARAMS) {
-    const p = params[outcome];
-    let y = p.intercept;
-    for (const a of api.ACTIVITIES) y += p.b[a.key] * ((levels[a.key] - params.mean[a.key]) / params.sd[a.key]);
-    return y;
-  };
-
-  // 個人差の更新: 事前 N(0, tau²)、観測の誤差 sigma
-  api.personalOffset = function (logs, today, outcome, params = api.PARAMS) {
-    const habit = api.habitFromLogs(logs, today, 28);
-    const L = logs.filter((l) => l.date <= today && U.daysBetween(l.date, today) < 28 && l[outcome] != null);
-    const n = L.length;
-    const tau = params.tau[outcome], sigma = params[outcome].sigma;
-    if (!n) return { offset: 0, varPost: tau * tau, n: 0, habit };
-    const resid = U.mean(L.map((l) => l[outcome])) - api.predictMean(habit.levels, outcome, params);
-    const prec = 1 / (tau * tau) + n / (sigma * sigma);
-    return { offset: (n / (sigma * sigma)) / prec * resid, varPost: 1 / prec, n, habit };
-  };
-
-  // 予測（平均・80%区間・20点）
-  api.forecast = function (logs, today, levels, params = api.PARAMS) {
-    const out = {};
-    for (const o of ['joy', 'fatigue']) {
-      const po = api.personalOffset(logs, today, o, params);
-      const mean = api.predictMean(levels, o, params) + po.offset;
-      const sd = Math.sqrt((params[o].sigma * params.weekFactor) ** 2 + po.varPost);
-      const z = U.normInv(0.9);
-      const dots = Array.from({ length: 20 }, (_, i) => U.clamp(mean + sd * U.normInv((i + 0.5) / 20), 1, 5));
-      out[o] = { mean: U.clamp(mean, 1, 5), sd, lo: U.clamp(mean - z * sd, 1, 5), hi: U.clamp(mean + z * sd, 1, 5), dots, n: po.n };
+  // 質問紙の回答 → モデルの入力（現状の頻度は最新のチェックイン、アバター・スイッチは初回）
+  api.inputs = function (survey) {
+    if (!survey || !survey.baseline) return null;
+    const b = survey.baseline.answers, last = survey.weekly.length ? survey.weekly[survey.weekly.length - 1].answers : b;
+    const x = {};
+    for (const f of api.MODEL.features) {
+      if (f === 'avatar') x.avatar = U.mean(['av_empathy', 'av_mood', 'av_visual'].map((k) => b[k]));
+      else if (f.startsWith('cur_')) x[f] = last[f];
+      else x[f] = b[f];
     }
-    out.highCount = out.fatigue.dots.filter((d) => d >= params.highFatigue).length;
+    return Object.values(x).some((v) => v == null || Number.isNaN(v)) ? null : x;
+  };
+
+  api.predictMean = (x, y) => {
+    const o = api.MODEL.outcomes[y];
+    return api.MODEL.features.reduce((s, f) => s + o.coef[f] * x[f], o.intercept);
+  };
+
+  // 個人差の更新（チェックインごとの観測）
+  api.personal = function (checkins, y) {
+    const o = api.MODEL.outcomes[y];
+    const tau2 = Math.max(o.rmseCV ** 2 - api.SIGMA_W ** 2, 0.01);
+    const obs = checkins.filter((c) => c.obs[y] != null && c.x);
+    if (!obs.length) return { offset: 0, varPost: tau2, n: 0, tau2 };
+    const resid = U.mean(obs.map((c) => c.obs[y] - api.predictMean(c.x, y)));
+    const prec = 1 / tau2 + obs.length / api.SIGMA_W ** 2;
+    return { offset: (obs.length / api.SIGMA_W ** 2) / prec * resid, varPost: 1 / prec, n: obs.length, tau2 };
+  };
+
+  // 質問紙の回答の並び → チェックイン列（初回＋毎週）
+  api.checkins = function (survey) {
+    if (!survey || !survey.baseline) return [];
+    const b = survey.baseline.answers;
+    const mk = (date, ans) => {
+      const x = {};
+      for (const f of api.MODEL.features) x[f] = f === 'avatar' ? U.mean(['av_empathy', 'av_mood', 'av_visual'].map((k) => b[k])) : f.startsWith('cur_') ? ans[f] : b[f];
+      const ok = Object.values(x).every((v) => v != null && !Number.isNaN(v));
+      return { date, x: ok ? x : null, obs: api.indices(ans) };
+    };
+    return [mk(survey.baseline.date, b), ...survey.weekly.map((w) => mk(w.date, w.answers))];
+  };
+
+  // 予測（平均・80%の幅・20点）
+  api.forecast = function (survey, x) {
+    const cks = api.checkins(survey);
+    const z = U.normInv(0.9), out = {};
+    for (const y of api.OUTCOMES) {
+      const p = api.personal(cks, y);
+      const mean = U.clamp(api.predictMean(x, y) + p.offset, 1, 5);
+      const sd = Math.sqrt(api.SIGMA_W ** 2 + p.varPost);
+      out[y] = { mean, sd, lo: U.clamp(mean - z * sd, 1, 5), hi: U.clamp(mean + z * sd, 1, 5), n: p.n,
+        dots: Array.from({ length: 20 }, (_, i) => U.clamp(mean + sd * U.normInv((i + 0.5) / 20), 1, 5)) };
+    }
+    out.highCount = out.BO.dots.filter((d) => d >= api.highBO()).length;
     return out;
   };
 
-  api.expressionFor = function (fatigueMean, params = api.PARAMS) {
-    if (fatigueMean >= params.highFatigue) return 'tired';
-    if (fatigueMean >= 2.8) return 'neutral';
-    return 'good';
+  // 2つの頻度の組の差（係数のばらつきから、差の確からしさ）
+  api.diff = function (x1, x2, y) {
+    const o = api.MODEL.outcomes[y], f = api.MODEL.features;
+    const dx = f.map((k) => x2[k] - x1[k]);
+    const delta = f.reduce((s, k, i) => s + o.coef[k] * dx[i], 0);
+    let v = 0; for (let i = 0; i < f.length; i++) for (let j = 0; j < f.length; j++) v += dx[i] * o.coefCov[i][j] * dx[j];
+    return { delta, se: Math.sqrt(Math.max(v, 0)) };
   };
 
-  if (typeof module !== 'undefined') module.exports = api;
-  else window.OF.model = api;
+  api.highBO = () => api.NORMS.indices.BO.tertiles[1];   // 215名の上位3分の1の境目（1〜5の指標）
+  api.expressionFor = (bo) => (bo >= api.highBO() ? 'tired' : bo >= api.NORMS.indices.BO.tertiles[0] ? 'neutral' : 'good');
+
+  if (typeof module !== 'undefined') module.exports = api; else window.OF.model = api;
 })();

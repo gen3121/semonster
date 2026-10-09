@@ -1,4 +1,4 @@
-// つらさの検知。強い言葉・連続する強い疲れ・WHO-5 の低得点で相談先を出し、予測の表示を止める。
+// つらさの検知。強い言葉・続く強い推し疲れ・WHO-5 の低得点で相談先を出し、予測の表示を止める。
 // 相談先の電話番号は data/resources.json にあり、研究者が確認・差し替えるもの。
 (function () {
   const api = {};
@@ -14,10 +14,10 @@
     return null;
   };
 
-  // 疲れ 5 が3日連続
-  api.detectStreak = function (logs) {
-    const last = logs.slice(-3);
-    return last.length === 3 && last.every((l) => l.fatigue === 5);
+  // 推し疲れの指標（1〜5）が、続けて2回のチェックインで 4.5 以上
+  api.detectBurden = function (boSeries) {
+    const v = boSeries.filter((x) => x != null).slice(-2);
+    return v.length === 2 && v.every((x) => x >= 4.5);
   };
 
   // WHO-5 素点 0〜25。13 未満は不調の目安（Topp et al., 2015）

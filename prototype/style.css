@@ -79,3 +79,13 @@ p.sub{color:var(--muted);font-size:13px;margin:0 0 10px}
 .why{background:var(--sky);border-radius:10px;padding:8px 12px;margin-top:8px;font-size:13px}
 .why[hidden]{display:none}
 .why-row{margin:6px 0}.why-row b{color:var(--navy);display:block}.why ul{margin:2px 0 0;padding-left:1.2em}
+
+/* 確認カード・同意 */
+.confirm{max-height:46vh;overflow-y:auto;border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:6px;background:#fff}
+.crow{padding:6px 0;border-bottom:1px solid #EEF2F7}.crow:last-of-type{border-bottom:0}
+.crow .ct{font-size:13px;color:var(--navy);font-weight:bold}.crow .ev{font-size:12px;color:var(--muted)}
+.crow .chips{margin:4px 0 0}.crow .chip{padding:3px 9px;font-size:13px}
+.ai-opt{display:flex;gap:8px;align-items:flex-start;cursor:pointer}.ai-opt input{margin-top:5px;width:18px;height:18px}
+.meter .pc{font-weight:normal;font-size:12px;color:var(--muted)}
+.band[data-band="低め"]{background:#FDE1E8;color:#B3234F}
+.band[data-band="高め"]{background:#E3F6F2;color:#0C7A67}
