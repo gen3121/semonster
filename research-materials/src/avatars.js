@@ -36,8 +36,8 @@ function brows(expr, HAIR = '#3A2B2E') {
 }
 function accessory(acc) {
   if (acc === 'sleep') return `
-    <text x="232" y="78" font-family="Arial" font-weight="bold" font-size="34" fill="#7C6BC4">z</text>
-    <text x="256" y="52" font-family="Arial" font-weight="bold" font-size="26" fill="#7C6BC4" opacity="0.8">z</text>`;
+    <path d="M234,56 h22 l-22,24 h22" stroke="#7C6BC4" stroke-width="6" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M262,34 h16 l-16,18 h16" stroke="#7C6BC4" stroke-width="5" fill="none" stroke-linejoin="round" stroke-linecap="round" opacity="0.8"/>`;
   if (acc === 'money') return `
     <g transform="translate(196,262) rotate(-8)">
       <rect x="0" y="0" width="74" height="50" rx="9" fill="#C98A4B"/>

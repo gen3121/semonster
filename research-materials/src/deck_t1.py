@@ -95,8 +95,8 @@ for i, (v, lab, col) in enumerate([("約8割", "推しが生きがい", "B"), ("
     d.text(s, x, 1.62, 1.42, 0.8, v, size=22, bold=True, color=col, align="c", anchor="m", margin=(0, 0, 0, 0))
     d.text(s, x, 2.45, 1.42, 0.5, lab, size=11.5, color="text", align="c", margin=(0, 0, 0, 0))
 d.bar(s, L, 3.2, 4.45, 3.55, ["頻度→充実", "没入→充実", "頻度→推し疲れ", "没入→推し疲れ"],
-      [("β", [0.43, 0.20, 0.29, 0.23])], ["B"], fmt="0.00", vmin=0, vmax=0.5, major=0.1,
-      point_colors=["B", "B", "A", "A"], title="パス係数（性格特性の関連は |β|≦.21）", gap=55)
+      [("係数", [0.43, 0.20, 0.29, 0.23])], ["B"], fmt="0.00", vmin=0, vmax=0.5, major=0.1,
+      point_colors=["B", "B", "A", "A"], title="パス係数（性格特性は .21 以下）", gap=55)
 d.box(s, 5.15, 1.55, 4.4, 2.35, fill="AL", radius=0.12)
 d.text(s, 5.35, 1.6, 4.0, 2.25, [
     dict(t="27%", size=34, bold=True, color="A", after=0),
@@ -168,8 +168,8 @@ d.text(s, L, 1.55, 4.4, 2.8, [
 ], size=14.5, after=10, margin=(0, 0, 0, 0))
 d.box(s, L, 4.55, 4.4, 1.0, fill="navy", radius=0.1)
 d.text(s, L + 0.15, 4.57, 4.1, 0.96, [
-    dict(t="予測 = (全体の傾向 β + 個人差 bᵢ) × 行動", size=14, bold=True, color="white", align="c", after=2),
-    dict(t="bᵢ ～ N(0, τ²)：記録が増えるほど本人寄りに", size=11.5, color="sky2", align="c"),
+    dict(t="予測 = (全体の傾向 + 個人差) × 行動", size=14, bold=True, color="white", align="c", after=2),
+    dict(t="個人差は平均0の正規分布から。記録が増えるほど本人寄りに", size=11.5, color="sky2", align="c"),
 ], margin=(0, 0, 0, 0), anchor="m")
 d.box(s, L, 5.7, 4.4, 1.05, fill="panel", radius=0.1,
       text=f"14日の記録で、推し疲れの80%予測区間は ±{P.PI['bo'][0]} → ±{P.PI['bo'][1]}", size=13, bold=True,

@@ -5,6 +5,7 @@
 #   3) 各 deck_*.py を実行（python-pptx が必要）
 set -e
 cd "$(dirname "$0")"
+[ -f ~/.fonts/BIZUDPGothic-Regular.ttf ] || ./fonts/setup_font.sh   # 画像・PDF の確認用
 mkdir -p assets
 [ -d node_modules ] || npm install
 node avatars.js

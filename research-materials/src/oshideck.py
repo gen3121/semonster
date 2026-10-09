@@ -17,6 +17,8 @@ from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION, XL_LABEL_POSITION
 from pptx.oxml.ns import qn
 from lxml import etree
 
+FONT = "BIZ UDPゴシック"  # 資料の字体はこれに固定（日本語・英数字・記号とも）
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.environ.get("OSHI_TEMPLATE", os.path.join(HERE, "template.pptx"))
 ASSETS = os.path.join(HERE, "assets")
@@ -74,7 +76,7 @@ def _set_bullet(p, char="•", color=None, indent=0.2, level=0):
         sc = etree.SubElement(bc, qn("a:srgbClr"))
         sc.set("val", C.get(color, color))
     bf = etree.SubElement(pPr, qn("a:buFont"))
-    bf.set("typeface", "Arial")
+    bf.set("typeface", FONT)
     bu = etree.SubElement(pPr, qn("a:buChar"))
     bu.set("char", char)
 
@@ -137,6 +139,52 @@ def fill_tf(tf, content, size=14, color="text", bold=False, align="l", anchor="t
     return tf
 
 
+# ---------------------------------------------------------------- font
+_AFTER_FONT = ("sym", "hlinkClick", "hlinkMouseOver", "rtl", "extLst")
+
+
+def _set_fonts(rpr):
+    """Pin latin / ea / cs typefaces of one a:rPr, a:defRPr or a:endParaRPr to FONT."""
+    ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    prev = None
+    for name in ("latin", "ea", "cs"):
+        el = rpr.find(ns + name)
+        if el is None:
+            el = etree.Element(ns + name)
+            if prev is not None:
+                prev.addnext(el)
+            else:
+                anchor = next((c for c in rpr if etree.QName(c).localname in _AFTER_FONT), None)
+                if anchor is not None:
+                    anchor.addprevious(el)
+                else:
+                    rpr.append(el)
+        el.attrib.clear()
+        el.set("typeface", FONT)
+        prev = el
+
+
+def _pin_font(root):
+    a = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    for run in list(root.iter(a + "r", a + "fld")):
+        if run.find(a + "rPr") is None:
+            run.insert(0, etree.Element(a + "rPr"))
+    for rpr in list(root.iter(a + "rPr", a + "defRPr", a + "endParaRPr")):
+        _set_fonts(rpr)
+    for bu in root.iter(a + "buFont"):
+        bu.attrib.clear()
+        bu.set("typeface", FONT)
+
+
+def apply_font(prs):
+    """Make every run on every slide, table and chart use FONT explicitly."""
+    for slide in prs.slides:
+        _pin_font(slide._element)
+        for shape in slide.shapes:
+            if getattr(shape, "has_chart", False) and shape.has_chart:
+                _pin_font(shape.chart._chartSpace)
+
+
 # ---------------------------------------------------------------- deck
 class Deck:
     def __init__(self, date, title="", author="今井元"):
@@ -193,6 +241,10 @@ class Deck:
                 p = d.text_frame.paragraphs[0]
                 r = p.add_run()
                 r.text = self.date
+                r.font.size = Pt(9)
+                d.text_frame.margin_left = Inches(0.03)
+                d.text_frame.margin_right = Inches(0.0)
+                d.text_frame.word_wrap = False
             elif idx == 12:
                 s.shapes.clone_placeholder(ph)
                 sn = s.placeholders[12]
@@ -207,6 +259,7 @@ class Deck:
         return s
 
     def save(self, path):
+        apply_font(self.prs)
         self.prs.save(path)
 
     # -- primitives

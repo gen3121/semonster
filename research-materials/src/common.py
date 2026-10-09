@@ -30,7 +30,7 @@ def roadmap(d, s, now, y0=1.55, rowh=0.6, x0=2.05, x1=9.45, en=False, compact=Fa
               (date(2026, 12, 1), "12月" if not en else "Dec"), (date(2027, 1, 1), "1月" if not en else "Jan"),
               (date(2027, 2, 1), "2月" if not en else "Feb"), (date(2027, 3, 1), "3月" if not en else "Mar")]
     rows = [
-        ("システム開発", [(date(2026, 10, 1), date(2026, 10, 30), "設計 → β版", "blue")]),
+        ("システム開発", [(date(2026, 10, 1), date(2026, 10, 30), "設計 → ベータ版", "blue")]),
         ("倫理審査・募集", [(date(2026, 10, 9), date(2026, 10, 23), "審査", "pink"),
                        (date(2026, 10, 24), date(2026, 11, 1), "募集", "purple")]),
         ("本実験（6週間）", [(date(2026, 11, 2), date(2026, 11, 15), "記録のみ", "B"),
@@ -97,7 +97,7 @@ def architecture(d, s, y0=1.55, en=False, highlight=None):
     from pptx.enum.shapes import MSO_SHAPE
     J = not en
     inp = [(("TIPI-J", "初回・約1分") if J else ("TIPI-J", "once, 1 min"), "brain"),
-           (("毎日の記録", "1日約30秒") if J else ("Daily log", "~30 s a day"), "pen"),
+           (("毎日の記録", "1日約30秒") if J else ("Daily log", "≈30 s a day"), "pen"),
            (("本人の希望", "増やしたい／減らしたい") if J else ("Wishes", "more / less of what"), "heart")]
     ix, iw, ih = L, 2.35, 0.78
     for i, (t, ic) in enumerate(inp):
@@ -148,7 +148,7 @@ def architecture(d, s, y0=1.55, en=False, highlight=None):
     ly = y0 + 3.2
     d.box(s, 2.95, ly, 6.6, 0.5, fill="sky", radius=0.25,
           text=("選ぶ → 1週間ためす → 実行チェック → 記録 → 毎晩更新 → 答え合わせ" if J else
-                "Choose → try a week → check-in → log → nightly update → forecast check"),
+                "Choose → try a week → check-in → log → update → check forecast"),
           size=12, bold=True, color="navy", align="c")
     d.line(s, 8.45, y0 + 3.0, 8.45, ly, color="blue", width=2, arrow=True)
     d.line(s, 3.6, ly, 3.6, y0 + 2.5, color="blue", width=2, arrow=True)
@@ -156,5 +156,5 @@ def architecture(d, s, y0=1.55, en=False, highlight=None):
     d.box(s, L, y0 + 3.92, R - L, 0.48, fill="pinkL", radius=0.1,
           text=("セーフティ層：強いつらさの記録（WHO-5 素点13点未満など）では予測表示を止め、相談先を表示する" if J else
                 "Safety layer: when logs signal strong distress, forecasts pause and help resources are shown"),
-          size=12, bold=True, color="pink", align="c")
+          size=12, bold=True, color="pink", align="l", margin=(0.62, 0.03, 0.1, 0.03))
     d.icon(s, "shield", L + 0.12, y0 + 3.97, 0.38, bg="pink")

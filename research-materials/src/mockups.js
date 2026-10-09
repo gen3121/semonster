@@ -6,7 +6,7 @@ const img = n => 'data:image/png;base64,' + fs.readFileSync(A + n + '.png').toSt
 
 const css = `
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'IPAPGothic','IPAGothic',Arial,sans-serif;background:transparent;width:380px;height:640px}
+body{font-family:'BIZ UDPGothic','BIZ UDPゴシック',sans-serif;background:transparent;width:380px;height:640px}
 .phone{position:absolute;left:6px;top:6px;width:368px;height:628px;border-radius:44px;background:#1E2430;padding:12px}
 .scr{width:344px;height:604px;border-radius:34px;background:#F4F8FC;overflow:hidden;position:relative}
 .notch{position:absolute;left:122px;top:0;width:100px;height:22px;background:#1E2430;border-radius:0 0 14px 14px}
@@ -76,7 +76,7 @@ const T = {
     avatar: `<div class="bar"><span class="logo">OshiFit</span><span>アバター作成</span></div>
       <h1>じぶんアバターをつくる</h1><div class="sub">あなたに似たアバターが「未来の見込み」を映します</div>
       <div class="circle"><img src="${img('av_neutral')}"></div>
-      <div class="priv">🔒 写真は<b>この端末の中だけ</b>で処理し、アバターができたらすぐに削除します。サーバーには送信しません。</div>
+      <div class="priv"><svg width="13" height="13" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:3px"><rect x="4" y="10" width="16" height="11" rx="2" fill="#0B3C6E"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="#0B3C6E" stroke-width="2.6" fill="none"/></svg>写真は<b>この端末の中だけ</b>で処理し、アバターができたらすぐに削除します。サーバーには送信しません。</div>
       <div class="card"><div class="row" style="font-weight:bold;color:#0B3C6E">自動で推定したパーツ</div>
       <div class="tl"><span class="chip on">髪型：ボブ</span><span class="chip on">髪色：ダーク</span><span class="chip on">顔型：丸</span><span class="chip">眼鏡：なし</span><span class="chip on">推し色：ピンク</span></div></div>
       <div class="btn">写真から作る</div><div class="btn2">写真を使わずパーツで作る</div>`,
@@ -119,7 +119,7 @@ const T = {
   },
   en: {
     log: `<div class="bar"><span class="logo">OshiFit</span><span>Wed, Nov 18</span></div>
-      <h1>Today's oshi-katsu</h1><div class="sub">~30 sec, once a day</div>
+      <h1>Today's oshi-katsu</h1><div class="sub">≈30 sec, once a day</div>
       <div class="card"><div class="row">Live / events<div class="chips"><span class="chip on">None</span><span class="chip">Went</span><span class="chip">Stream</span></div></div>
       <div class="row">Goods spend<div class="chips"><span class="chip">¥0</span><span class="chip on">&lt;¥3k</span><span class="chip">More</span></div></div>
       <div class="row">Streams / videos<b style="color:#0099FF">1.5 h</b></div><div class="slider"><i style="width:38%"></i><b style="left:34%"></b></div>

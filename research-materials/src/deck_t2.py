@@ -46,14 +46,14 @@ notes(s, "Oshi-katsu means passionately supporting your favorite idol or charact
 
 # 3 ---------------------------------------------------------------- survey
 s = d.slide("Preliminary survey (N = 215)")
-for i, (v, lab, col) in enumerate([("~80%", "oshi = reason to live", "B"), ("~40%", "worry about money", "A"), ("~30%", "lose sleep", "purple")]):
+for i, (v, lab, col) in enumerate([("≈80%", "oshi = reason to live", "B"), ("≈40%", "worry about money", "A"), ("≈30%", "lose sleep", "purple")]):
     x = L + i * 1.52
     d.box(s, x, 1.55, 1.42, 1.5, fill="white", line="line", radius=0.12, shadow=True)
     d.text(s, x, 1.62, 1.42, 0.8, v, size=22, bold=True, color=col, align="c", anchor="m", margin=(0, 0, 0, 0))
     d.text(s, x + 0.05, 2.42, 1.32, 0.55, lab, size=11, color="text", align="c", margin=(0, 0, 0, 0))
 d.bar(s, L, 3.2, 4.45, 3.55, ["Frequency\n→ Fulfil", "Immersion\n→ Fulfil", "Frequency\n→ Fatigue", "Immersion\n→ Fatigue"],
-      [("β", [0.43, 0.20, 0.29, 0.23])], ["B"], fmt="0.00", vmin=0, vmax=0.5, major=0.1,
-      point_colors=["B", "B", "A", "A"], title="Path coefficients (personality |β| ≤ .21)", gap=55)
+      [("coef.", [0.43, 0.20, 0.29, 0.23])], ["B"], fmt="0.00", vmin=0, vmax=0.5, major=0.1,
+      point_colors=["B", "B", "A", "A"], title="Path coefficients", gap=55)
 d.box(s, 5.15, 1.55, 4.4, 2.35, fill="AL", radius=0.12)
 d.text(s, 5.35, 1.6, 4.0, 2.25, [
     dict(t="27%", size=34, bold=True, color="A", after=0),
@@ -130,7 +130,7 @@ notes(s, "Proposals rebalance rather than restrict. We generate 98 candidates by
 
 # 8 ---------------------------------------------------------------- walkthrough
 s = d.slide("A week with OshiFit")
-phones = [("mk_en_log", "Every day", "Log in ~30 s"), ("mk_en_propose", "Weekly", "Pick a proposal"),
+phones = [("mk_en_log", "Every day", "Log in ≈30 s"), ("mk_en_propose", "Weekly", "Pick a proposal"),
           ("mk_en_mirror", "Weekly (Group C)", "Compare futures")]
 for i, (im, when, t) in enumerate(phones):
     x = L + 0.1 + i * 3.1
@@ -174,7 +174,7 @@ notes(s, "We ran a six-week randomized controlled trial with three arms. Everyon
 s = d.slide("Results: avatars boosted follow-through")
 d.linechart(s, L, 1.45, 5.5, 4.4, ["Wk 3", "Wk 4", "Wk 5", "Wk 6"],
             [("B: Text", P.EXEC["B"]), ("C: + Avatar", P.EXEC["C"])], ["blue", "B"], fmt="0", vmin=30, vmax=70,
-            major=10, title="Followed through on the chosen proposal (%)", labels=True)
+            major=10, title="Proposal follow-through (%)", labels=True)
 d.text(s, L, 5.9, 5.5, 0.85, f"N = {sum(P.FLOW['completed'])} completed (after the paper was submitted). Same proposals in B and C.",
        size=11.5, color="muted", margin=(0, 0, 0, 0))
 d.box(s, 6.15, 1.5, 3.4, 2.15, fill="BL", radius=0.12)
@@ -229,7 +229,7 @@ notes(s, "Three implications for designers. First, make uncertainty a feature, n
 
 # 13 --------------------------------------------------------------- limitations
 s = d.slide("Limitations and next steps")
-lims = [("Short and small", "6 weeks, ~65 per arm; habits take longer (median 66 days; Lally et al., 2010)", "hourglass"),
+lims = [("Short and small", "6 weeks, ≈65 per arm; habits take longer (median 66 days; Lally et al., 2010)", "hourglass"),
         ("Bundled features", "Group C saw both avatars and dot counts; we cannot yet separate them", "layers"),
         ("Self-report", "Logs and WHO-5 are self-reported; physiological signals could complement them", "pen"),
         ("Sample", "Mostly university students and women in Japan", "globe")]

@@ -3,3 +3,7 @@ assets/
 *.pptx
 !template.pptx
 __pycache__/
+fonts/.venv/
+fonts/out/
+fonts/node_modules/
+fonts/package*.json
