@@ -36,6 +36,15 @@ test('instrument: 選択式の項目は上限が昇順で、最後が上の端',
   }
 });
 
+test('topics: AIインタビューの問いかけは、質問紙の項目の文そのもの（言い換えない）', () => {
+  for (const [k, t] of Object.entries(T.TOPICS)) {
+    if (!t.openFree) continue;
+    for (const id of t.items) assert.ok(t.open.includes(I.ITEMS[id].text.replace(/^この1週間（これまで）、/, '')), `${k}/${id}`);
+  }
+  assert.ok(T.TOPICS.burden.open.startsWith('この1週間（これまで）のことで、'));
+  assert.ok(!T.TOPICS.current.open.startsWith('この1週間'));
+});
+
 // ---------------------------------------------------------------- 規則での読み取り
 test('extract: 尺度の言葉を1〜5に読む（あいまいなら null）', () => {
   const a = (t) => X.parseLikert('agree', t), f = (t) => X.parseLikert('freq', t);
@@ -188,12 +197,41 @@ test('model: 頻度の差は向きを入れ替えると符号が逆で、ずれ�
   assert.ok(Math.abs(a.delta + b.delta) < 1e-12);
   assert.ok(Math.abs(a.se - b.se) < 1e-12 && a.se > 0);
 });
-test('proposals: 理想より少なくならない・理想より多くならない／負担が下がる案だけ／3案までで重複なし', () => {
+// 理想から大きく離れた人（最適度 0%）の回答
+const FAR = { cur_media: 1, cur_live: 1, cur_goods: 5, cur_sns: 5, ideal_media: 5, ideal_live: 5, ideal_goods: 1, ideal_sns: 1 };
+test('optimality: ずれの合計から最適度を計算し、80以上でだけ「最適」とする', () => {
+  const o = P.optimality(ANS);                      // ずれ: 音楽0・ライブ1・グッズ0・SNS2 → 合計3
+  assert.equal(o.total, 3); assert.equal(o.max, 16);
+  assert.equal(o.score, Math.round(100 * (1 - 3 / 16)));   // 81
+  assert.equal(o.optimal, true);
+  assert.equal(P.optimality({ ...ANS, ...FAR }).score, 0);
+  assert.equal(P.optimality({ ...ANS, ...FAR }).optimal, false);
+  assert.equal(P.optimality({ ...ANS, cur_sns: 3 }).score, 94);          // 合計1 → 93.75
+  const edge = P.optimality({ ...ANS, cur_sns: 5, cur_live: 2 });         // 合計4 → 75（80未満）
+  assert.equal(edge.score, 75); assert.equal(edge.optimal, false);
+  assert.equal(P.optimality({ ...ANS, ideal_sns: undefined }), null);
+});
+test('proposals: すでに最適に近い人には、微修正（1つだけの変更）を出す。理想に近づく案が先', () => {
   const sv = survey();
   const r = P.generate(sv);
+  assert.equal(r.micro, true); assert.equal(r.optimality.score, 81);
   assert.ok(r.options.length >= 1 && r.options.length <= 3);
-  const wishes = P.wishes(sv.baseline.answers);       // ライブは理想のほうが多い、SNSは理想のほうが少ない
+  const wishes = P.wishes(P.latestAnswers(sv));           // ライブは理想のほうが多い、SNSは理想のほうが少ない
   assert.equal(wishes.live, 'more'); assert.equal(wishes.sns, 'less');
+  for (const o of r.options) {
+    assert.equal(o.changes.length, 1, '微修正は1つだけ');
+    const c = o.changes[0];
+    if (wishes[c.key] === 'more') assert.ok(c.dir > 0); if (wishes[c.key] === 'less') assert.ok(c.dir < 0);
+    assert.ok(o.reason === 'ideal' || o.dBO < 0);
+  }
+  assert.equal(r.options[0].reason, 'ideal');
+});
+test('proposals: 理想から離れた人には、最大2つの組み替え。理想より少なくならない・多くならない／負担が下がる案だけ／3案までで重複なし', () => {
+  const sv = survey(2, FAR); sv.baseline.answers = { ...sv.baseline.answers, ...FAR };
+  const r = P.generate(sv);
+  assert.equal(r.micro, false);
+  assert.ok(r.options.length >= 1 && r.options.length <= 3);
+  const wishes = P.wishes(P.latestAnswers(sv));
   const sigs = new Set();
   for (const o of r.options) {
     assert.ok(o.dBO < 0, o.label);
@@ -201,6 +239,10 @@ test('proposals: 理想より少なくならない・理想より多くならな
     assert.ok(o.changes.length <= 2);
     const sig = o.changes.map((c) => c.key + c.dir).sort().join(); assert.ok(!sigs.has(sig)); sigs.add(sig);
   }
+});
+test('proposals: 「いまの頻度」は最新のチェックインを使う（初回の回答ではない）', () => {
+  const sv = survey(2, { cur_sns: 3 });             // 週ごとの回答で SNS が理想（3）に一致
+  assert.equal(P.optimality(P.latestAnswers(sv)).total, 1);
 });
 
 // ---------------------------------------------------------------- 性格・WHO-5
@@ -221,6 +263,13 @@ test('state: 各軸と指標が、画面に出す計算式どおりに手計算�
   assert.equal(r.money.value, 40);                                     // 2 ÷ (12.5 − 7.5) × 100
   assert.equal(r.who5.value, 44);                                      // 11 × 4
   for (const a of [...r.bo.axes, ...r.wb.axes]) assert.ok(a.percentile >= 0 && a.percentile <= 100);
+});
+test('state: 最適度のブロックに、式・入力値・しきい値が入る', () => {
+  const r = SD.compute({ survey: survey(0), who5: [] }, '2026-11-02');
+  assert.equal(r.opt.value, 81); assert.equal(r.opt.optimal, true);
+  assert.ok(r.opt.inputs.some((t) => t.includes('ライブ・イベント参加：理想 4、いま 3 → ずれ 1')));
+  assert.ok(r.opt.inputs.some((t) => t.includes('100 × (1 − 3 ÷ 16) ＝ 81')));
+  assert.ok(r.opt.formula && r.opt.note.includes('しきい値'));
 });
 test('state: 順位(%)は予備調査の分布から、独立に数え直した値と一致する', () => {
   const r = SD.compute({ survey: survey(0), who5: [] }, '2026-11-02');

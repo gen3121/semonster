@@ -344,13 +344,24 @@
     if (!p) {
       const r = P.generate(s.survey);
       p = { week: w, createdDate: ST.today(s), chosen: null, skipped: false, skipReason: null, exec: null, execReason: null,
-        options: r.options.map((o) => ({ id: o.id, label: o.label, texts: o.texts, changes: o.changes, dWB: o.dWB, dBO: o.dBO, seWB: o.seWB, seBO: o.seBO })) };
+        micro: r.micro, optimality: r.optimality ? r.optimality.score : null,
+        options: r.options.map((o) => ({ id: o.id, label: o.label, texts: o.texts, changes: o.changes, dWB: o.dWB, dBO: o.dBO, seWB: o.seWB, seBO: o.seBO, reason: o.reason || null })) };
       s.proposals.push(p); save();
     }
     return p;
   }
   const SKIP_REASONS = [['忙しい／余裕がない', 'busy'], ['楽しさが減りそう', 'less-fun'], ['自分には合わない', 'mismatch'], ['効果を信じられない', 'doubt'], ['もう実行している', 'already'], ['その他', 'other']];
   const pts = (d) => { const v = r0(d * 25); return v > 0 ? `+${v}` : v < 0 ? `−${-v}` : '±0'; };
+
+  // 最適度のカード（理想の頻度に、いまの頻度がどれだけ近いか）
+  function optCard(opt) {
+    const card = h('div', { class: 'card', 'data-section': 'opt' }, h('h2', { style: 'margin-top:0' }, '推し活の最適度'));
+    if (opt.value == null) return card.append(h('div', { class: 'note' }, opt.inputs[0])), card;
+    card.append(h('div', { class: 'big' }, h('span', { class: 'num', id: 'opt-num' }, opt.value), h('span', { class: 'of' }, ' %'),
+      h('span', { class: 'band', 'data-band': opt.optimal ? '高め' : 'ふつう' }, opt.optimal ? 'すでにほぼ最適' : '理想とのずれあり')),
+      h('p', { class: 'note', style: 'margin-top:0' }, '「いちばん幸せ」と答えた理想の頻度に、いまの推し活がどれだけ近いか。'), ...whyBox('opt', opt));
+    return card;
+  }
 
   function viewPlan(main) {
     main.style.padding = '14px';
@@ -360,10 +371,14 @@
     }
     if (distressRecent()) return main.append(resourcesCard('いまは、提案よりも休むことを優先しましょう'));
     const p = currentProposal();
-    main.append(h('h1', {}, '今週、どれを試す？'), h('p', { class: 'sub' }, `第${w + 1}週の提案。あなたの「理想の頻度」より少なくなる変え方は出さないようにしています。選ばなくてもかまいません。`));
-    if (!p.options.length) main.append(h('div', { class: 'card' }, '今の回答からは、負担が下がる見込みの組み替え案が見つかりませんでした。今週はこのままで大丈夫です。'));
+    const r = SD.compute(s, ST.today(s));
+    main.append(h('h1', {}, p.micro ? 'すでにほぼ最適です' : '今週、どれを試す？'),
+      h('p', { class: 'sub' }, p.micro ? `いまの推し活は、あなたの理想の頻度に近い状態です（最適度 ${p.optimality}%）。大きく変える必要はありません。もし試すなら、次の微修正をどうぞ。`
+        : `第${w + 1}週の提案。あなたの「理想の頻度」より少なくなる変え方は出さないようにしています。選ばなくてもかまいません。`), optCard(r.opt));
+    if (!p.options.length) main.append(h('div', { class: 'card' }, p.micro ? '今週は、このままで大丈夫です。' : '今の回答からは、負担が下がる見込みの組み替え案が見つかりませんでした。今週はこのままで大丈夫です。'));
     p.options.forEach((o, i) => {
-      const card = h('div', { class: 'card' + (p.chosen === i ? ' sel' : ''), 'data-opt': i }, h('b', {}, o.label), o.texts.map((t) => h('div', {}, '・', t)));
+      const card = h('div', { class: 'card' + (p.chosen === i ? ' sel' : ''), 'data-opt': i }, h('b', {}, o.label), p.micro ? null : o.texts.map((t) => h('div', {}, '・', t)));
+      if (o.reason) card.append(h('div', { class: 'note' }, o.reason === 'ideal' ? '理由：あなたの理想の頻度に近づきます。' : '理由：推し疲れが下がる見込みです。'));
       if (group() === 'C') card.append(h('div', { class: 'note' }, `見込み（0〜100の点数での差）：推し疲れ ${pts(o.dBO)}（±${r0(o.seBO * 25)}）、幸福度 ${pts(o.dWB)}（±${r0(o.seWB * 25)}）`));
       if (p.chosen == null && !p.skipped) card.append(h('button', { class: 'btn small', onclick: () => choose(p, i) }, 'これを1週間ためす'));
       if (p.chosen === i) card.append(h('div', { class: 'note' }, '選択中。次のチェックインで、実行できたかを聞きます。'));
@@ -427,7 +442,7 @@
     const mo = h('div', { class: 'card', 'data-section': 'money' }, h('h2', { style: 'margin-top:0' }, '推し活費用の負担'));
     if (r.money.value != null) mo.append(h('div', { class: 'big' }, h('span', { class: 'num', id: 'money-num' }, r.money.value), h('span', { class: 'of' }, ' %　（自由に使える額に対する推し活費用）')), ...whyBox('money', r.money));
     else mo.append(h('div', { class: 'note' }, r.money.inputs[0]));
-    main.append(mo);
+    main.append(mo, optCard(r.opt));
     const wb = r.who5;
     const wc = h('div', { class: 'card', 'data-section': 'who5' }, h('h2', { style: 'margin-top:0' }, '気分の目安（WHO-5）'));
     if (wb) wc.append(h('div', { class: 'big' }, h('span', { class: 'num', id: 'who5-num' }, wb.value), h('span', { class: 'of' }, ' / 100')), ...whyBox('who5', wb));

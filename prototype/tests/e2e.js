@@ -106,6 +106,11 @@ const who5 = async (page, labels = ['いつも', 'ほとんどいつも', '半�
   const nOpt = await page.locator('[data-opt]').count();
   assert.ok(nOpt >= 1 && nOpt <= 3, `提案は1〜3案（${nOpt}）`);
   assert.match(await page.locator('[data-opt="0"]').innerText(), /見込み（0〜100の点数での差）：推し疲れ/);
+  assert.equal(await page.locator('#opt-num').innerText(), '94', '最適度：ずれの合計1 → 94%');
+  assert.match(await page.locator('h1').innerText(), /すでにほぼ最適です/);
+  assert.match(await page.locator('[data-opt="0"]').innerText(), /理由：あなたの理想の頻度に近づきます/);
+  await page.locator('[data-why=opt]').click();
+  assert.match(await page.locator('#why-opt').innerText(), /100 × \(1 − 1 ÷ 16\) ＝ 94/);
   await shot(page, 'plan');
   await page.locator('#skip').click();
   await page.locator('#skip-reasons').waitFor();

@@ -48,7 +48,7 @@
   api.exportData = (s) => JSON.stringify({
     id: s.id, group: s.group, startDate: s.startDate, aiReading: s.aiReading, avatarSource: s.avatarSource,
     baseline: s.survey.baseline, weekly: s.survey.weekly, who5: s.who5,
-    proposals: s.proposals.map((p) => ({ week: p.week, createdDate: p.createdDate, chosen: p.chosen, skipped: p.skipped, skipReason: p.skipReason || null, exec: p.exec, execReason: p.execReason || null,
+    proposals: s.proposals.map((p) => ({ week: p.week, micro: !!p.micro, optimality: p.optimality == null ? null : p.optimality, createdDate: p.createdDate, chosen: p.chosen, skipped: p.skipped, skipReason: p.skipReason || null, exec: p.exec, execReason: p.execReason || null,
       options: p.options.map((o) => ({ id: o.id, texts: o.texts, dWB: o.dWB, dBO: o.dBO })) })),
     distress: s.distress, modelVersion: typeof window !== 'undefined' && window.OF && window.OF.model ? window.OF.model.MODEL.version : null,
   }, null, 2);

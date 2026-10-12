@@ -4,6 +4,7 @@
   const U = typeof module !== 'undefined' ? require('./util.js') : window.OF.util;
   const M = typeof module !== 'undefined' ? require('./model.js') : window.OF.model;
   const I = typeof module !== 'undefined' ? require('./instrument.js') : window.OF.instrument;
+  const P = typeof module !== 'undefined' ? require('./proposals.js') : window.OF.proposals;
   const api = {};
   const r1 = (x) => Math.round(x * 10) / 10, r0 = Math.round;
   const N = () => M.NORMS;
@@ -60,6 +61,19 @@
       note: '範囲の中央値で換算した概算です。100%を超えると、自由に使える額より推し活費用のほうが多いことを意味します。貯金や仕送りの事情は含みません。',
     };
   };
+  // 最適度: 理想の頻度と、いまの頻度の近さ（質問紙の回答だけ。モデルの予測は使わない）
+  const optimal = (ans) => {
+    const o = P.optimality(ans);
+    if (!o) return { value: null, inputs: ['理想の頻度と、いまの頻度の8項目に答えると計算されます'], formula: '', note: '' };
+    return {
+      value: o.score, optimal: o.optimal, threshold: P.OPTIMAL, gaps: o.gaps,
+      formula: '最適度 ＝ 100 ×（1 −（4活動の「理想とのずれ」の合計）÷ 16）。ずれは、理想の頻度といまの頻度の差（0〜4段階）',
+      inputs: [...o.gaps.map((g) => `${g.label}：理想 ${g.ideal}、いま ${g.cur} → ずれ ${g.gap}`), `ずれの合計 ＝ ${o.total}`, `100 × (1 − ${o.total} ÷ ${o.max}) ＝ ${o.score}`,
+        o.optimal ? `${P.OPTIMAL}以上なので、「すでにほぼ最適」として、微修正の提案だけを出します。` : `${P.OPTIMAL}未満なので、理想に近づく組み替えを提案します。`],
+      note: '「最適」は、あなた自身が答えた「いちばん幸せな頻度」に近い、という意味です。推し疲れの重さや、健康にとって最適かどうかは含みません。しきい値（80）は仮の値です。',
+    };
+  };
+
   api.compute = function (s, today) {
     const sv = s.survey;
     if (!sv || !sv.baseline) return { ready: false };
@@ -68,7 +82,7 @@
     const out = { ready: true, date: last.date, n: N().n };
     out.bo = indexBlock('BO', I.BO_ITEMS, '推し疲れ（ストレス）', I.BO_ITEMS.map((id) => itemAxis(id, ans, I.SHORT[id])), ans);
     out.wb = indexBlock('WB', I.WB_ITEMS, '推し活の効果（幸福度）', I.WB_ITEMS.map((id) => itemAxis(id, ans, I.SHORT[id])), ans);
-    out.money = money(ans);
+    out.money = money(ans); out.opt = optimal(ans);
     const w = s.who5.length ? s.who5.slice().sort((a, b) => a.date.localeCompare(b.date)).slice(-1)[0] : null;
     out.who5 = w ? {
       value: w.raw * 4, raw: w.raw, date: w.date, answers: w.answers, formula: 'WHO-5 の素点（5項目 × 0〜5点 ＝ 0〜25）× 4 ＝ 0〜100',
