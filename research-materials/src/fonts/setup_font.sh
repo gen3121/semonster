@@ -6,7 +6,7 @@ set -e
 cd "$(dirname "$0")"
 python3 -m venv .venv >/dev/null 2>&1
 .venv/bin/pip install -q fonttools brotli
-[ -d node_modules/@fontsource/biz-udpgothic ] || npm install --silent @fontsource/biz-udpgothic
+[ -d node_modules/@fontsource/biz-udpgothic ] || npm install --silent --no-save --prefix . @fontsource/biz-udpgothic
 mkdir -p out ~/.fonts
 for w in "400 Regular" "700 Bold"; do
   set -- $w

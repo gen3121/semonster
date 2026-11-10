@@ -1,0 +1,35 @@
+% OshiFit 修士論文（下書き）。ビルド: latexmk（LuaLaTeX）。字体は BIZ UDPゴシック に統一（リポジトリの CLAUDE.md）。
+\documentclass[a4paper,11pt]{ltjsreport}
+\usepackage{luatexja-fontspec}
+\setmainfont{BIZ UDPGothic}[BoldFont={BIZ UDPGothic Bold}]
+\setsansfont{BIZ UDPGothic}[BoldFont={BIZ UDPGothic Bold}]
+\setmainjfont{BIZ UDPGothic}[BoldFont={BIZ UDPGothic Bold}]
+\setsansjfont{BIZ UDPGothic}[BoldFont={BIZ UDPGothic Bold}]
+\renewcommand{\headfont}{\gtfamily\sffamily\bfseries}  % 見出しを太字に
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+\usepackage{cite}
+% 未確認・未記入の印（赤字）。提出前に全部消す
+\newcommand{\todo}[1]{\textcolor{red}{【#1】}}
+
+\title{推し活の見直しを支援するシステム OshiFit の\\設計と、幸福度・ストレスへの効果の検討}
+\author{今井 元\\大阪工業大学大学院 情報科学研究科 \todo{所属・研究室名を確認}}
+\date{\todo{提出日}}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+\input{chapters/1_introduction}
+\input{chapters/2_related_work}
+\input{chapters/3_system}
+\input{chapters/4_experiment}
+\input{chapters/5_results}
+\input{chapters/6_discussion}
+
+\bibliographystyle{unsrt}
+\nocite{*}
+\bibliography{references}
+\end{document}
