@@ -30,6 +30,16 @@ node demo_check.js            # 展示用が通信せずに動くか
 - `e2e_study.js`：エミュレーター上で、同意 → 途中で閉じて再開 → 85項目 → アバター → 群B → 4日後の振り返り → CSV の書き出し → 参加をやめる（記録の削除）まで、実際のブラウザで確認
 - Playwright は `PLAYWRIGHT_MODULE` で場所を指定する
 
+## 分析（研究者側）
+
+手順は `analysis/ANALYSIS_ja.md`。開発者ページの CSV を `data/`（コミットしない）に置いて：
+```bash
+pip install -r analysis/requirements.txt
+python -m analysis.run --data data --out out        # 分析レポート.md と各手順の結果
+python -m analysis.make_synthetic --out syn --n 120 # 動作確認用の合成データ（結果に使わない）
+python -m pytest analysis/tests -q                   # 15件
+```
+
 ## 変更の記録
 
 | 日時 | 変更 | 影響する画面 |
@@ -38,3 +48,4 @@ node demo_check.js            # 展示用が通信せずに動くか
 | 2026-11-12 | 研究版では、編集者モードと「回答の自動補完」を使えないようにした（以前は、回答していない項目を真ん中の値で埋めて分析画面などを表示できた）。進めない画面に入ろうとすると、いま進むべき画面に戻す | すべて |
 | 2026-11-12 | 開発者ページ `admin.html` を本物のデータで作成（大学アカウントでログイン、閲覧のみ、確認が必要な人、CSV 4種） | 開発者ページ |
 | 2026-11-12 | `firestore.rules`・`firebase.json` を追加 | なし（サーバー側） |
+| 2026-11-12 | 分析パイプライン `analysis/`（手順0〜7）を追加 | なし（研究者側） |
