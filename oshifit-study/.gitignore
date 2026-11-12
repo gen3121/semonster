@@ -1,0 +1,9 @@
+tests/node_modules/
+tests/.sdk-cache/
+tests/shots/
+*.log
+.firebase/
+# 参加者の実データ・秘密鍵はコミットしない
+data/
+*.csv
+serviceAccount*.json

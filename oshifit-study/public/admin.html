@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OshiFit 開発者ページ</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
+<style>
+:root{--bg:#f9f9ff;--card:#fff;--line:#e5e7eb;--fg:#141b2b;--muted:#424754;--primary:#0058be;--bad:#ba1a1a;--bad-bg:#ffdad6;--warn:#825100;--warn-bg:#ffddb8;--low:#f1f3ff}
+@media (prefers-color-scheme:dark){:root{--bg:#0b1120;--card:#141b2b;--line:#2a3550;--fg:#edf0ff;--muted:#c2c6d6;--primary:#adc6ff;--bad:#ffb4ab;--bad-bg:#3d1515;--warn:#ffb95f;--warn-bg:#33230a;--low:#1a2234}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.7 "BIZ UDPGothic",sans-serif;padding:16px}
+main{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+h1{font-size:22px;margin:0}h2{font-size:16px;margin:0 0 8px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:8px 16px;font:inherit;font-weight:700;cursor:pointer}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.kpi b{display:block;font-size:26px}
+.kpi span{font-size:12px;color:var(--muted)}
+.alert{padding:8px 0;border-top:1px solid var(--line)}.alert:first-child{border-top:0}.alert.bad{color:var(--bad)}.alert.w{color:var(--warn)}
+.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--low);color:var(--muted);font-size:12px}.mono{font-family:ui-monospace,Menlo,monospace}.muted{color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;min-width:260px;background:var(--card);color:var(--fg)}
+</style>
+<script src="config.js"></script>
+</head><body><main id="app"><p class="muted">読み込んでいます…</p></main>
+<script type="module">
+// 開発者ページ（閲覧のみ）。admins/{メールアドレス} に登録した大学アカウントだけが全件を読める（firestore.rules）。
+// CSV の形は DATA_SCHEMA_ja.md。参加者の実データをリポジトリに入れないこと。
+const V = "10.14.1", CDN = (m) => `https://www.gstatic.com/firebasejs/${V}/firebase-${m}.js`;
+const [{ initializeApp }, A, F] = await Promise.all([import(CDN("app")), import(CDN("auth")), import(CDN("firestore"))]);
+const app = initializeApp(window.OSHIFIT_FIREBASE), auth = A.getAuth(app), db = F.getFirestore(app);
+if (window.OSHIFIT_EMULATOR) { A.connectAuthEmulator(auth, window.OSHIFIT_EMULATOR.auth, { disableWarnings: true }); F.connectFirestoreEmulator(db, ...window.OSHIFIT_EMULATOR.firestore); }
+const QN = await (await fetch("questionnaire.json")).json();
+const $ = (s) => document.querySelector(s), el = $("#app"), DAY = 864e5;
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const ms = (t) => (t && t.toMillis ? t.toMillis() : null);
+const PLANS = ["sns23", "archive", "budget", "declutter", "donate", "oneday", "choose3", "skipok", "mute", "snsonce", "party", "create", "calm", "event", "good3"];
+const SC = ["wb", "joy", "sleep", "money", "duty", "compare", "burnout", "who5raw", "shs", "pss"];
+const items = (ids) => QN.sections.filter((s) => ids.includes(s.id)).flatMap((s) => s.items.map((i) => i.id));
+const BASE_ITEMS = QN.sections.flatMap((s) => s.items.map((i) => i.id)).filter((id) => id !== "Q62");
+const FINAL_ITEMS = [...items(["who5", "shs", "pss"]), "Q29", "Q30", "Q31", "Q32", "Q33", "Q34", "Q39", "Q44", "Q45", "Q46", "Q47", "Q48", "Q49", "Q50", "Q51", "J1", "J2", "K1", "K2", "K3", "K4", "K5"];
+
+function login() {
+  el.innerHTML = `<section class="card"><h1>開発者ページ</h1><p class="muted">登録した大学アカウントでログインしてください（閲覧のみ）。</p>
+   <div class="row"><button class="btn primary" id="g">Google でログイン</button></div>
+   <div class="row" style="margin-top:10px"><input id="mail" type="email" placeholder="大学のメールアドレス"><button class="btn" id="m">ログイン用のリンクを送る</button></div><p id="msg" class="muted"></p></section>`;
+  $("#g").onclick = () => A.signInWithPopup(auth, new A.GoogleAuthProvider()).catch((e) => ($("#msg").textContent = "ログインできませんでした：" + e.code));
+  $("#m").onclick = async () => {
+    const mail = $("#mail").value.trim(); if (!mail) return;
+    try { await A.sendSignInLinkToEmail(auth, mail, { url: location.href, handleCodeInApp: true }); localStorage.setItem("oshifit.adminMail", mail); $("#msg").textContent = "メールを送りました。届いたリンクをこの端末で開いてください。"; }
+    catch (e) { $("#msg").textContent = "送れませんでした：" + e.code; }
+  };
+}
+if (A.isSignInWithEmailLink(auth, location.href)) {
+  const mail = localStorage.getItem("oshifit.adminMail") || prompt("ログインに使ったメールアドレスを入力してください");
+  await A.signInWithEmailLink(auth, mail, location.href).catch((e) => console.error(e));
+  history.replaceState(null, "", location.pathname);
+}
+
+A.onAuthStateChanged(auth, async (u) => {
+  if (!u || u.isAnonymous) return login();
+  try { const me = await F.getDoc(F.doc(db, "admins", u.email)); if (!me.exists()) throw new Error("not admin"); }
+  catch (e) { el.innerHTML = `<section class="card"><h1>開発者ページ</h1><p>このアカウント（${esc(u.email)}）には閲覧の権限がありません。</p><button class="btn" id="out">ログアウト</button></section>`; $("#out").onclick = () => A.signOut(auth); return; }
+  el.innerHTML = `<p class="muted">データを読み込んでいます…</p>`;
+  const [ps, cks, pil] = await Promise.all([F.getDocs(F.collection(db, "participants")), F.getDocs(F.collectionGroup(db, "checkins")), F.getDocs(F.collection(db, "pilots"))]);
+  const pilots = new Set(pil.docs.map((d) => d.id));
+  const P = ps.docs.map((d) => ({ uid: d.id, ...d.data() }));
+  const byUid = {}; cks.docs.forEach((c) => { const uid = c.ref.parent.parent.id; (byUid[uid] = byUid[uid] || []).push(c.data()); });
+  P.forEach((p) => { p.cks = (byUid[p.uid] || []).sort((a, b) => a.week - b.week); p.pilot = pilots.has(p.pid) ? 1 : 0; });
+  render(u, P);
+});
+
+function alerts(P) {
+  const out = [], now = Date.now();
+  for (const p of P) {
+    const dec = ms(p.decidedAt);
+    if (dec && (p.group === "B" || p.group === "C") && !p.final && p.cks.length < 6) {
+      const last = p.cks.length ? Math.max(...p.cks.map((c) => ms(c.at) || 0)) : dec;
+      const gap = Math.floor((now - last) / DAY);
+      if (gap >= 10) out.push(["bad", `${p.pid}：振り返りが10日以上ない（${gap}日。開始から${Math.floor((now - dec) / DAY)}日目・${p.cks.length}回済み）`]);
+    }
+    const w0 = p.scores && p.scores.who5raw; if (w0 != null && w0 <= 7) out.push(["bad", `${p.pid}：開始時のWHO-5が${w0}点（7点以下）`]);
+    const c3 = p.cks.find((c) => c.week === 3); if (c3 && c3.W1 != null) { const r = ["W1", "W2", "W3", "W4", "W5"].reduce((a, k) => a + (c3[k] ?? 0), 0); if (r <= 7) out.push(["bad", `${p.pid}：3回目のWHO-5が${r}点（7点以下）`]); }
+    const wf = p.final && p.final.scores && p.final.scores.who5raw; if (wf != null && wf <= 7) out.push(["bad", `${p.pid}：最後の調査のWHO-5が${wf}点（7点以下）`]);
+    if (p.answers && p.answers.Q42 != null && p.answers.Q42 !== 2) out.push(["w", `${p.pid}：注意確認（Q42）の誤答`]);
+  }
+  return out;
+}
+
+function render(u, P) {
+  const al = alerts(P), cnt = (f) => P.filter(f).length, d = (t) => (ms(t) ? new Date(ms(t)).toLocaleDateString("ja-JP") : "–");
+  const k = [["同意して開始", P.length], ["質問紙を完了", cnt((p) => p.baselineDone)], ["群A（順調）", cnt((p) => p.group === "A")], ["群B（プランB）", cnt((p) => p.group === "B")], ["群C（プランA）", cnt((p) => p.group === "C")], ["最後の調査まで完了", cnt((p) => p.final)], ["注意確認の誤答", cnt((p) => p.answers && p.answers.Q42 != null && p.answers.Q42 !== 2)], ["プレ実験の参加者", cnt((p) => p.pilot)]];
+  el.innerHTML = `<div class="row" style="justify-content:space-between"><div><h1>開発者ページ</h1><p class="muted">${esc(u.email)} でログイン中・閲覧のみ（書き換え・削除はできません）</p></div><button class="btn" id="out">ログアウト</button></div>
+   <section class="kpis">${k.map(([l, v]) => `<div class="card kpi"><span>${l}</span><b>${v}</b></div>`).join("")}</section>
+   <section class="card"><h2>確認が必要（${al.length}件）</h2>${al.length ? al.map(([c, t]) => `<div class="alert ${c}">${esc(t)}</div>`).join("") : '<p class="muted">ありません</p>'}
+    <p class="muted" style="font-size:12px">連絡先は集めていないため、相談先の表示はアプリが自動で行います。</p></section>
+   <section class="card"><div class="row" style="justify-content:space-between"><h2>参加者（${P.length}人）</h2><div class="row">
+     <button class="btn" data-csv="baseline">開始時（baseline.csv）</button><button class="btn" data-csv="weekly">振り返りごと（weekly.csv）</button><button class="btn" data-csv="trial">最後の調査まで（trial.csv）</button><button class="btn" data-csv="free">自由記述（free.csv）</button></div></div>
+    <div class="tablewrap"><table><thead><tr><th>参加ID</th><th>開始日</th><th>群</th><th>提案</th><th>振り返り</th><th>開始からの日数</th><th>WHO-5 開始→最後</th><th>プレ実験</th></tr></thead><tbody>
+    ${P.map((p) => { const dec = ms(p.decidedAt); return `<tr><td class="mono">${esc(p.pid)}</td><td>${d(p.createdAt)}</td><td>${p.group ? "群" + p.group : "未決定"}</td><td>${esc((p.planIds || []).join("・") || "–")}</td><td>${p.group === "A" ? "–" : p.cks.length + " / 6"}</td><td>${dec ? Math.floor((Date.now() - dec) / DAY) + "日目" : "–"}</td><td>${p.scores?.who5raw ?? "–"} → ${p.final?.scores?.who5raw ?? "–"}</td><td>${p.pilot ? "はい" : ""}</td></tr>`; }).join("")}
+    </tbody></table></div></section>`;
+  $("#out").onclick = () => A.signOut(auth);
+  el.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => download(b.dataset.csv, P)));
+}
+
+// ---------- CSV（DATA_SCHEMA_ja.md と同じ列） ----------
+const iso = (t) => (ms(t) ? new Date(ms(t)).toISOString() : "");
+function csv(rows, cols) {
+  const q = (v) => { if (v == null) return ""; const s = String(v); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  return "﻿" + [cols.join(","), ...rows.map((r) => cols.map((c) => q(r[c])).join(","))].join("\r\n");
+}
+export function tables(P) {
+  const baseCols = ["pid", "uid", "pilot", "created_at", "decided_at", "group", "plans_offered", "plans_chosen", "avatar_source", ...BASE_ITEMS, ...SC,
+    ...["wb", "joy", "sleep", "money", "duty", "compare", "burnout", "pss"].map((k) => "pred_B_" + k), "pred_hw", "pred_hwWb"];
+  const baseline = P.filter((p) => p.baselineDone).map((p) => {
+    const r = { pid: p.pid, uid: p.uid, pilot: p.pilot, created_at: iso(p.createdAt), decided_at: iso(p.decidedAt), group: p.group || "", plans_offered: (p.plansOffered || []).map((x) => x.id).join(";"), plans_chosen: (p.planIds || []).join(";"), avatar_source: p.avatar?.source || "" };
+    BASE_ITEMS.forEach((id) => (r[id] = p.answers?.[id])); SC.forEach((k) => (r[k] = p.scores?.[k]));
+    if (p.pred) { Object.keys(p.pred.B || {}).forEach((k) => (r["pred_B_" + k] = p.pred.B[k])); r.pred_hw = p.pred.hw; r.pred_hwWb = p.pred.hwWb; }
+    return r;
+  });
+  const wkCols = ["pid", "group", "week", "day", "at", ...PLANS.map((x) => "did_" + x), "Q44", "Q45", "Q47", "Q48", "joy", "stress", "happy", "W1", "W2", "W3", "W4", "W5", "burn", "joyN"];
+  const weekly = P.flatMap((p) => p.cks.map((c) => ({ ...c, pid: p.pid, group: p.group, at: iso(c.at) })));
+  const trCols = ["pid", "pilot", "group", "final_day", "final_at", ...FINAL_ITEMS, ...SC.map((k) => k + "_post"), "n_checkins", "exec_rate"];
+  const trial = P.filter((p) => p.final).map((p) => {
+    const r = { pid: p.pid, pilot: p.pilot, group: p.group, final_day: p.final.day, final_at: iso(p.final.at), n_checkins: p.cks.length };
+    FINAL_ITEMS.forEach((id) => (r[id] = p.final.answers?.[id])); SC.forEach((k) => (r[k + "_post"] = p.final.scores?.[k]));
+    if (p.group === "B") { const v = p.cks.flatMap((c) => Object.keys(c).filter((x) => x.startsWith("did_")).map((x) => [1, 0.5, 0][c[x]])).filter((x) => x != null); r.exec_rate = v.length ? v.reduce((a, b) => a + b, 0) / v.length : ""; }
+    return r;
+  });
+  const free = P.flatMap((p) => [p.answers?.Q62 ? { pid: p.pid, where: "baseline_Q62", text: p.answers.Q62 } : null, p.final?.answers?.how ? { pid: p.pid, where: "final_how", text: p.final.answers.how } : null].filter(Boolean));
+  return { baseline: [baseline, baseCols], weekly: [weekly, wkCols], trial: [trial, trCols], free: [free, ["pid", "where", "text"]] };
+}
+function download(name, P) {
+  const [rows, cols] = tables(P)[name];
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv(rows, cols)], { type: "text/csv" }));
+  a.download = `${name}_${new Date().toISOString().slice(0, 10)}.csv`; document.body.append(a); a.click(); a.remove();
+}
+window.__oshifitTables = (P) => { const t = tables(P); return Object.fromEntries(Object.entries(t).map(([k, [r, c]]) => [k, csv(r, c)])); };
+</script>
+</body></html>
