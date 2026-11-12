@@ -71,7 +71,7 @@ function alerts(P) {
   const out = [], now = Date.now();
   for (const p of P) {
     const dec = ms(p.decidedAt);
-    if (dec && (p.group === "B" || p.group === "C") && !p.final && p.cks.length < 6) {
+    if (dec && !p.withdrawn && (p.group === "B" || p.group === "C") && !p.final && p.cks.length < 6) {
       const last = p.cks.length ? Math.max(...p.cks.map((c) => ms(c.at) || 0)) : dec;
       const gap = Math.floor((now - last) / DAY);
       if (gap >= 10) out.push(["bad", `${p.pid}：振り返りが10日以上ない（${gap}日。開始から${Math.floor((now - dec) / DAY)}日目・${p.cks.length}回済み）`]);
@@ -86,7 +86,7 @@ function alerts(P) {
 
 function render(u, P) {
   const al = alerts(P), cnt = (f) => P.filter(f).length, d = (t) => (ms(t) ? new Date(ms(t)).toLocaleDateString("ja-JP") : "–");
-  const k = [["同意して開始", P.length], ["質問紙を完了", cnt((p) => p.baselineDone)], ["群A（順調）", cnt((p) => p.group === "A")], ["群B（プランB）", cnt((p) => p.group === "B")], ["群C（プランA）", cnt((p) => p.group === "C")], ["最後の調査まで完了", cnt((p) => p.final)], ["注意確認の誤答", cnt((p) => p.answers && p.answers.Q42 != null && p.answers.Q42 !== 2)], ["プレ実験の参加者", cnt((p) => p.pilot)]];
+  const k = [["同意して開始", P.length], ["質問紙を完了", cnt((p) => p.baselineDone)], ["群A（順調）", cnt((p) => p.group === "A")], ["群B（プランB）", cnt((p) => p.group === "B")], ["群C（プランA）", cnt((p) => p.group === "C")], ["最後の調査まで完了", cnt((p) => p.final)], ["注意確認の誤答", cnt((p) => p.answers && p.answers.Q42 != null && p.answers.Q42 !== 2)], ["プレ実験の参加者", cnt((p) => p.pilot)], ["参加をやめた人", cnt((p) => p.withdrawn)]];
   el.innerHTML = `<div class="row" style="justify-content:space-between"><div><h1>開発者ページ</h1><p class="muted">${esc(u.email)} でログイン中・閲覧のみ（書き換え・削除はできません）</p></div><button class="btn" id="out">ログアウト</button></div>
    <section class="kpis">${k.map(([l, v]) => `<div class="card kpi"><span>${l}</span><b>${v}</b></div>`).join("")}</section>
    <section class="card"><h2>確認が必要（${al.length}件）</h2>${al.length ? al.map(([c, t]) => `<div class="alert ${c}">${esc(t)}</div>`).join("") : '<p class="muted">ありません</p>'}
@@ -94,7 +94,7 @@ function render(u, P) {
    <section class="card"><div class="row" style="justify-content:space-between"><h2>参加者（${P.length}人）</h2><div class="row">
      <button class="btn" data-csv="baseline">開始時（baseline.csv）</button><button class="btn" data-csv="weekly">振り返りごと（weekly.csv）</button><button class="btn" data-csv="trial">最後の調査まで（trial.csv）</button><button class="btn" data-csv="free">自由記述（free.csv）</button></div></div>
     <div class="tablewrap"><table><thead><tr><th>参加ID</th><th>開始日</th><th>群</th><th>提案</th><th>振り返り</th><th>開始からの日数</th><th>WHO-5 開始→最後</th><th>プレ実験</th></tr></thead><tbody>
-    ${P.map((p) => { const dec = ms(p.decidedAt); return `<tr><td class="mono">${esc(p.pid)}</td><td>${d(p.createdAt)}</td><td>${p.group ? "群" + p.group : "未決定"}</td><td>${esc((p.planIds || []).join("・") || "–")}</td><td>${p.group === "A" ? "–" : p.cks.length + " / 6"}</td><td>${dec ? Math.floor((Date.now() - dec) / DAY) + "日目" : "–"}</td><td>${p.scores?.who5raw ?? "–"} → ${p.final?.scores?.who5raw ?? "–"}</td><td>${p.pilot ? "はい" : ""}</td></tr>`; }).join("")}
+    ${P.map((p) => { const dec = ms(p.decidedAt); return `<tr><td class="mono">${esc(p.pid)}</td><td>${d(p.createdAt)}</td><td>${p.group ? "群" + p.group : "未決定"}${p.withdrawn ? "（やめた）" : ""}</td><td>${esc((p.planIds || []).join("・") || "–")}</td><td>${p.group === "A" ? "–" : p.cks.length + " / 6"}</td><td>${dec ? Math.floor((Date.now() - dec) / DAY) + "日目" : "–"}</td><td>${p.scores?.who5raw ?? "–"} → ${p.final?.scores?.who5raw ?? "–"}</td><td>${p.pilot ? "はい" : ""}</td></tr>`; }).join("")}
     </tbody></table></div></section>`;
   $("#out").onclick = () => A.signOut(auth);
   el.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => download(b.dataset.csv, P)));
@@ -107,19 +107,19 @@ function csv(rows, cols) {
   return "﻿" + [cols.join(","), ...rows.map((r) => cols.map((c) => q(r[c])).join(","))].join("\r\n");
 }
 export function tables(P) {
-  const baseCols = ["pid", "uid", "pilot", "created_at", "decided_at", "group", "plans_offered", "plans_chosen", "avatar_source", ...BASE_ITEMS, ...SC,
+  const baseCols = ["pid", "uid", "pilot", "qset", "withdrawn", "withdrawn_at", "created_at", "decided_at", "group", "plans_offered", "plans_chosen", "avatar_source", ...BASE_ITEMS, ...SC,
     ...["wb", "joy", "sleep", "money", "duty", "compare", "burnout", "pss"].map((k) => "pred_B_" + k), "pred_hw", "pred_hwWb"];
   const baseline = P.filter((p) => p.baselineDone).map((p) => {
-    const r = { pid: p.pid, uid: p.uid, pilot: p.pilot, created_at: iso(p.createdAt), decided_at: iso(p.decidedAt), group: p.group || "", plans_offered: (p.plansOffered || []).map((x) => x.id).join(";"), plans_chosen: (p.planIds || []).join(";"), avatar_source: p.avatar?.source || "" };
+    const r = { pid: p.pid, uid: p.uid, pilot: p.pilot, qset: p.qset || "", withdrawn: p.withdrawn ? 1 : 0, withdrawn_at: iso(p.withdrawnAt), created_at: iso(p.createdAt), decided_at: iso(p.decidedAt), group: p.group || "", plans_offered: (p.plansOffered || []).map((x) => x.id).join(";"), plans_chosen: (p.planIds || []).join(";"), avatar_source: p.avatar?.source || "" };
     BASE_ITEMS.forEach((id) => (r[id] = p.answers?.[id])); SC.forEach((k) => (r[k] = p.scores?.[k]));
     if (p.pred) { Object.keys(p.pred.B || {}).forEach((k) => (r["pred_B_" + k] = p.pred.B[k])); r.pred_hw = p.pred.hw; r.pred_hwWb = p.pred.hwWb; }
     return r;
   });
   const wkCols = ["pid", "group", "week", "day", "at", ...PLANS.map((x) => "did_" + x), "Q44", "Q45", "Q47", "Q48", "joy", "stress", "happy", "W1", "W2", "W3", "W4", "W5", "burn", "joyN"];
   const weekly = P.flatMap((p) => p.cks.map((c) => ({ ...c, pid: p.pid, group: p.group, at: iso(c.at) })));
-  const trCols = ["pid", "pilot", "group", "final_day", "final_at", ...FINAL_ITEMS, ...SC.map((k) => k + "_post"), "n_checkins", "exec_rate"];
+  const trCols = ["pid", "pilot", "withdrawn", "group", "final_day", "final_at", ...FINAL_ITEMS, ...SC.map((k) => k + "_post"), "n_checkins", "exec_rate"];
   const trial = P.filter((p) => p.final).map((p) => {
-    const r = { pid: p.pid, pilot: p.pilot, group: p.group, final_day: p.final.day, final_at: iso(p.final.at), n_checkins: p.cks.length };
+    const r = { pid: p.pid, pilot: p.pilot, withdrawn: p.withdrawn ? 1 : 0, group: p.group, final_day: p.final.day, final_at: iso(p.final.at), n_checkins: p.cks.length };
     FINAL_ITEMS.forEach((id) => (r[id] = p.final.answers?.[id])); SC.forEach((k) => (r[k + "_post"] = p.final.scores?.[k]));
     if (p.group === "B") { const v = p.cks.flatMap((c) => Object.keys(c).filter((x) => x.startsWith("did_")).map((x) => [1, 0.5, 0][c[x]])).filter((x) => x != null); r.exec_rate = v.length ? v.reduce((a, b) => a + b, 0) / v.length : ""; }
     return r;

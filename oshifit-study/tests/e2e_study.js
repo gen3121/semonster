@@ -39,7 +39,7 @@ async function answerAll(page, stop) {
     const num = page.locator("#f-num");
     if (await num.count()) { await num.fill("21"); await page.locator("#sv-next").click(); continue; }
     const tx = page.locator("#f-text");
-    if (await tx.count()) { await page.locator("#sv-next").click(); continue; }
+    if (await tx.count()) { await page.locator("#sv-next").click({ timeout: 3000 }).catch(() => {}); continue; }   // 押す前に画面が変わることがある
     if (!(await page.locator(".qid").count())) { await page.waitForTimeout(200); continue; }   // 画面の切り替え中
     const id = (await page.locator(".qid").innerText()).trim();
     const opts = page.locator("[data-j]");
@@ -69,15 +69,23 @@ async function answerAll(page, stop) {
   assert.equal(await page.locator("#ed-sel").count(), 0, "研究版では編集者モードを出さない");
   await page.goto(BASE + "#analysis");
   await page.waitForFunction(() => location.hash === "#start");
-  step("同意する前は、分析などの画面に入れない（回答の自動補完もしない）");
-  await page.locator("#agree").check();
+  step("登録する前は、分析などの画面に入れない（回答の自動補完もしない）");
+  const MAIL = `p${Date.now()}@example.com`, PW = "oshifit-pass1";
   await page.locator("#go").click();
+  await page.waitForFunction(() => location.hash === "#signup");
+  await page.locator("#su-mail").fill(MAIL); await page.locator("#su-pw").fill(PW);
+  await page.locator("[data-g='男性']").click();
+  assert.equal(await page.locator("#su-go").isDisabled(), true, "同意しないと登録できない");
+  await page.locator("#agree").check();
+  await page.screenshot({ path: path.join(OUT, "00_signup.png") });
+  await page.locator("#su-go").click();
   await page.locator(".qid").waitFor();
   const uid = await page.evaluate(() => window.OFStore.uid);
-  assert.ok(uid, "匿名ログインした");
+  assert.ok(uid, "メールアドレスで登録した");
   let d = await read((db) => getDoc(doc(db, "participants", uid)));
-  assert.equal(d.data().mode, "study"); assert.match(d.data().pid, /^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
-  step("同意して始めると、匿名ログインし participants/{uid} が作られる");
+  assert.equal(d.data().mode, "study"); assert.equal(d.data().answers.Q2, "男性"); assert.equal(d.data().email, undefined, "メールは Firestore に入れない");
+  assert.equal(await page.locator(".qid").innerText(), "Q1");
+  step("新規登録（メール・パスワード・性別・同意）→ participants/{uid} が作られ、質問へ進む（性別は質問で聞き直さない）");
 
   // 途中まで答えて、読み込み直すと続きから
   await page.locator("#f-num").fill("21"); await page.locator("#sv-next").click();          // Q1 年齢
@@ -86,22 +94,41 @@ async function answerAll(page, stop) {
   d = await read((db) => getDoc(doc(db, "participants", uid)));
   const savedN = Object.keys(d.data().answers).length;
   assert.ok(savedN >= 10, `途中経過が保存される（${savedN}問）`);
-  await page.reload();
-  await page.locator(".qid").waitFor({ timeout: 15000 }).catch(async (e) => { console.log("DEBUG", page.url(), (await page.locator("#app").innerText()).slice(0, 300), errors); throw e; });
+  // ログアウトして、ログインし直すと続きから
+  await page.evaluate(async () => { await window.OFStore.logout(); });
+  await page.reload(); await page.waitForFunction(() => location.hash === "#start" || location.hash === "" || location.hash === "#withdrawn"); await page.evaluate(() => (location.hash = "login"));
+  await page.locator("#li-mail").waitFor({ timeout: 8000 }).catch(async (e) => { console.log("DEBUG", page.url(), (await page.locator("#app").innerText()).slice(0, 200), errors); throw e; });
+  await page.locator("#li-mail").fill(MAIL); await page.locator("#li-pw").fill("wrong-pass");
+  await page.locator("#li-go").click();
+  await page.getByText("メールアドレスかパスワードが違います").waitFor();
+  await page.locator("#li-pw").fill(PW); await page.locator("#li-go").click();
+  await page.locator(".qid").waitFor({ timeout: 15000 });
   const resumeAt = (await page.locator(".qid").innerText()).trim();
-  assert.notEqual(resumeAt, "Q1", "読み込み直すと続きの質問から");
-  step(`途中で閉じても、続き（${resumeAt}）から再開できる`);
+  assert.notEqual(resumeAt, "Q1", "ログインし直すと続きの質問から");
+  step(`ログアウト → ログイン（パスワード違いは断る）で、続き（${resumeAt}）から再開できる`);
 
   await answerAll(page, async () => (await page.locator("#av-go").count()) > 0);
   d = await read((db) => getDoc(doc(db, "participants", uid)));
   assert.equal(d.data().baselineDone, true);
-  assert.equal(Object.keys(d.data().answers).filter((k) => k !== "Q62").length, 85, "85項目が保存される");
+  const keys = Object.keys(d.data().answers).filter((k) => k !== "Q62");
+  assert.equal(keys.length, 68, "短縮版：67項目＋性別が保存される");
+  assert.ok(!keys.includes("Q35") && !keys.includes("Q55"), "省いた項目は聞かない");
   assert.ok(d.data().scores && d.data().scores.pss != null && d.data().scores.wb != null);
   assert.equal(d.data().answers.Q42, 2);
-  step("85項目の回答と得点（PSS-J・WHO-5 など）が保存される");
+  step("短縮版の67項目＋性別と、得点（PSS-J・WHO-5 など）が保存される");
 
   // ---------- アバター → 分析 → 2つの未来 → プランB
-  await page.locator("[data-style=long]").click();
+  const hairNames = await page.locator(".avopt span").allInnerTexts();
+  assert.ok(hairNames.includes("ショート") && hairNames.includes("ツンツン") && !hairNames.includes("ツインテール"), "男性向けの髪型が並ぶ");
+  await page.locator(".avopt", { hasText: "ツンツン" }).click();
+  await page.locator("[data-tab=hairColor]").click();
+  assert.equal(await page.locator(".sw").count(), 36, "髪の色は36色");
+  await page.locator(".sw").nth(30).click();
+  await page.locator("[data-tab=shirt]").click();
+  await page.locator(".sw").nth(5).click();
+  await page.locator("[data-tab=beard]").click();
+  await page.locator(".avopt").nth(1).click();
+  await page.screenshot({ path: path.join(OUT, "02_avatar.png") });
   await page.locator("#av-go").click();
   await page.locator("#an-go").waitFor();
   await page.screenshot({ path: path.join(OUT, "01_analysis.png"), fullPage: false });
@@ -117,7 +144,8 @@ async function answerAll(page, stop) {
   const p = d.data();
   if (!p.group) console.log("DEBUG errors", errors);
   assert.equal(p.group, group);
-  assert.equal(p.avatar.style, "long"); assert.equal(p.avatarDone, true);
+  assert.equal(p.avatar.hair, "spiky"); assert.equal(p.avatar.hairColor, 30); assert.equal(p.avatar.shirt, 5); assert.equal(p.avatar.beard, 1); assert.equal(p.avatarDone, true);
+  assert.equal(JSON.stringify(p.avatar).includes("data:"), false, "写真は保存しない");
   assert.ok(p.decidedAt && p.decidedAt.toMillis(), "決めた時刻（サーバー）");
   if (group === "B") { assert.ok(p.planIds.length >= 1); assert.ok(p.pred && p.pred.B && p.pred.hw); assert.ok(p.plansOffered.length >= 1); }
   step(`群${group}に決まり、群・提案・見込み・時刻が保存される`);
@@ -170,11 +198,15 @@ async function answerAll(page, stop) {
   await page.locator("#wk").check();
   await page.locator("#w-go").click();
   await page.waitForFunction(() => location.hash === "#withdrawn");
-  d = await read((db) => getDoc(doc(db, "participants", uid)));
-  assert.equal(d.exists(), false, "記録が消える");
-  const ck2 = await read((db) => getDocs(collection(db, "participants", uid, "checkins")));
-  assert.equal(ck2.size, 0, "振り返りも消える");
-  step("参加をやめると、サーバーの記録（本体・振り返り）が消える");
+  for (let i = 0; i < 25; i++) { d = await read((db) => getDoc(doc(db, "participants", uid))); if (d.data().withdrawn) break; await page.waitForTimeout(200); }
+  assert.equal(d.exists(), true, "記録は残る"); assert.equal(d.data().withdrawn, true); assert.ok(d.data().withdrawnAt);
+  assert.equal(d.data().baselineDone, true);
+  if (group === "B") { const ck2 = await read((db) => getDocs(collection(db, "participants", uid, "checkins"))); assert.equal(ck2.size, 1, "振り返りも残る"); }
+  // やめた人がもう一度ログインしても、記録は増やせない
+  await page.reload(); await page.waitForFunction(() => location.hash === "#start" || location.hash === "" || location.hash === "#withdrawn"); await page.evaluate(() => (location.hash = "login"));
+  await page.locator("#li-mail").fill(MAIL); await page.locator("#li-pw").fill(PW); await page.locator("#li-go").click();
+  await page.waitForFunction(() => location.hash === "#withdrawn");
+  step("参加をやめると「やめた」印が付き、記録は残る（同意どおり研究に使う）。再ログインしても参加は再開しない");
 
   assert.deepEqual(errors.filter((e) => !/auth\/|Firestore|offline|unavailable/i.test(e)), [], "ページのエラー: " + errors.join(" / "));
   await browser.close(); await env.cleanup();

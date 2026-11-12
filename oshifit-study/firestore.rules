@@ -1,5 +1,6 @@
 rules_version = '2';
-// OshiFit 研究版の Firestore ルール。参加者は自分の記録だけ読み書きでき、開発者（admins に登録した大学アカウント）は全件を閲覧だけできる。
+// OshiFit 研究版の Firestore ルール。参加者（メールアドレスでログイン）は自分の記録だけ読み書きでき、開発者（admins に登録した大学アカウント）は全件を閲覧だけできる。
+// 参加をやめても記録は消さない（倫理審査の同意どおり）。やめたあとは書き込めない。
 service cloud.firestore {
   match /databases/{db}/documents {
     function signedIn() { return request.auth != null; }
@@ -19,6 +20,8 @@ service cloud.firestore {
         && request.resource.data.pid is string && request.resource.data.pid.size() == 9
         && !('group' in request.resource.data) && !('final' in request.resource.data);
       allow update: if owner(uid)
+        && !(resource.data.get('withdrawn', false) == true)                 // やめたあとは書き込めない
+        && (!('withdrawn' in request.resource.data) || request.resource.data.withdrawn == true)
         && unchanged('pid') && unchanged('mode') && unchanged('createdAt') && unchanged('consentedAt')
         // 選んだ群・提案・見込み・決めた時刻は変えられない
         && unchanged('group') && unchanged('planIds') && unchanged('decidedAt') && unchanged('pred') && unchanged('plansOffered')
@@ -28,16 +31,16 @@ service cloud.firestore {
         && (!('group' in request.resource.data) || request.resource.data.group in ['A', 'B', 'C'])
         && (('group' in resource.data) || !('group' in request.resource.data) || request.resource.data.decidedAt == request.time)
         && (!('final' in request.resource.data) || 'group' in resource.data);
-      allow delete: if owner(uid);   // 参加をやめる（記録を削除）
+      allow delete: if false;        // 記録は消さない（参加をやめても研究に使う）
 
       match /checkins/{week} {
         allow read: if owner(uid) || isAdmin();
         allow create: if owner(uid)
           && week in ['1', '2', '3', '4', '5', '6']
           && request.resource.data.week == int(week)
-          && get(/databases/$(db)/documents/participants/$(uid)).data.get('group', '') in ['B', 'C'];
-        allow update: if false;      // 振り返りはあとから書き換えない
-        allow delete: if owner(uid);
+          && get(/databases/$(db)/documents/participants/$(uid)).data.get('group', '') in ['B', 'C']
+          && !(get(/databases/$(db)/documents/participants/$(uid)).data.get('withdrawn', false) == true);
+        allow update, delete: if false;   // 振り返りはあとから書き換えない・消さない
       }
     }
     match /{path=**}/checkins/{week} { allow read: if isAdmin(); }

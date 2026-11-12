@@ -1,11 +1,12 @@
 // OshiFit の保存（研究版のみ）。Firebase の匿名認証と Cloud Firestore を使う。
+// ログイン：メールアドレスとパスワード（Firebase Authentication）。メールアドレスは Authentication だけにあり、Firestore には入れない。
 // 保存先：participants/{uid}（開始時の回答・得点・群・見込み・最後の調査）と participants/{uid}/checkins/{回}（振り返り）。
 // 写真と顔の特徴点は保存しない（アバターは色や形の番号だけ）。データの形は DATA_SCHEMA_ja.md。
 (function () {
   "use strict";
   const V = "10.14.1";
   const CDN = (m) => `https://www.gstatic.com/firebasejs/${V}/firebase-${m}.js`;
-  let fb = null, uid = null, ref = null, debounceT = null, failed = 0;
+  let fb = null, uid = null, email = null, ref = null, debounceT = null, failed = 0;
 
   async function load() {
     if (fb) return fb;
@@ -21,12 +22,16 @@
   const report = (e) => { failed++; console.error("[OshiFit 保存]", e); if (window.OSHIFIT_ON_SAVE_ERROR) window.OSHIFIT_ON_SAVE_ERROR(e); };
   const ms = (t) => (t && typeof t.toMillis === "function" ? t.toMillis() : typeof t === "number" ? t : null);
 
-  // 起動：匿名でログインし、保存済みの記録があれば返す（なければ null）
+  // 起動：ログイン済みなら、保存済みの記録を返す（なければ null）
   async function init() {
-    const { auth, fs, db, au } = await load();
+    const { auth, au } = await load();
     const user = au.currentUser || (await new Promise((res) => { const off = auth.onAuthStateChanged(au, (u) => { off(); res(u); }); }));
-    if (!user) return null;                                         // まだ同意していない（同意したときに匿名ログインする）
-    uid = user.uid; ref = fs.doc(db, "participants", uid);
+    if (!user || user.isAnonymous) return null;
+    return loadMine(user);
+  }
+  async function loadMine(user) {
+    const { fs, db } = fb;
+    uid = user.uid; email = user.email; ref = fs.doc(db, "participants", uid);
     const snap = await fs.getDoc(ref);
     if (!snap.exists()) return null;
     const d = snap.data();
@@ -36,16 +41,30 @@
       sc: d.scores || null, plans: d.plansOffered || null, group: d.group || null, decidedAt: ms(d.decidedAt),
       plan: d.group ? { id: (d.planIds && d.planIds[0]) || null, ids: d.group === "B" ? d.planIds || [] : [], accepted: d.group === "B" } : null,
       pred: d.pred || null, weekly: cks.docs.map((x) => { const w = x.data(); return { ...w, at: ms(w.at) }; }),
-      final: d.final ? { sc: d.final.scores, day: d.final.day } : null,
+      final: d.final ? { sc: d.final.scores, day: d.final.day } : null, withdrawn: !!d.withdrawn,
     };
   }
+  // 新規登録（メールアドレスとパスワード）。続けて begin() で記録を作る
+  async function signup(mail, pw) {
+    const { auth, au } = await load();
+    const cred = await auth.createUserWithEmailAndPassword(au, mail, pw);
+    uid = cred.user.uid; email = cred.user.email;
+    auth.sendEmailVerification(cred.user).catch(() => {});        // 確認メール（届かなくても参加はできる）
+  }
+  async function login(mail, pw) {
+    const { auth, au } = await load();
+    const cred = await auth.signInWithEmailAndPassword(au, mail, pw);
+    return loadMine(cred.user);
+  }
+  async function logout() { if (fb) await fb.auth.signOut(fb.au); uid = null; email = null; ref = null; }
+  async function resetPassword(mail) { const { auth, au } = await load(); await auth.sendPasswordResetEmail(au, mail); }
 
-  // 同意して始める：匿名ログインして、参加者の記録を作る
+  // 同意して始める：ログイン中のアカウントで、参加者の記録を作る（性別 Q2 は登録画面で聞く）
   async function begin(S) {
-    const { auth, fs, db, au } = await load();
-    const cred = au.currentUser ? { user: au.currentUser } : await auth.signInAnonymously(au);
-    uid = cred.user.uid; ref = fs.doc(db, "participants", uid);
-    await fs.setDoc(ref, { pid: S.id, mode: "study", appVersion: window.OSHIFIT_APP_VERSION || null, consentedAt: fs.serverTimestamp(), createdAt: fs.serverTimestamp(), answers: {}, baselineDone: false });
+    const { fs, db, au } = await load();
+    if (!au.currentUser) throw new Error("not_signed_in");
+    uid = au.currentUser.uid; email = au.currentUser.email; ref = fs.doc(db, "participants", uid);
+    await fs.setDoc(ref, { pid: S.id, mode: "study", appVersion: window.OSHIFIT_APP_VERSION || null, qset: window.OSHIFIT_QSET || "short", consentedAt: fs.serverTimestamp(), createdAt: fs.serverTimestamp(), answers: { Q2: S.answers.Q2 }, baselineDone: false });
   }
   const upd = (data) => { if (!ref) return Promise.reject(new Error("not_started")); return fb.fs.updateDoc(ref, data).catch(report); };
 
@@ -65,17 +84,14 @@
   }
   function final(S, answers, day) { return upd({ final: { answers: { ...answers }, scores: S.final.sc, day, at: fb.fs.serverTimestamp() } }); }
 
-  // 参加をやめる：振り返り → 本体の順に消し、匿名アカウントも消す。失敗したら例外を投げる（画面は「削除しました」と言わない）
+  // 参加をやめる：記録は消さず（倫理審査の同意どおり研究に使う）、「やめた」印と時刻を付けてログアウトする。失敗したら例外を投げる
   async function withdraw() {
-    if (!ref) { const r = await init(); if (!ref) return true; }
-    const { fs, au } = fb;
-    const cks = await fs.getDocs(fs.collection(ref, "checkins"));
-    for (const c of cks.docs) await fs.deleteDoc(c.ref);
-    await fs.deleteDoc(ref);
-    try { if (au.currentUser) await au.currentUser.delete(); } catch (e) { await fb.auth.signOut(au); }
-    ref = null; uid = null;
+    if (!ref) await init();
+    if (!ref) return true;
+    await fb.fs.updateDoc(ref, { withdrawn: true, withdrawnAt: fb.fs.serverTimestamp() });
+    await logout();
     return true;
   }
 
-  window.OFStore = { init, begin, draft, baseline, avatar, decide, checkin, final, withdraw, get failed() { return failed; }, get uid() { return uid; } };
+  window.OFStore = { init, signup, login, logout, resetPassword, begin, draft, baseline, avatar, decide, checkin, final, withdraw, get failed() { return failed; }, get uid() { return uid; }, get email() { return email; } };
 })();

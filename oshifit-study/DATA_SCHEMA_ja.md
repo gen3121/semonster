@@ -3,19 +3,21 @@
 ## Firestore（プロジェクト `oshifit-study`、asia-northeast1）
 
 ```
-participants/{uid}                 … 参加者1人（uid は匿名認証の ID）
-  pid            参加ID（例 "7F3K-92QD"。画面に出すID）
+participants/{uid}                 … 参加者1人（uid は Firebase Authentication の ID。ログインはメールアドレスとパスワード。メールアドレスは Authentication にだけあり、ここには入れない）
+  pid            研究用の番号（例 "7F3K-92QD"。自動で作る。マイページに出す）
+  qset           質問の版（"short"＝短縮版、"full"＝全項目）
+  withdrawn      参加をやめたら true（記録は消さない。倫理審査の同意どおり研究に使う）、withdrawnAt はその時刻
   mode           "study"
   appVersion     アプリの版（例 "2026-11-12"）
   createdAt      サーバー時刻（同意して始めた時）
-  answers        開始時の回答 {Q1: 21, Q2: "女性", …, W1: 3, H1: 5, P1: 2, Q62: "自由記述"}
+  answers        開始時の回答（Q2 性別は新規登録の画面で聞く。短縮版では questionnaire.json の short_omit の17項目は空） {Q1: 21, Q2: "女性", …, W1: 3, H1: 5, P1: 2, Q62: "自由記述"}
   scores         開始時の得点 {wb, joy, sleep, money, duty, compare, burnout, who5raw, shs, pss}
   plansOffered   [{id, why}]（示した提案、最大3つ）
   group          "A" | "B" | "C"（一度決めたら変えられない）
   planIds        群B：選んだ提案の id の配列。群C：示した提案の先頭1つ。群A：[]
   decidedAt      サーバー時刻（群が決まった時）。「開始からの日数」の起点
   pred           {A:{…scores}, B:{…scores}, hw, hwWb}（2つの未来で示した見込み。群Aはなし）
-  avatar         {skin, hair, shirt, style, face, eye, brow, mouth, source}（写真は保存しない）
+  avatar         {v:2, gender, face, skin, hair, hairColor, brow, eye, eyeColor, nose, mouth, glasses, beard, shirt}（番号と記号だけ。写真は使わない。avatar.js）
   final          {answers:{…}, scores:{…}, day, at}（最後の調査）
 participants/{uid}/checkins/{week} … 振り返り（week = 何回目か 1〜6。文書IDも同じ）
   week, day（開始からの日数）, at（サーバー時刻）
@@ -34,7 +36,7 @@ pilots/{pid}                       … プレ実験の参加ID（研究者が入
 すべて UTF-8（BOM 付き、Excel で開ける）。1行目は列名。
 
 ### baseline.csv（1行1人）
-`pid, uid, pilot(0/1), created_at, decided_at, group, plans_offered(;区切り), plans_chosen(;区切り), avatar_source,`
+`pid, uid, pilot(0/1), qset, withdrawn(0/1), withdrawn_at, created_at, decided_at, group, plans_offered(;区切り), plans_chosen(;区切り), avatar_source,`
 開始時の全項目 `Q1 … Q61, W1 … W5, H1 … H4, P1 … P14`（Q62 の自由記述は free.csv に分ける）、
 得点 `wb, joy, sleep, money, duty, compare, burnout, who5raw, shs, pss`、
 見込み `pred_B_wb, pred_B_joy, pred_B_sleep, pred_B_money, pred_B_duty, pred_B_compare, pred_B_burnout, pred_B_pss, pred_hw, pred_hwWb`
@@ -43,7 +45,7 @@ pilots/{pid}                       … プレ実験の参加ID（研究者が入
 `pid, group, week, day, at, did_<planId>…（その人の提案の分だけ。列は全提案分を作り、ないところは空）, Q44, Q45, Q47, Q48, joy, stress, happy, W1 … W5, burn, joyN`
 
 ### trial.csv（1行1人。最後の調査まで）
-`pid, pilot, group, final_day, final_at,` 最後の調査の項目 `W1 … W5, H1 … H4, P1 … P14, Q29 … Q34, Q39, Q44 … Q51, J1, J2, K1 … K5`（群Aは J/K なし）、
+`pid, pilot, withdrawn, group, final_day, final_at,` 最後の調査の項目 `W1 … W5, H1 … H4, P1 … P14, Q29 … Q34, Q39, Q44 … Q51, J1, J2, K1 … K5`（群Aは J/K なし）、
 最後の得点 `wb_post, joy_post, sleep_post, money_post, duty_post, compare_post, burnout_post, who5raw_post, shs_post, pss_post`、
 `n_checkins`（振り返りの回数）、`exec_rate`（群Bで「行った=1、一部=0.5、行わなかった=0」の平均）
 

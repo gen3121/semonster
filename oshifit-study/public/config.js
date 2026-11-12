@@ -3,12 +3,13 @@
 //   "demo"  … 展示（学祭）・確認用。何も保存しない。編集者モードあり
 window.OSHIFIT_MODE = "demo";
 window.OSHIFIT_APP_VERSION = "2026-11-12";
+// 質問の数："short"＝短縮版（採点・提案に使わない17項目を省く）、"full"＝承認時の全項目
+window.OSHIFIT_QSET = "short";
 // Firebase コンソール →「プロジェクトの設定」→「マイアプリ」のウェブアプリの値を貼る（公開されても問題ない値。秘密鍵ではない）
 window.OSHIFIT_FIREBASE = {
   apiKey: "【Firebase コンソールの値】",
-  authDomain: "oshifit-study.firebaseapp.com",
-  projectId: "oshifit-study",
-  storageBucket: "oshifit-study.appspot.com",
+  authDomain: "oshifit-34941.firebaseapp.com",
+  projectId: "oshifit-34941",
   messagingSenderId: "【Firebase コンソールの値】",
   appId: "【Firebase コンソールの値】",
 };

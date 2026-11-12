@@ -70,14 +70,18 @@ test("群Aは振り返りを書けない。最後の調査は一度だけ", asyn
   await assertSucceeds(updateDoc(r, { final: { day: 28, scores: { wb: 60 } } }));
   await assertFails(updateDoc(r, { final: { day: 29, scores: { wb: 90 } } }));
 });
-test("参加をやめる：自分の記録と振り返りを削除できる", async () => {
+test("参加をやめる：記録は消せない。「やめた」印を付けたあとは書き込めない", async () => {
   const r = doc(me(), "participants", "u1");
   await setDoc(r, base);
   await updateDoc(r, { group: "C", planIds: ["mute"], decidedAt: serverTimestamp() });
   await setDoc(doc(r, "checkins", "1"), { week: 1, day: 4 });
-  await assertFails(deleteDoc(doc(other(), "participants", "u1")));
-  await assertSucceeds(deleteDoc(doc(r, "checkins", "1")));
-  await assertSucceeds(deleteDoc(r));
+  await assertFails(deleteDoc(doc(r, "checkins", "1")));
+  await assertFails(deleteDoc(r));
+  await assertSucceeds(updateDoc(r, { withdrawn: true, withdrawnAt: serverTimestamp() }));
+  await assertFails(updateDoc(r, { withdrawn: false }));
+  await assertFails(updateDoc(r, { avatar: { hair: "bob" } }));
+  await assertFails(setDoc(doc(r, "checkins", "2"), { week: 2, day: 9 }));
+  await assertSucceeds(getDoc(r));                                   // 自分の記録は読める
 });
 test("開発者（admins に登録・メール確認済み）だけが全件を読める。書き換えはできない", async () => {
   await setDoc(doc(me(), "participants", "u1"), base);

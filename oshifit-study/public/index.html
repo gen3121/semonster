@@ -1,4 +1,17 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+/* アバター作成（Mii を参考にした選び方） */
+.avstage{align-items:center;position:sticky;top:64px;z-index:5}
+.avprev{background:var(--low);border-radius:16px;width:100%;display:flex;justify-content:center;padding:6px 0}
+.avtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.avtab{appearance:none;flex:none;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:6px 12px;font:600 13px var(--sans);cursor:pointer;min-height:36px}
+.avtab[aria-selected="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.avgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px}
+.avopt{appearance:none;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font:600 11px var(--sans);color:var(--muted)}
+.avopt[aria-pressed="true"]{border-color:var(--primary);background:var(--good-bg);color:var(--fg)}
+.swgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.sw{appearance:none;aspect-ratio:1/1;border-radius:50%;border:2px solid var(--line2);cursor:pointer;padding:0}
+.sw[aria-pressed="true"]{border:3px solid var(--fg);box-shadow:0 0 0 3px var(--primary)}
+</style></head><body>
 <title>OshiFit 画面試作</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -383,7 +396,28 @@ tr:last-child td{border-bottom:0}
 
 <script src="config.js"></script>
 <script src="store.js"></script>
+<script src="avatar.js"></script>
 <script>window.OSHIFIT_Q={
+ "short_omit": [
+  "Q35",
+  "Q36",
+  "Q37",
+  "Q38",
+  "Q40",
+  "Q41",
+  "Q43",
+  "Q52",
+  "Q53",
+  "Q54",
+  "Q55",
+  "Q56",
+  "Q57",
+  "Q58",
+  "Q59",
+  "Q60",
+  "Q61"
+ ],
+ "short_omit_note": "短縮版（config.js の OSHIFIT_QSET=\"short\"）で聞かない項目。採点・提案・群の判定に使わない項目（気持ちと生活の10項目、したくなるときの7項目）。性別 Q2 は新規登録の画面で聞く。",
  "sections": [
   {
    "id": "basic",
@@ -1273,21 +1307,9 @@ function predict(sc,planId){const p=planById(planId);const B={...sc};
   if(p.axis!=="joy"&&p.axis!=="wb") B.burnout=clamp(sc.burnout-p.eff/4,0,100); else B.joy=clamp(sc.joy+p.eff,0,100);
   return{A:sc,B,hw:15,hwWb:12,plan:p};}
 
-const SKIN=["#f8e1d0","#f1cdb3","#e2b38f","#c98f6a","#9c6a4a"], HAIR=["#2b211e","#5a3d2e","#8a5a3c","#c49a6c","#7b5da8","#d97aa6","#e3c584","#9e9aa0"], SHIRT=["#0058be","#2170e4","#006c49","#825100","#424754"];
-const STYLES=[["bun","お団子"],["bob","ボブ"],["long","ロング"],["short","ショート"]];
-function defAv(){return{skin:0,hair:1,shirt:0,style:"bun",face:1,eye:1,brow:0,mouth:1,source:"parts"}}
-function avatar(av,mood,size=120){av=av||defAv();
-  const sk=SKIN[av.skin],hr=HAIR[av.hair],sh=mood==="tired"?"#727785":SHIRT[av.shirt];
-  const fw=[30,28,26][av.face??1], fh=[28,30,33][av.face??1], ey=[0.8,1,1.25][av.eye??1], mw=[5,7,9][av.mouth??1], bt=[0,-2,2][av.brow??0];
-  const back={bun:`<circle cx="65" cy="20" r="14" fill="${hr}"/><ellipse cx="65" cy="58" rx="36" ry="38" fill="${hr}"/>`,bob:`<path d="M27 70Q25 24 65 22Q105 24 103 70Q100 88 90 88L40 88Q30 88 27 70Z" fill="${hr}"/>`,long:`<path d="M26 112Q20 26 65 22Q110 26 104 112Z" fill="${hr}"/>`,short:`<ellipse cx="65" cy="52" rx="34" ry="32" fill="${hr}"/>`}[av.style];
-  const eyeY=66;
-  const eyes=mood==="tired"?`<ellipse cx="54" cy="${eyeY+1}" rx="${5*ey}" ry="${3*ey}" fill="#3a2a2a"/><path d="M${48-ey} ${eyeY-2.5}L${60+ey} ${eyeY-2.5}" stroke="${hr}" stroke-width="2.6"/><ellipse cx="76" cy="${eyeY+1}" rx="${5*ey}" ry="${3*ey}" fill="#3a2a2a"/><path d="M${70-ey} ${eyeY-2.5}L${82+ey} ${eyeY-2.5}" stroke="${hr}" stroke-width="2.6"/>`
-   :`<ellipse cx="54" cy="${eyeY}" rx="${5*ey}" ry="${6*ey}" fill="#3a2a2a"/><circle cx="${55.6+ey}" cy="${eyeY-2*ey}" r="${1.7*ey}" fill="#fff"/><ellipse cx="76" cy="${eyeY}" rx="${5*ey}" ry="${6*ey}" fill="#3a2a2a"/><circle cx="${77.6+ey}" cy="${eyeY-2*ey}" r="${1.7*ey}" fill="#fff"/>`;
-  const brows=`<path d="M${47} ${57-bt}L${60} ${56+bt}" stroke="${hr}" stroke-width="2.2" stroke-linecap="round"/><path d="M${70} ${56+bt}L${83} ${57-bt}" stroke="${hr}" stroke-width="2.2" stroke-linecap="round"/>`;
-  const mouth={tired:`<path d="M${65-mw} 84Q65 81 ${65+mw} 84" fill="none" stroke="#a5575c" stroke-width="2"/>`,neutral:`<path d="M${65-mw} 82Q65 85 ${65+mw} 82" fill="none" stroke="#b5525e" stroke-width="2"/>`,bright:`<path d="M${65-mw-1} 81Q65 89 ${65+mw+1} 81" fill="none" stroke="#c0505e" stroke-width="2.2"/>`}[mood||"neutral"];
-  const cheek=mood==="bright"?`<ellipse cx="46" cy="77" rx="5" ry="3" fill="#f5a9c0" opacity=".65"/><ellipse cx="84" cy="77" rx="5" ry="3" fill="#f5a9c0" opacity=".65"/>`:"";
-  const deco=mood==="tired"?`<path d="M98 22a8 8 0 0 1 14-3a7 7 0 0 1 9 9a6 6 0 0 1-3 11h-18a7 7 0 0 1-2-17z" fill="#c2c6d6"/>`:mood==="bright"?`<rect x="100" y="54" width="7" height="40" rx="3" fill="#2170e4" transform="rotate(18 103 74)"/><circle cx="96" cy="52" r="7" fill="#d8e2ff" opacity=".85"/><path d="M14 26l3-7 3 7 7 3-7 3-3 7-3-7-7-3z" fill="#ffb95f" opacity=".85"/>`:"";
-  return `<svg width="${size}" height="${r0(size*140/130)}" viewBox="0 0 130 140" role="img" aria-label="あなたのアバター"><path d="M18 140Q20 98 65 94Q110 98 112 140Z" fill="${sh}"/>${back}<ellipse cx="65" cy="65" rx="${fw}" ry="${fh}" fill="${sk}"/><path d="M${65-fw-1} 54Q50 33 65 35Q82 33 ${65+fw+1} 54Q80 44 65 46Q50 44 ${65-fw-1} 54Z" fill="${hr}"/>${brows}${eyes}${cheek}${mouth}${deco}</svg>`;}
+/* アバターは avatar.js（Mii を参考にしたパーツ式。写真は使わない） */
+function defAv(){return window.OFAvatar.defaults(S.answers&&S.answers.Q2)}
+function avatar(av,mood,size=120){if(av&&av.v!==2)av=null;return window.OFAvatar.render(av||defAv(),mood,size)}
 /* アバターの表情：6軸の平均が50未満＝疲れ気味、50〜64＝ふつう、65以上＝元気（数値の区分だけに連動） */
 function axMean(sc){return mean(SC.axes.map(a=>sc[a.key]))}
 function moodOf(sc){const m=axMean(sc);return m>=65?"bright":m<50?"tired":"neutral"}
@@ -1329,7 +1351,9 @@ function mkItem(it,s){const base={id:it.id,text:it.text,sec:s.title,lead:s.lead}
   if(it.type==="choice")return{...base,kind:"list",labels:it.opts,vals:it.opts};
   if(it.type==="text")return{...base,kind:"text",optional:!!it.optional};
   const L=it.scale||s.scale,b=s.base??1;return{...base,kind:L.length===7?"circle":"list",labels:L,vals:L.map((_,j)=>b+j)}}
-const BASE_ITEMS=QN.sections.flatMap(s=>s.items.map(it=>mkItem(it,s)));
+/* 質問の数を減らす（config.js の OSHIFIT_QSET="short"）。採点・提案・分析に使わない項目を省き、性別（Q2）は新規登録で聞く */
+const OMIT=new Set(["Q2",...((window.OSHIFIT_QSET||"short")==="short"?(QN.short_omit||[]):[])]);
+const BASE_ITEMS=QN.sections.flatMap(s=>s.items.filter(it=>!OMIT.has(it.id)).map(it=>mkItem(it,s)));
 const AGREE7=["全く当てはまらない","ほとんど当てはまらない","あまり当てはまらない","どちらともいえない","やや当てはまる","かなり当てはまる","非常に当てはまる"];
 function itemOf(id){return BASE_ITEMS.find(i=>i.id===id)}
 function checkItems(){const ps=(planIds().length?planIds():["sns23"]).map(planById), sec="振り返り", lead="前回の振り返りから今日までについて答えてください。", A=v=>({kind:"circle",labels:AGREE7,vals:AGREE7.map((_,j)=>j+1)});
@@ -1504,15 +1528,14 @@ function vStart(){app.className="app land";
    <section class="band axes-band" id="sec-axes">${wave("var(--l-band)")}<div class="in"><div class="sechead"><p class="eyebrow">5 FACTORS → WELL-BEING</p><h2 class="jp-xl">5つの要素が、幸福度とストレスを決める</h2><p class="body">街の5つの場所が、推し活の5つの要素です。この5つの状態から、結果として公園の「幸福度」と「ストレス度」が決まると考えます。どの要素も点数が高いほど良い向きで、60点以上を<b class="tb">青</b>、60点未満を<b class="tr">赤</b>で表示します。</p></div>
      <div class="axcards">${axes.map(a=>`<article class="axcard" id="ax-${a.key}"><div class="arch">${miniSVG(a.key)}</div><span class="no">0${a.no}</span><p class="en small-en">${a.d[0]}</p><h3>${a.name}</h3><p class="small muted">${a.d[1]}</p></article>`).join("")}<article class="axcard result" id="ax-wb"><div class="arch">${miniSVG("wb")}</div><span class="no">→</span><p class="en small-en">RESULT ／ 公園</p><h3>幸福度とストレス度</h3><p class="small muted">5つの要素の結果。幸福度はWHO-5（最近2週間の気分）、ストレス度はPSS-J（最近1か月）で測ります。</p></article></div></div></section>
    <section class="band flow-band" id="sec-flow">${wave("var(--l-ink)")}<div class="in"><div class="sechead inv"><p class="eyebrow">HOW IT WORKS</p><h2 class="jp-xl">最初の15分と、4週間の振り返り</h2></div>
-     <ol class="flowcards">${[["質問に答える","今の推し活と気分について、約86問。選ぶと自動で次の質問へ進みます。"],["アバターを作る","写真は端末の中で読み取るだけ。保存も送信もしません。"],["6つの軸を見る","良いところは青、見直したいところは赤。算出の根拠も見られます。"],["2つの未来を比べる","今のまま（A）と、提案を試す（B）。4週間後の見込みを並べます。"]].map(([t,d],i)=>`<li><span class="big">0${i+1}</span><h3>${t}</h3><p>${d}</p></li>`).join("")}</ol>
+     <ol class="flowcards">${[["質問に答える","今の推し活と気分について、約${BASE_ITEMS.length}問。選ぶと自動で次の質問へ進みます。"],["アバターを作る","顔の形・髪型・色を選んで、自分に似せた分身を作ります。写真は使いません。"],["6つの軸を見る","良いところは青、見直したいところは赤。算出の根拠も見られます。"],["2つの未来を比べる","今のまま（A）と、提案を試す（B）。4週間後の見込みを並べます。"]].map(([t,d],i)=>`<li><span class="big">0${i+1}</span><h3>${t}</h3><p>${d}</p></li>`).join("")}</ol>
      <div class="road"><p class="eyebrow">4 WEEKS</p><div class="track4">${[0,4,8,12,16,20,24,28].map((d,i)=>`<div class="mile ${i===0?"s":i===7?"f":""}"><span class="dot"></span><b>${i===0?"開始":i===7?"最後の調査":`${i}回目`}</b><span>${i===0?"0日目":i===7?"28日目〜":`${d}日目ごろ`}</span></div>`).join("")}</div>
      <p class="xs" style="color:var(--ink-muted)">振り返りは前回から4日以上あけて、4〜5日ごとに6回（各約2分）。3回目だけ、最近2週間の気分（WHO-5）も答えます。</p></div></div></section>
    <section class="band about-band" id="sec-about">${wave("var(--bg)")}<div class="in"><div class="sechead"><p class="eyebrow">ABOUT THE STUDY</p><h2 class="jp-xl">安心して参加してもらうために</h2></div>
-     <div class="facts-grid">${[["写真は送らない","アバター用の写真は端末の中で顔の比率と色を読み取るだけ。保存も送信もしません。"],["名前は集めない","名前やメールアドレスは集めず、匿名の参加IDだけで記録します。"],["いつでもやめられる","マイページから参加をやめられ、記録は削除されます。不利益はありません。"],["プレ実験の方も歓迎","プレ実験に参加した方も参加できます。参加IDを研究者にお知らせください。"]].map(([t,d],i)=>`<div class="fact"><span class="fno">${["PHOTO","ANONYMOUS","OPT-OUT","PILOT"][i]}</span><h3>${t}</h3><p class="small muted">${d}</p></div>`).join("")}</div></div></section>
+     <div class="facts-grid">${[["写真は使わない","アバターは写真を使わず、顔の形や髪型を自分で選んで作ります。"],["メールはログインだけに使う","メールアドレスはログインのためだけに使い、回答とは別に管理します。名前は集めません。"],["いつでもやめられる","マイページから参加をやめられます。それまでの回答は、同意いただいたとおり研究に使います。不利益はありません。"],["プレ実験の方も歓迎","プレ実験に参加した方も参加できます。マイページの研究用の番号を研究者にお知らせください。"]].map(([t,d],i)=>`<div class="fact"><span class="fno">${["AVATAR","PRIVACY","OPT-OUT","PILOT"][i]}</span><h3>${t}</h3><p class="small muted">${d}</p></div>`).join("")}</div></div></section>
    <section class="band join-band" id="sec-join"><div class="in"><div class="joincard"><div class="stack" style="gap:12px"><p class="eyebrow">JOIN</p><h2 class="jp-xl">さっそく、はじめてみる</h2>
-       <ul class="facts"><li>約86の質問（約15分）</li><li>約4週間、4〜5日ごとに6回の振り返り（各約2分）。28日目以降に最後の調査</li><li>写真は端末の中だけで使い、保存も送信もしません</li></ul>
-       <label class="consent" for="agree"><input type="checkbox" id="agree">説明を読み、研究への参加に同意します</label>
-       <button class="btn primary pill big" id="go" disabled>はじめる${ARROW}</button></div><div class="joinart">${miniSVG("home")}</div></div></div></section>
+       <ul class="facts"><li>約${BASE_ITEMS.length}の質問（約${Math.max(8,Math.round(BASE_ITEMS.length*10/60))}分）</li><li>約4週間、4〜5日ごとに6回の振り返り（各約2分）。28日目以降に最後の調査</li><li>メールアドレスで登録し、次からはログインして続きから答えられます</li></ul>
+       <div class="row" style="flex-wrap:wrap;gap:10px"><a class="btn primary pill big" id="go" href="#signup">新規登録してはじめる${ARROW}</a><a class="btn pill big" id="to-login" href="#login">ログイン</a></div></div><div class="joinart">${miniSVG("home")}</div></div></div></section>
    <footer class="lfoot">${wave("var(--l-ink)")}<div class="in"><div class="fgrid"><div><p class="display sm">OshiFit</p><p class="small">OshiFitで推し活を持続可能に！</p></div>
      <div class="small"><b>大阪工業大学大学院 情報科学研究科</b><br>倫理審査 承認済みの研究です<br>問い合わせ先：<span class="mono">m1m02530106@oit.ac.jp</span></div></div><p class="xs" style="color:var(--ink-muted)">© 2026 OshiFit 研究プロジェクト</p></div></footer>
    <button class="totop" id="totop" aria-label="ページの先頭へ" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
@@ -1521,33 +1544,68 @@ function vStart(){app.className="app land";
   app.querySelectorAll(".pin").forEach(p=>{const g=()=>{to("sec-axes");const c=document.getElementById("ax-"+p.dataset.ax);if(c){c.classList.add("flash");setTimeout(()=>c.classList.remove("flash"),1600)}};p.onclick=g;p.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();g()}}});
   $("#totop").onclick=()=>scrollTo({top:0,behavior:"smooth"});
   const tt=$("#totop");onscroll=()=>{if(tt.isConnected)tt.hidden=scrollY<500};
-  $("#agree").onchange=e=>{$("#go").disabled=!e.target.checked};$("#go").onclick=async()=>{if(STUDY&&!S.consented){$("#go").disabled=true;try{await OFStore.begin(S);S.consented=true}catch(e){console.error(e);toast("サーバーにつながりませんでした。通信を確認して、もう一度お試しください");$("#go").disabled=false;return}}S.consented=true;go("q")};wire()}
+  wire()}
+
+/* ---------- 新規登録・ログイン（メールアドレスとパスワード。Firebase Authentication） ---------- */
+const AUTH_ERR={"auth/email-already-in-use":"このメールアドレスは登録済みです。「ログイン」から入ってください。","auth/invalid-email":"メールアドレスの形が正しくありません。","auth/weak-password":"パスワードは8文字以上にしてください。","auth/invalid-credential":"メールアドレスかパスワードが違います。","auth/wrong-password":"メールアドレスかパスワードが違います。","auth/user-not-found":"このメールアドレスは登録されていません。","auth/too-many-requests":"試行が多すぎます。しばらくしてからお試しください。","auth/network-request-failed":"通信できませんでした。通信を確認してください。"};
+const authMsg=e=>AUTH_ERR[e&&e.code]||"うまくいきませんでした。もう一度お試しください。";
+function vSignup(){const opts=QN.sections[0].items.find(i=>i.id==="Q2").opts, logged=STUDY&&OFStore.email;
+  app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">SIGN UP</p><h2>${logged?"登録の続き":"新規登録"}</h2><p class="small muted">登録すると、質問 → アバター → 分析 → 2つの未来 の順に進みます。途中でやめても、ログインすれば続きから答えられます。</p></div>
+   <section class="card">${logged?`<p class="small">ログイン中：<b>${esc(OFStore.email)}</b></p>`:`
+    <label class="stack" style="gap:4px"><b class="small">メールアドレス</b><input class="field" id="su-mail" type="email" autocomplete="email" inputmode="email"></label>
+    <label class="stack" style="gap:4px"><b class="small">パスワード（8文字以上）</b><input class="field" id="su-pw" type="password" autocomplete="new-password" minlength="8"></label>`}
+    <div class="stack" style="gap:6px"><b class="small">性別（アバターで選べる髪型が変わります）</b><div class="olist" role="radiogroup" aria-label="性別">${opts.map((o,j)=>`<button class="obtn" role="radio" data-g="${esc(o)}" aria-checked="${S.answers.Q2===o}"><span class="dot" aria-hidden="true"></span><span>${j+1}　${esc(o)}</span></button>`).join("")}</div></div>
+    <p class="xs muted">メールアドレスはログインのためだけに使い、回答とは別に管理します。研究の結果に名前やメールアドレスが出ることはありません。</p>
+    <label class="consent card" for="agree"><input type="checkbox" id="agree">説明を読み、研究への参加に同意します</label>
+    <p class="small" id="su-msg" role="alert" style="color:var(--bad)"></p></section></main>
+   ${dock("su-back","登録して質問へ","su-go",true)}`;
+  const ok=()=>{$("#su-go").disabled=!($("#agree").checked&&S.answers.Q2&&(logged||($("#su-mail").value.includes("@")&&$("#su-pw").value.length>=8)))};
+  app.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{S.answers.Q2=b.dataset.g;app.querySelectorAll("[data-g]").forEach(x=>x.setAttribute("aria-checked",String(x===b)));ok()});
+  app.querySelectorAll("input").forEach(x=>x.oninput=x.onchange=ok);
+  $("#su-back").onclick=()=>go("start");
+  $("#su-go").onclick=async()=>{const b=$("#su-go");b.disabled=true;$("#su-msg").textContent="";
+    if(STUDY){try{if(!logged)await OFStore.signup($("#su-mail").value.trim(),$("#su-pw").value);await OFStore.begin(S)}catch(e){console.error(e);$("#su-msg").textContent=authMsg(e);b.disabled=false;return}}
+    S.consented=true;go("q")};wire()}
+function vLogin(){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">LOGIN</p><h2>ログイン</h2><p class="small muted">登録したメールアドレスとパスワードで、続きから答えられます。</p></div>
+   <section class="card"><label class="stack" style="gap:4px"><b class="small">メールアドレス</b><input class="field" id="li-mail" type="email" autocomplete="email" inputmode="email"></label>
+    <label class="stack" style="gap:4px"><b class="small">パスワード</b><input class="field" id="li-pw" type="password" autocomplete="current-password"></label>
+    <p class="small" id="li-msg" role="alert"></p><button class="btn sm" id="li-reset">パスワードを忘れたとき（再設定のメールを送る）</button></section></main>
+   ${dock("li-back","ログイン","li-go")}`;
+  const msg=(t,bad)=>{const m=$("#li-msg");m.textContent=t;m.style.color=bad?"var(--bad)":"var(--muted)"};
+  $("#li-back").onclick=()=>go("start");
+  $("#li-reset").onclick=async()=>{const m=$("#li-mail").value.trim();if(!m)return msg("メールアドレスを入れてください",true);if(!STUDY)return msg("展示用では送りません");try{await OFStore.resetPassword(m);msg("再設定のメールを送りました。届いたメールの手順で新しいパスワードにしてください。")}catch(e){msg(authMsg(e),true)}};
+  $("#li-go").onclick=async()=>{if(!STUDY){S.consented=true;return go("home")}const b=$("#li-go");b.disabled=true;
+    try{const saved=await OFStore.login($("#li-mail").value.trim(),$("#li-pw").value);if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers)}render()}
+    catch(e){console.error(e);msg(authMsg(e),true);b.disabled=false}};wire()}
 
 function vQ(){if(!SV.q&&STUDY){const i=BASE_ITEMS.findIndex(it=>S.answers[it.id]==null&&!it.optional);SV.q={i:i<0?BASE_ITEMS.length-1:i}} // 途中から再開
   vSurvey("q",BASE_ITEMS,S.answers,"質問に答える",null,()=>{S.sc=scores(S.answers);S.plans=null;S.baselineDone=true;if(STUDY)OFStore.baseline(S);toast("質問はこれで終わりです");go("avatar")},0)}
-function vAvatar(){S.avatar=S.avatar||defAv();const av=S.avatar;
-  const sw=(name,arr,cur)=>`<div class="row" role="radiogroup" style="flex-wrap:wrap;gap:8px">${arr.map((c,i)=>`<button class="cbtn" role="radio" data-av="${name}" data-v="${i}" aria-checked="${cur===i}" aria-label="${name} ${i+1}" style="width:38px;height:38px;background:${c};border-color:${cur===i?"var(--primary)":"var(--line2)"}"></button>`).join("")}</div>`;
-  app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(1)}<div><p class="eyebrow view-eyebrow">AVATAR</p><h2>アバターを作る</h2><p class="small muted">4週間後の2つの未来を、この分身で見比べます。</p></div>
-   <section class="card" style="align-items:center"><div class="sunk" style="width:100%;display:flex;justify-content:center">${avatar(av,"neutral",150)}</div></section>
-   <section class="card"><div class="sec"><h3>写真から作る</h3><span class="chip">任意</span></div>
-    <button class="btn block" id="photo">写真を選ぶ</button>
-    <p class="callout good">写真は端末の中で顔の比率と色を読み取るだけで、保存も送信もしません。</p></section>
-   <section class="card"><div class="sec"><h3>自分で選ぶ</h3></div>
-    <div class="stack" style="gap:8px"><b class="small">髪型</b><div class="segs" style="grid-template-columns:repeat(4,1fr)">${STYLES.map(([k,l])=>`<button class="seg" data-style="${k}" aria-pressed="${av.style===k}">${l}</button>`).join("")}</div></div>
-    <div class="stack" style="gap:8px"><b class="small">髪の色</b>${sw("hair",HAIR,av.hair)}</div>
-    <div class="stack" style="gap:8px"><b class="small">肌の色</b>${sw("skin",SKIN,av.skin)}</div>
-    <div class="stack" style="gap:8px"><b class="small">服の色</b>${sw("shirt",SHIRT,av.shirt)}</div></section></main>
+let AVTAB="hair";
+function vAvatar(){const A=window.OFAvatar,gender=S.answers.Q2;
+  if(!S.avatar||S.avatar.v!==2)S.avatar=A.defaults(gender);const av=S.avatar;av.gender=gender||null;
+  const styles=A.stylesFor(gender);if(!styles.some(([k])=>k===av.hair))av.hair=styles[0][0];
+  const TABS=[["face","顔の形"],["skin","肌の色"],["hair","髪型"],["hairColor","髪の色"],["brow","まゆ"],["eye","目"],["eyeColor","目の色"],["nose","鼻"],["mouth","口"],["glasses","めがね"],...(gender==="女性"?[]:[["beard","ひげ"]]),["shirt","服の色"]];
+  if(!TABS.some(t=>t[0]===AVTAB))AVTAB="hair";
+  const LISTS={face:A.FACE,brow:A.BROW,eye:A.EYE,nose:A.NOSE,mouth:A.MOUTH,glasses:A.GLASSES,beard:A.BEARD};
+  const COLORS={skin:A.SKIN,hairColor:A.PALETTE,eyeColor:A.EYE_COLOR,shirt:A.PALETTE};
+  let grid="";
+  if(AVTAB==="hair")grid=`<div class="avgrid">${styles.map(([k,n])=>`<button class="avopt" data-k="hair" data-v="${k}" aria-pressed="${av.hair===k}">${A.render({...av,hair:k},"neutral",62)}<span>${esc(n)}</span></button>`).join("")}</div>`;
+  else if(COLORS[AVTAB])grid=`<div class="swgrid">${COLORS[AVTAB].map((c,i)=>`<button class="sw" data-k="${AVTAB}" data-v="${i}" aria-pressed="${av[AVTAB]===i}" aria-label="${TABS.find(t=>t[0]===AVTAB)[1]} ${i+1}" style="background:${c}"></button>`).join("")}</div>`;
+  else grid=`<div class="avgrid">${LISTS[AVTAB].map((n,i)=>`<button class="avopt" data-k="${AVTAB}" data-v="${i}" aria-pressed="${av[AVTAB]===i}">${A.render({...av,[AVTAB]:i},"neutral",62)}<span>${esc(n)}</span></button>`).join("")}</div>`;
+  app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(1)}<div><p class="eyebrow view-eyebrow">AVATAR</p><h2>アバターを作る</h2><p class="small muted">自分に似せて作ってください。4週間後の2つの未来を、この分身で見比べます。</p></div>
+   <section class="card avstage"><div class="avprev">${A.render(av,"neutral",150)}</div><button class="btn sm" id="av-rand">おまかせ</button></section>
+   <section class="card" style="gap:10px"><div class="avtabs" role="tablist">${TABS.map(([k,l])=>`<button class="avtab" role="tab" data-tab="${k}" aria-selected="${AVTAB===k}">${l}</button>`).join("")}</div>${grid}</section></main>
    ${dock("av-back","結果を見る","av-go")}`;
-  app.querySelectorAll("[data-style]").forEach(b=>b.onclick=()=>{av.style=b.dataset.style;keep(vAvatar)});
-  app.querySelectorAll("[data-av]").forEach(b=>b.onclick=()=>{av[b.dataset.av]=+b.dataset.v;keep(vAvatar)});
-  $("#photo").onclick=()=>toast("試作では写真を読み込みません（研究版では端末の中で読み取ります）");
+  app.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{AVTAB=b.dataset.tab;keep(vAvatar)});
+  app.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{const k=b.dataset.k;av[k]=k==="hair"?b.dataset.v:+b.dataset.v;keep(vAvatar)});
+  $("#av-rand").onclick=()=>{const r=n=>Math.floor(Math.random()*n);Object.assign(av,{face:r(A.FACE.length),skin:r(A.SKIN.length),hair:styles[r(styles.length)][0],hairColor:r(18),brow:r(A.BROW.length),eye:r(A.EYE.length),eyeColor:r(3),nose:r(A.NOSE.length-1),mouth:r(A.MOUTH.length),shirt:r(36)});keep(vAvatar)};
   $("#av-back").onclick=()=>go("q");$("#av-go").onclick=()=>{S.avatarDone=true;if(STUDY)OFStore.avatar(S);go("analysis")};wire()}
 /* レーダーは幸福度とストレスを決める5つの要素。幸福度・ストレス度は結果として下の横棒で示す */
 const FACTORS=()=>SC.axes.filter(a=>a.key!=="wb");const FV=sc=>FACTORS().map(a=>sc[a.key]),FN=()=>FACTORS().map(a=>a.name);
 const pss100=sc=>sc.pss==null?null:sc.pss/56*100;
 function outBars(rows,labels){
   const one=(v,good,i)=>`<div class="ob-row"><span class="xs muted">${labels[i]}</span><div class="ob"><i style="width:${clamp(v,0,100)}%;background:${good?"var(--good)":"var(--bad)"};opacity:${i===0&&labels.length>1?.4:1}"></i></div><b class="ob-v">${r0(v)}</b></div>`;
-  return`<div class="outbars"><div class="ob-flow" aria-hidden="true"><span>5つの要素</span><svg viewBox="0 0 40 12" width="40" height="12"><path d="M2 6h32M28 1l6 5-6 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>幸福度とストレス度</span></div>${rows.filter(r=>r[1].every(v=>v!=null)).map(([n,vals,good,ref,desc])=>`<div class="ob-item"><div class="row" style="justify-content:space-between"><b class="small">${n}</b><span class="xs muted">${desc}</span></div>
+  return`<div class="outbars"><div class="ob-flow" aria-hidden="true"><span>5つの要素</span><svg viewBox="0 0 40 12" width="40" height="12"><path d="M2 6h32M28 1l6 5-6 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>幸福度とストレス度</span></div>${rows.filter(r=>r[1].every(v=>v!=null)).map(([n,vals,good,ref,desc])=>`<div class="ob-item"><div class="row" style="justify-content:space-between"><b class="small">${n}</b></div>
    <div class="ob-wrap">${vals.map((v,i)=>one(v,good,i)).join("")}${ref!=null?`<span class="ob-ref" style="left:calc(5.4em + 8px + (100% - 7.8em - 16px) * ${ref/100})"></span>`:""}</div></div>`).join("")}</div>`}
 function radar(series,labels){const W=320,H=300,cx=160,cy=150,R=100,n=labels.length,ang=i=>-Math.PI/2+i*2*Math.PI/n,pt=(i,v)=>[cx+Math.cos(ang(i))*R*v/100,cy+Math.sin(ang(i))*R*v/100];
   const ring=v=>Array.from({length:n},(_,i)=>pt(i,v).join(",")).join(" ");
@@ -1648,37 +1706,39 @@ function vResult(){if(STUDY&&!S.final)return go("home");if(!S.final){ensureGroup
    <section class="card"><h3>ご協力ありがとうございました</h3><p class="small muted">${grp()==="B"?"プランBに取り組んだ約4週間の変化です。":grp()==="A"?"順調な推し活を続けられたかを、開始時と比べて示しています。":"今のままで続けた約4週間の変化です。"}研究の結果は全員分を集計し、OshiFitの提案の改善に使います。</p></section></main>${tabbar("home")}`;wire()}
 function vMypage(){if(!S.group)ensureGroup();const g=grp(),ps=planIds().map(planById),p=ps[0]||null;
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">MY PAGE</p><h2>マイページ</h2></div>
-   <section class="card"><div class="sec"><h3>参加ID</h3><span class="xs muted">名前やメールとは結びつきません</span></div>
-    <div class="idbox"><span class="mono" id="pid">${S.id}</span><button class="btn sm" id="copy">コピー</button></div>
-    <p class="xs muted">プレ実験に参加した方は、このIDを研究者に知らせてください。</p></section>
+   <section class="card"><div class="sec"><h3>アカウント</h3>${STUDY?'<button class="btn sm" id="logout">ログアウト</button>':""}</div>
+    ${STUDY&&OFStore.email?`<p class="small">ログイン中：<b>${esc(OFStore.email)}</b></p>`:""}
+    <div class="idbox"><span class="small muted">研究用の番号</span><span class="mono" id="pid">${S.id}</span><button class="btn sm" id="copy">コピー</button></div>
+    <p class="xs muted">プレ実験に参加した方は、この番号を研究者に知らせてください。</p></section>
    <section class="card"><div class="sec"><h3>参加の状況</h3></div><div>
     <div class="kv"><span>群</span><b>${g==="A"?"群A（今のままで順調）":g==="B"?"群B（プランBを実行）":"群C（プランAを選択）"}</b></div>
     ${p?`<div class="kv"><span>提案</span><b>${esc(planTitle(p))}</b></div>`:""}
     <div class="kv"><span>振り返り</span><b>${S.weekly.length} / ${N_CHECK}回</b></div><div class="kv"><span>開始から</span><b>${dayNo()}日目</b></div>
     <div class="kv"><span>最後の調査</span><b>${S.final?"回答済み":"28日目以降"}</b></div></div></section>
    <section class="card"><div class="sec"><h3>データの扱い</h3></div><ul class="facts">
-    <li>写真は端末の中で読み取るだけで、保存も送信もしません</li><li>回答は匿名IDで、研究用のサーバー（東京）に保存します</li><li>研究の目的以外には使いません</li></ul></section>
+    <li>アバターに写真は使いません</li><li>メールアドレスはログインのためだけに使い、回答は研究用の番号で、研究用のサーバーに保存します</li><li>参加をやめても、それまでの回答は同意いただいたとおり研究に使います</li><li>研究の目的以外には使いません</li></ul></section>
    <section class="card"><div class="sec"><h3>つらいとき</h3></div><p class="small muted">振り返りは休んでかまいません。一人で抱えずに、大学の学生相談室や、厚生労働省「まもろうよ こころ」の相談窓口を利用してください。</p></section>
    <section class="card" style="border-color:color-mix(in srgb,var(--bad) 40%,transparent)"><div class="sec"><h3 style="color:var(--bad)">参加をやめる</h3></div>
-    <p class="small muted">参加をやめても不利益はありません。これまでの回答は削除され、元に戻せません。</p>
-    <a class="btn danger-o block" href="#withdraw">参加をやめる（記録を削除）</a></section>
-   <section class="card"><div class="sec"><h3>問い合わせ先</h3></div><div class="idbox"><span class="small" id="mail" style="font-weight:600;word-break:break-all">m1m02530106@oit.ac.jp</span><button class="btn sm" id="copymail">コピー</button></div><p class="xs muted">メールで参加をやめるときは、参加IDも書いてください。</p></section></main>${tabbar("mypage")}`;
+    <p class="small muted">参加をやめても不利益はありません。それまでの回答は、同意いただいたとおり研究に使います。</p>
+    <a class="btn danger-o block" href="#withdraw">参加をやめる</a></section>
+   <section class="card"><div class="sec"><h3>問い合わせ先</h3></div><div class="idbox"><span class="small" id="mail" style="font-weight:600;word-break:break-all">m1m02530106@oit.ac.jp</span><button class="btn sm" id="copymail">コピー</button></div><p class="xs muted">メールで参加をやめるときは、研究用の番号も書いてください。</p></section></main>${tabbar("mypage")}`;
+  if($("#logout"))$("#logout").onclick=async()=>{await OFStore.logout();S=blank();SV={};go("start")};
   $("#copymail").onclick=()=>{(navigator.clipboard?navigator.clipboard.writeText($("#mail").textContent):Promise.reject()).then(()=>toast("メールアドレスをコピーしました")).catch(()=>{const r=document.createRange();r.selectNodeContents($("#mail"));const s=getSelection();s.removeAllRanges();s.addRange(r);toast("選択しました。コピーしてください")})};
   $("#copy").onclick=()=>{const t=S.id;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast("参加IDをコピーしました")).catch(()=>{const r=document.createRange();r.selectNodeContents($("#pid"));const s=getSelection();s.removeAllRanges();s.addRange(r);toast("IDを選択しました。コピーしてください")})};wire()}
 function vWithdraw(){vMypage();const sc=document.createElement("div");sc.className="scrim";
   sc.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="wt"><div class="grab"></div><h2 id="wt">参加をやめますか？</h2>
    <p class="small">参加をやめても、成績や評価などの不利益は一切ありません。</p>
-   <div class="callout bad"><b>削除されるもの</b><br>開始時の回答、振り返り、最後の調査、アバターの設定（研究用のサーバーとこの端末の両方から）。削除した記録は元に戻せません。</div>
-   <label class="check" for="wk"><input type="checkbox" id="wk">記録が削除され、元に戻せないことを理解しました</label>
-   <button class="btn primary block" id="w-keep">参加を続ける</button><button class="btn danger block" id="w-go" disabled>参加をやめて記録を削除する</button></div>`;
+   <div class="callout"><b>参加をやめると</b><br>これからの振り返りと最後の調査はなくなります。それまでの回答は、同意いただいたとおり研究に使います（削除はしません）。参加をやめたあとは、もう一度この研究に参加することはできません。</div>
+   <label class="check" for="wk"><input type="checkbox" id="wk">参加をやめると、もう一度は参加できないことを理解しました</label>
+   <button class="btn primary block" id="w-keep">参加を続ける</button><button class="btn danger block" id="w-go" disabled>参加をやめる</button></div>`;
   document.body.appendChild(sc);const close=()=>{sc.remove();go("mypage")};
   sc.onclick=e=>{if(e.target===sc)close()};$("#w-keep").onclick=close;$("#wk").onchange=e=>{$("#w-go").disabled=!e.target.checked};
-  $("#w-go").onclick=async()=>{if(STUDY){const b=$("#w-go");b.disabled=true;b.textContent="削除しています…";try{await OFStore.withdraw()}catch(e){console.error(e);b.disabled=false;b.textContent="参加をやめて記録を削除する";toast("削除できませんでした。通信を確認して、もう一度お試しください");return}}
-    sc.remove();S={...blank(),id:S.id};try{localStorage.removeItem("oshifit.v1")}catch(e){}go("withdrawn")};$("#w-keep").focus()}
+  $("#w-go").onclick=async()=>{if(STUDY){const b=$("#w-go");b.disabled=true;b.textContent="手続きしています…";try{await OFStore.withdraw()}catch(e){console.error(e);b.disabled=false;b.textContent="参加をやめる";toast("手続きできませんでした。通信を確認して、もう一度お試しください");return}}
+    sc.remove();S={...blank(),id:S.id};S.withdrawn=true;go("withdrawn")};$("#w-keep").focus()}
 function vWithdrawn(){app.innerHTML=header()+`<main class="stack" style="padding-top:22px">
    <section class="card" style="align-items:center;text-align:center"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7 12l3.5 3.5L17 9"/></svg>
-    <h2>参加をやめる手続きが終わりました</h2><p class="small muted">これまでの回答を、研究用のサーバーとこの端末から削除しました。ご協力ありがとうございました。</p></section>
-   <section class="card"><div class="kv"><span>研究用のサーバー</span><b>削除しました</b></div><div class="kv"><span>この端末</span><b>削除しました</b></div><div class="kv"><span>今後の連絡</span><b>ありません</b></div></section>
+    <h2>参加をやめる手続きが終わりました</h2><p class="small muted">これまでの回答は、同意いただいたとおり研究に使います。ご協力ありがとうございました。</p></section>
+   <section class="card"><div class="kv"><span>これからの振り返り・最後の調査</span><b>ありません</b></div><div class="kv"><span>今後の連絡</span><b>ありません</b></div></section>
    <p class="small muted">これからも、ご自身の生活と推し活のバランスを大切にお過ごしください。</p>
    <a class="btn block" href="#start">最初の画面に戻る</a></main>`;wire()}
 function vAdmin(){app.className="app wide";
@@ -1697,7 +1757,7 @@ function vAdmin(){app.className="app wide";
   app.querySelectorAll("[data-csv]").forEach(b=>b.onclick=()=>toast("試作では書き出しません（研究版の開発者ページで書き出します）"));wire()}
 
 /* ---------- 画面の切り替え ---------- */
-const VIEWS={start:vStart,q:vQ,avatar:vAvatar,analysis:vAnalysis,future:vFuture,home:vHome,checkin:vCheckin,final:vFinal,result:vResult,mypage:vMypage,withdraw:vWithdraw,withdrawn:vWithdrawn,admin:vAdmin};
+const VIEWS={start:vStart,signup:vSignup,login:vLogin,q:vQ,avatar:vAvatar,analysis:vAnalysis,future:vFuture,home:vHome,checkin:vCheckin,final:vFinal,result:vResult,mypage:vMypage,withdraw:vWithdraw,withdrawn:vWithdrawn,admin:vAdmin};
 function keep(fn){const y=scrollY;fn();scrollTo(0,y)}
 function go(v){if(location.hash==="#"+v)render();else location.hash=v}
 let taps=0,tapT=0;
@@ -1710,9 +1770,12 @@ function wire(){const lg=$("#logo");if(lg&&!STUDY)lg.onclick=()=>{const t=Date.n
   $("#ed-reset").onclick=()=>{S=blank();SV={};PI=0;toast("最初からにしました");go("start")};
   $("#ed-off").onclick=()=>{EDIT=false;render();toast("ロゴを5回続けて押すと、また開きます")}}
 /* 研究版：まだ進めない画面には入れない（回答の自動補完をしないため） */
-function allowed(v){if(!STUDY||v==="withdrawn")return v;
+function allowed(v){if(!STUDY)return v;
+  if(S.withdrawn)return v==="start"?v:"withdrawn";
+  if(v==="withdrawn")return S.consented?allowed("home"):"start";
   if(v==="admin"){location.href="admin.html";return"start"}
-  if(!S.consented)return"start";
+  if(!S.consented)return["start","signup","login"].includes(v)?v:"start";
+  if(v==="login"||v==="signup")return allowed("home");   // ログイン済みなら、いま進むべき画面へ
   if(!S.baselineDone)return v==="start"?v:"q";
   if(!S.group){if(["avatar","analysis"].includes(v))return v;if(v==="future")return S.avatarDone?v:"avatar";return S.avatarDone?"analysis":"avatar"}
   if(["start","q","avatar","future"].includes(v))return"home";
