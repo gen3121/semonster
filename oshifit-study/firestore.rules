@@ -6,7 +6,9 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function owner(uid) { return signedIn() && request.auth.uid == uid; }
     function isAdmin() {
-      return signedIn() && request.auth.token.email_verified == true
+      // Microsoft のアカウントは email_verified が付かないことがあるため、Google・Microsoft でのログインも認める
+      return signedIn()
+        && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider in ['google.com', 'microsoft.com'])
         && exists(/databases/$(db)/documents/admins/$(request.auth.token.email));
     }
     function unchanged(f) {   // 一度入れた値は変えられない

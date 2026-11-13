@@ -1547,19 +1547,25 @@ function vStart(){app.className="app land";
   wire()}
 
 /* ---------- 新規登録・ログイン（メールアドレスとパスワード。Firebase Authentication） ---------- */
-const AUTH_ERR={"auth/email-already-in-use":"このメールアドレスは登録済みです。「ログイン」から入ってください。","auth/invalid-email":"メールアドレスの形が正しくありません。","auth/weak-password":"パスワードは8文字以上にしてください。","auth/invalid-credential":"メールアドレスかパスワードが違います。","auth/wrong-password":"メールアドレスかパスワードが違います。","auth/user-not-found":"このメールアドレスは登録されていません。","auth/too-many-requests":"試行が多すぎます。しばらくしてからお試しください。","auth/network-request-failed":"通信できませんでした。通信を確認してください。"};
+const AUTH_ERR={"auth/email-already-in-use":"このメールアドレスは登録済みです。「ログイン」から入ってください。","auth/invalid-email":"メールアドレスの形が正しくありません。","auth/weak-password":"パスワードは8文字以上にしてください。","auth/invalid-credential":"メールアドレスかパスワードが違います。","auth/wrong-password":"メールアドレスかパスワードが違います。","auth/user-not-found":"このメールアドレスは登録されていません。","auth/too-many-requests":"試行が多すぎます。しばらくしてからお試しください。","auth/network-request-failed":"通信できませんでした。通信を確認してください。","auth/popup-closed-by-user":"ログインの画面が閉じられました。もう一度お試しください。","auth/popup-blocked":"ポップアップが止められました。ブラウザの設定でこのサイトのポップアップを許可してください。","auth/account-exists-with-different-credential":"このメールアドレスは別の方法（メール・Google・Microsoft のどれか）で登録済みです。登録したときの方法でログインしてください。"};
 const authMsg=e=>AUTH_ERR[e&&e.code]||"うまくいきませんでした。もう一度お試しください。";
 function vSignup(){const opts=QN.sections[0].items.find(i=>i.id==="Q2").opts, logged=STUDY&&OFStore.email;
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">SIGN UP</p><h2>${logged?"登録の続き":"新規登録"}</h2><p class="small muted">登録すると、質問 → アバター → 分析 → 2つの未来 の順に進みます。途中でやめても、ログインすれば続きから答えられます。</p></div>
    <section class="card">${logged?`<p class="small">ログイン中：<b>${esc(OFStore.email)}</b></p>`:`
     <label class="stack" style="gap:4px"><b class="small">メールアドレス</b><input class="field" id="su-mail" type="email" autocomplete="email" inputmode="email"></label>
-    <label class="stack" style="gap:4px"><b class="small">パスワード（8文字以上）</b><input class="field" id="su-pw" type="password" autocomplete="new-password" minlength="8"></label>`}
+    <label class="stack" style="gap:4px"><b class="small">パスワード（8文字以上）</b><input class="field" id="su-pw" type="password" autocomplete="new-password" minlength="8"></label>
+    <p class="xs muted">または、性別を選んで同意したあと、下のボタンで Google・Microsoft のアカウントで登録できます。</p>`}
     <div class="stack" style="gap:6px"><b class="small">性別（アバターで選べる髪型が変わります）</b><div class="olist" role="radiogroup" aria-label="性別">${opts.map((o,j)=>`<button class="obtn" role="radio" data-g="${esc(o)}" aria-checked="${S.answers.Q2===o}"><span class="dot" aria-hidden="true"></span><span>${j+1}　${esc(o)}</span></button>`).join("")}</div></div>
     <p class="xs muted">メールアドレスはログインのためだけに使い、回答とは別に管理します。研究の結果に名前やメールアドレスが出ることはありません。</p>
     <label class="consent card" for="agree"><input type="checkbox" id="agree">説明を読み、研究への参加に同意します</label>
+    ${logged?"":`<div class="row" style="flex-wrap:wrap"><button class="btn sm" id="su-google" disabled>Google で登録</button><button class="btn sm" id="su-ms" disabled>Microsoft で登録</button></div>`}
     <p class="small" id="su-msg" role="alert" style="color:var(--bad)"></p></section></main>
    ${dock("su-back","登録して質問へ","su-go",true)}`;
-  const ok=()=>{$("#su-go").disabled=!($("#agree").checked&&S.answers.Q2&&(logged||($("#su-mail").value.includes("@")&&$("#su-pw").value.length>=8)))};
+  const ok=()=>{const base=$("#agree").checked&&!!S.answers.Q2;$("#su-go").disabled=!(base&&(logged||($("#su-mail").value.includes("@")&&$("#su-pw").value.length>=8)));["#su-google","#su-ms"].forEach(id=>{if($(id))$(id).disabled=!base})};
+  const soc=async kind=>{if(!STUDY){S.consented=true;return go("q")}$("#su-msg").textContent="";
+    try{const saved=await OFStore.social(kind);if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers);return render()}await OFStore.begin(S);S.consented=true;go("q")}
+    catch(e){console.error(e);$("#su-msg").textContent=authMsg(e)}};
+  if($("#su-google")){$("#su-google").onclick=()=>soc("google");$("#su-ms").onclick=()=>soc("microsoft")}
   app.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{S.answers.Q2=b.dataset.g;app.querySelectorAll("[data-g]").forEach(x=>x.setAttribute("aria-checked",String(x===b)));ok()});
   app.querySelectorAll("input").forEach(x=>x.oninput=x.onchange=ok);
   $("#su-back").onclick=()=>go("start");
@@ -1569,11 +1575,13 @@ function vSignup(){const opts=QN.sections[0].items.find(i=>i.id==="Q2").opts, lo
 function vLogin(){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">LOGIN</p><h2>ログイン</h2><p class="small muted">登録したメールアドレスとパスワードで、続きから答えられます。</p></div>
    <section class="card"><label class="stack" style="gap:4px"><b class="small">メールアドレス</b><input class="field" id="li-mail" type="email" autocomplete="email" inputmode="email"></label>
     <label class="stack" style="gap:4px"><b class="small">パスワード</b><input class="field" id="li-pw" type="password" autocomplete="current-password"></label>
-    <p class="small" id="li-msg" role="alert"></p><button class="btn sm" id="li-reset">パスワードを忘れたとき（再設定のメールを送る）</button></section></main>
+    <p class="small" id="li-msg" role="alert"></p><div class="row" style="flex-wrap:wrap"><button class="btn sm" id="li-google">Google でログイン</button><button class="btn sm" id="li-ms">Microsoft でログイン</button></div><button class="btn sm" id="li-reset">パスワードを忘れたとき（再設定のメールを送る）</button></section></main>
    ${dock("li-back","ログイン","li-go")}`;
   const msg=(t,bad)=>{const m=$("#li-msg");m.textContent=t;m.style.color=bad?"var(--bad)":"var(--muted)"};
   $("#li-back").onclick=()=>go("start");
   $("#li-reset").onclick=async()=>{const m=$("#li-mail").value.trim();if(!m)return msg("メールアドレスを入れてください",true);if(!STUDY)return msg("展示用では送りません");try{await OFStore.resetPassword(m);msg("再設定のメールを送りました。届いたメールの手順で新しいパスワードにしてください。")}catch(e){msg(authMsg(e),true)}};
+  const soc=async kind=>{if(!STUDY){S.consented=true;return go("home")}try{const saved=await OFStore.social(kind);if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers);render()}else go("signup")}catch(e){console.error(e);msg(authMsg(e),true)}};
+  $("#li-google").onclick=()=>soc("google");$("#li-ms").onclick=()=>soc("microsoft");
   $("#li-go").onclick=async()=>{if(!STUDY){S.consented=true;return go("home")}const b=$("#li-go");b.disabled=true;
     try{const saved=await OFStore.login($("#li-mail").value.trim(),$("#li-pw").value);if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers)}render()}
     catch(e){console.error(e);msg(authMsg(e),true);b.disabled=false}};wire()}

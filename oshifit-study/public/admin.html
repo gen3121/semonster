@@ -39,9 +39,10 @@ const FINAL_ITEMS = [...items(["who5", "shs", "pss"]), "Q29", "Q30", "Q31", "Q32
 
 function login() {
   el.innerHTML = `<section class="card"><h1>開発者ページ</h1><p class="muted">登録した大学アカウントでログインしてください（閲覧のみ）。</p>
-   <div class="row"><button class="btn primary" id="g">Google でログイン</button></div>
+   <div class="row"><button class="btn primary" id="g">Google でログイン</button><button class="btn primary" id="ms">Microsoft（大学のアカウント）でログイン</button></div>
    <div class="row" style="margin-top:10px"><input id="mail" type="email" placeholder="大学のメールアドレス"><button class="btn" id="m">ログイン用のリンクを送る</button></div><p id="msg" class="muted"></p></section>`;
   $("#g").onclick = () => A.signInWithPopup(auth, new A.GoogleAuthProvider()).catch((e) => ($("#msg").textContent = "ログインできませんでした：" + e.code));
+  $("#ms").onclick = () => { const p = new A.OAuthProvider("microsoft.com"); p.setCustomParameters({ prompt: "select_account" }); A.signInWithPopup(auth, p).catch((e) => ($("#msg").textContent = "ログインできませんでした：" + e.code)); };
   $("#m").onclick = async () => {
     const mail = $("#mail").value.trim(); if (!mail) return;
     try { await A.sendSignInLinkToEmail(auth, mail, { url: location.href, handleCodeInApp: true }); localStorage.setItem("oshifit.adminMail", mail); $("#msg").textContent = "メールを送りました。届いたリンクをこの端末で開いてください。"; }

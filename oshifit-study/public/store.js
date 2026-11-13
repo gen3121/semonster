@@ -56,6 +56,14 @@
     const cred = await auth.signInWithEmailAndPassword(au, mail, pw);
     return loadMine(cred.user);
   }
+  // Google・Microsoft でログイン（ポップアップ）。記録がまだなければ null を返す（登録画面で性別と同意を聞いてから begin）
+  async function social(kind) {
+    const { auth, au } = await load();
+    const p = kind === "microsoft" ? new auth.OAuthProvider("microsoft.com") : new auth.GoogleAuthProvider();
+    if (kind === "microsoft") p.setCustomParameters({ prompt: "select_account" });
+    const cred = await auth.signInWithPopup(au, p);
+    return loadMine(cred.user);
+  }
   async function logout() { if (fb) await fb.auth.signOut(fb.au); uid = null; email = null; ref = null; }
   async function resetPassword(mail) { const { auth, au } = await load(); await auth.sendPasswordResetEmail(au, mail); }
 
@@ -93,5 +101,5 @@
     return true;
   }
 
-  window.OFStore = { init, signup, login, logout, resetPassword, begin, draft, baseline, avatar, decide, checkin, final, withdraw, get failed() { return failed; }, get uid() { return uid; }, get email() { return email; } };
+  window.OFStore = { init, signup, login, social, logout, resetPassword, begin, draft, baseline, avatar, decide, checkin, final, withdraw, get failed() { return failed; }, get uid() { return uid; }, get email() { return email; } };
 })();

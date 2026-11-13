@@ -93,4 +93,8 @@ test("開発者（admins に登録・メール確認済み）だけが全件を�
   await assertFails(setDoc(doc(admin(), "admins", "y@oit.ac.jp"), {}));
   const unverified = env.authenticatedContext("adm3", { email: "oi@oit.ac.jp", email_verified: false }).firestore();
   await assertFails(getDocs(collection(unverified, "participants")));
+  const ms = env.authenticatedContext("adm4", { email: "oi@oit.ac.jp", email_verified: false, firebase: { sign_in_provider: "microsoft.com" } }).firestore();
+  await assertSucceeds(getDocs(collection(ms, "participants")));                 // 大学の Microsoft アカウント
+  const pw = env.authenticatedContext("adm5", { email: "oi@oit.ac.jp", email_verified: false, firebase: { sign_in_provider: "password" } }).firestore();
+  await assertFails(getDocs(collection(pw, "participants")));                    // パスワード登録・未確認では見られない
 });
