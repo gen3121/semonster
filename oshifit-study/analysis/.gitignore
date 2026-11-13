@@ -1,0 +1,9 @@
+# 参加者のデータと分析結果はコミットしない
+__pycache__/
+*.pyc
+data/
+out/
+out_*/
+results/
+*.csv
+*.png

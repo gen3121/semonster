@@ -1,0 +1,1804 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+/* アバター作成（Mii を参考にした選び方） */
+.avstage{align-items:center;position:sticky;top:64px;z-index:5}
+.avprev{background:var(--low);border-radius:16px;width:100%;display:flex;justify-content:center;padding:6px 0}
+.avtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.avtab{appearance:none;flex:none;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:6px 12px;font:600 13px var(--sans);cursor:pointer;min-height:36px}
+.avtab[aria-selected="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.avgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:8px}
+.avopt{appearance:none;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;font:600 11px var(--sans);color:var(--muted)}
+.avopt[aria-pressed="true"]{border-color:var(--primary);background:var(--good-bg);color:var(--fg)}
+.swgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.sw{appearance:none;aspect-ratio:1/1;border-radius:50%;border:2px solid var(--line2);cursor:pointer;padding:0}
+.sw[aria-pressed="true"]{border:3px solid var(--fg);box-shadow:0 0 0 3px var(--primary)}
+</style></head><body>
+<title>OshiFit 画面試作</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BBH+Bartle&family=Instrument+Sans:wght@600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@700;900&display=swap">
+<style>
+/* OshiFit 研究版の画面試作。色は DESIGN.md（Modern Engineering System）に統一。
+   決まり：青＝良い・利点、赤＝負担・欠点。角丸は部品8px・カード12px・状態表示だけ丸型。影は低く、1pxの線で区切る。 */
+:root{
+  --bg:#f9f9ff; --card:#ffffff; --low:#f1f3ff; --cont:#e9edff; --high:#e1e8fd; --line:#e5e7eb; --line2:#c2c6d6;
+  --fg:#141b2b; --muted:#424754; --faint:#727785;
+  --primary:#0058be; --primary-c:#2170e4; --primary-h:#004395; --primary-fx:#d8e2ff; --on-primary:#ffffff;
+  --good:#0058be; --good-bg:#e9edff; --bad:#ba1a1a; --bad-bg:#ffdad6; --bad-fg:#93000a;
+  --ok:#006c49; --ok-bg:#dcf7eb; --warn:#825100; --warn-bg:#ffddb8;
+  --ink:#0f172a; --ink-line:#1e293b; --ink-fg:#e2e8f0; --ink-muted:#94a3b8;
+  --inverse:#293040; --inverse-fg:#edf0ff; --scrim:rgba(15,23,42,.55);
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-up:0 10px 15px -3px rgba(0,0,0,.08),0 4px 6px -2px rgba(0,0,0,.04);
+  --sans:"Inter","BIZ UDPGothic","Hiragino Sans","Yu Gothic",sans-serif;
+  --head:"Inter","Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:8px; --r-lg:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1120; --card:#141b2b; --low:#1a2234; --cont:#222c42; --high:#2a3550; --line:#2a3550; --line2:#3a4664;
+  --fg:#edf0ff; --muted:#c2c6d6; --faint:#8b91a5;
+  --primary:#adc6ff; --primary-c:#7aa4f5; --primary-h:#d8e2ff; --primary-fx:#0f2a57; --on-primary:#001a42;
+  --good:#adc6ff; --good-bg:#132a52; --bad:#ffb4ab; --bad-bg:#3d1515; --bad-fg:#ffdad6;
+  --ok:#4edea3; --ok-bg:#0d2a1f; --warn:#ffb95f; --warn-bg:#33230a;
+  --ink:#060a14; --ink-line:#1e293b; --ink-fg:#e2e8f0; --ink-muted:#94a3b8;
+  --inverse:#dce2f7; --inverse-fg:#141b2b; --scrim:rgba(0,0,0,.65);
+  --shadow:none; --shadow-up:0 10px 24px rgba(0,0,0,.5); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1120; --card:#141b2b; --low:#1a2234; --cont:#222c42; --high:#2a3550; --line:#2a3550; --line2:#3a4664;
+  --fg:#edf0ff; --muted:#c2c6d6; --faint:#8b91a5;
+  --primary:#adc6ff; --primary-c:#7aa4f5; --primary-h:#d8e2ff; --primary-fx:#0f2a57; --on-primary:#001a42;
+  --good:#adc6ff; --good-bg:#132a52; --bad:#ffb4ab; --bad-bg:#3d1515; --bad-fg:#ffdad6;
+  --ok:#4edea3; --ok-bg:#0d2a1f; --warn:#ffb95f; --warn-bg:#33230a;
+  --ink:#060a14; --ink-line:#1e293b; --ink-fg:#e2e8f0; --ink-muted:#94a3b8;
+  --inverse:#dce2f7; --inverse-fg:#141b2b; --scrim:rgba(0,0,0,.65);
+  --shadow:none; --shadow-up:0 10px 24px rgba(0,0,0,.5); color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--fg)}
+body{margin:0;font:400 15px/1.7 var(--sans);-webkit-font-smoothing:antialiased;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 32px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--card)}
+.app{max-width:480px;margin:0 auto}
+.app.wide{max-width:1200px}
+h1,h2,h3{font-family:var(--head);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:clamp(24px,6.4vw,30px);font-weight:800;line-height:1.3}
+h2{font-size:20px;font-weight:700;line-height:1.4}
+h3{font-size:15px;font-weight:700;line-height:1.5}
+p{margin:0}
+button{font:inherit;color:inherit}
+.stack{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:10px;align-items:center}
+.row>*{min-width:0}
+.muted{color:var(--muted)} .small{font-size:13px} .xs{font-size:12px;line-height:1.6}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.num{font-family:var(--sans);font-variant-numeric:tabular-nums;font-weight:700}
+/* 上部バー */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:8;margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));background:color-mix(in srgb,var(--card) 92%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top .in{max-width:480px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:36px}
+.wide .top .in{max-width:1200px}
+.logo{display:inline-flex;align-items:center;gap:8px;font:800 18px var(--head);letter-spacing:-.02em;cursor:pointer;user-select:none;background:none;border:0;padding:0}
+.logo i{width:4px;height:18px;border-radius:2px;background:var(--primary);box-shadow:0 0 10px color-mix(in srgb,var(--primary) 55%,transparent)}
+.tag{font:600 11px var(--sans);color:var(--muted);background:var(--low);border:1px solid var(--line);border-radius:6px;padding:1px 7px}
+.ctx{font:600 12px var(--sans);color:var(--primary);background:var(--good-bg);border-radius:999px;padding:3px 10px;white-space:nowrap}
+/* 編集者モード（研究者・確認用） */
+.editbar{max-width:480px;margin:8px auto 0;display:grid;grid-template-columns:auto 1fr auto;gap:6px;align-items:center;padding:6px;border-radius:var(--r-lg);background:var(--warn-bg);color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent)}
+.wide .editbar{max-width:1200px}
+.editbar select,.editbar button{appearance:none;border:1px solid color-mix(in srgb,var(--warn) 25%,transparent);background:var(--card);color:var(--fg);border-radius:var(--r);min-height:34px;padding:4px 10px;font:600 12.5px var(--sans);cursor:pointer;min-width:0}
+.editbar .tools{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.editbar .tools span{font:600 11.5px var(--sans);margin-right:auto}
+/* 進み具合 */
+.stepper{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.stepper li{display:flex;flex-direction:column;gap:5px;font:600 11px var(--sans);color:var(--faint)}
+.stepper li::before{content:"";height:4px;border-radius:2px;background:var(--line)}
+.stepper li.done{color:var(--fg)} .stepper li.done::before{background:var(--fg)}
+.stepper li.now{color:var(--primary)} .stepper li.now::before{background:var(--primary)}
+/* 面 */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;min-width:0}
+.sunk{background:var(--low);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px}
+.callout{border-radius:var(--r-lg);padding:12px 14px;font-size:13px;line-height:1.7;border:1px solid var(--line);background:var(--low)}
+.callout.good{background:var(--good-bg);border-color:color-mix(in srgb,var(--good) 30%,transparent)}
+.callout.bad{background:var(--bad-bg);border-color:color-mix(in srgb,var(--bad) 35%,transparent);color:var(--bad-fg)}
+.chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 10px;font:600 12px var(--sans);background:var(--low);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.chip.wrap{white-space:normal;line-height:1.5;padding-block:3px}
+.chip.good{background:var(--good-bg);color:var(--good);border-color:transparent}
+.chip.bad{background:var(--bad-bg);color:var(--bad-fg);border-color:transparent}
+.chip.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent}
+.chip.warn{background:var(--warn-bg);color:var(--warn);border-color:transparent}
+.sec{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+/* ボタン */
+.btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:50px;padding:10px 18px;border-radius:var(--r);border:1px solid var(--line);background:var(--card);font:600 15px var(--sans);cursor:pointer;transition:background .15s,border-color .15s;text-decoration:none;color:var(--fg)}
+.btn:hover{border-color:var(--line2);background:var(--low)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.btn.primary:hover{background:var(--primary-h);border-color:var(--primary-h)}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:var(--card)}
+.btn.danger-o{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 50%,transparent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.block{width:100%}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:13px}
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 40%,transparent);outline-offset:2px}
+.dock{position:sticky;bottom:0;z-index:6;margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:color-mix(in srgb,var(--card) 94%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(16,20,46,.05)}
+.dock .in{max-width:480px;margin:0 auto;display:flex;gap:8px}
+.dock .in>.btn{flex:2}.dock .in>.btn.back{flex:1}
+.dock .note{max-width:480px;margin:6px auto 0;text-align:center;font-size:11.5px;color:var(--muted)}
+/* 下のタブ */
+.tabbar{position:sticky;bottom:0;z-index:6;margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:4px max(16px,env(safe-area-inset-right,0px)) calc(4px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));background:color-mix(in srgb,var(--card) 94%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-top:1px solid var(--line);margin-top:20px}
+.tabbar .in{max-width:480px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+.tab{appearance:none;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font:600 11px var(--sans);color:var(--faint);cursor:pointer;border-radius:var(--r);min-height:48px;text-decoration:none}
+.tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tab[aria-current="page"]{color:var(--primary)}
+/* 質問（1問ずつ・選ぶと次へ） */
+.qprog{display:flex;flex-direction:column;gap:6px}
+.qprog .meta{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;color:var(--muted)}
+.bar{height:6px;border-radius:999px;background:var(--cont);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--primary);border-radius:999px;transition:width .35s ease}
+.qcard{min-height:330px}
+.qcard .ans{display:flex;flex-direction:column;gap:6px}
+.qhead{display:flex;flex-direction:column;gap:8px;min-height:var(--qh,120px)}
+.qcard.in{animation:slidein .28s cubic-bezier(.16,1,.3,1)}
+.qcard.back{animation:slideback .28s cubic-bezier(.16,1,.3,1)}
+@keyframes slidein{from{opacity:.35}to{opacity:1}}
+@keyframes slideback{from{opacity:.35}to{opacity:1}}
+.qid{font:600 12px var(--mono);color:var(--primary);background:var(--good-bg);border-radius:6px;padding:1px 8px}
+.qtext{font:700 18px/1.55 var(--head);letter-spacing:-.01em}
+.lead{font-size:12px;line-height:1.6;color:var(--muted)}
+.circles{position:relative;display:flex;justify-content:space-between;align-items:center;padding:14px 2px}
+.circles::before{content:"";position:absolute;left:16px;right:16px;top:50%;height:2px;background:var(--line);transform:translateY(-50%)}
+.cbtn{position:relative;z-index:1;appearance:none;border-radius:50%;border:2px solid var(--line2);background:var(--card);cursor:pointer;display:grid;place-items:center;font:700 13px var(--sans);color:var(--muted);transition:transform .15s,background .15s,border-color .15s;padding:0}
+.cbtn:hover{border-color:var(--primary);transform:scale(1.06)}
+.cbtn[aria-checked="true"]{background:var(--primary);border-color:var(--primary);color:var(--on-primary);box-shadow:0 0 0 5px color-mix(in srgb,var(--primary) 18%,transparent)}
+.ends{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted)}
+.ends span:last-child{text-align:right}
+.chosen{min-height:22px;text-align:center;font-size:13px;font-weight:600;color:var(--primary)}
+.olist{display:flex;flex-direction:column;gap:8px}
+.obtn{appearance:none;display:flex;align-items:center;gap:12px;width:100%;text-align:left;min-height:48px;padding:10px 14px;border-radius:var(--r-lg);border:1px solid var(--line);background:var(--card);cursor:pointer;font:500 14px var(--sans);color:var(--fg);transition:border-color .15s,background .15s}
+.obtn:hover{border-color:var(--line2);background:var(--low)}
+.obtn .dot{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid var(--line2);display:grid;place-items:center}
+.obtn .n{flex:none;font:600 12px var(--mono);color:var(--faint);width:18px;text-align:center}
+.obtn[aria-checked="true"]{border-color:var(--primary);background:var(--good-bg);font-weight:700}
+.obtn[aria-checked="true"] .dot{border-color:var(--primary);background:var(--primary);box-shadow:inset 0 0 0 3px var(--card)}
+.field{width:100%;font:16px var(--sans);padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--card);color:var(--fg)}
+textarea.field{min-height:120px;resize:vertical}
+/* はじめ：ペンライトの帯 */
+.lights{background:var(--ink);border:1px solid var(--ink-line);border-radius:var(--r-lg);padding:16px 14px 12px;color:var(--ink-fg)}
+.lights .sticks{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;height:118px;align-items:end}
+.stick{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;height:100%;font-size:11px;color:var(--ink-muted)}
+.stick b{display:block;width:10px;border-radius:5px 5px 2px 2px;height:var(--h);background:var(--c);box-shadow:0 0 14px 1px var(--c);transform-origin:bottom;animation:rise .9s cubic-bezier(.2,.9,.2,1) both;animation-delay:var(--d)}
+@keyframes rise{from{transform:scaleY(.1);opacity:.3}to{transform:none;opacity:1}}
+.flow{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.flow li{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start}
+.flow .no{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:700 12px var(--mono);background:var(--low);border:1px solid var(--line)}
+.flow li:first-child .no{background:var(--fg);color:var(--card);border-color:var(--fg)}
+.facts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--muted)}
+.facts li{display:grid;grid-template-columns:18px 1fr;gap:8px}
+.facts li::before{content:"";width:6px;height:6px;margin:8px 0 0 6px;border-radius:50%;background:var(--primary)}
+.consent{display:flex;gap:12px;align-items:center;font-weight:700;font-size:14px;cursor:pointer}
+.consent.card{flex-direction:row}
+.consent input{width:20px;height:20px;accent-color:var(--primary)}
+/* 分析 */
+.axes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ax{border:1px solid var(--line);border-radius:var(--r-lg);padding:10px 12px;background:var(--card);display:flex;flex-direction:column;gap:6px}
+.ax .h{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:12.5px;font-weight:700}
+.ax .v{font:800 26px/1 var(--sans);font-variant-numeric:tabular-nums}
+.ax .v small{font-size:12px;font-weight:500;color:var(--faint)}
+.ax.good .v{color:var(--good)} .ax.bad .v{color:var(--bad)}
+.track{height:6px;border-radius:999px;background:var(--cont);overflow:hidden}
+.track i{display:block;height:100%;border-radius:999px;background:currentColor}
+.ax.good .track{color:var(--good)} .ax.bad .track{color:var(--bad)}
+.trait{display:grid;grid-template-columns:6.5em 1fr 2.4em;gap:10px;align-items:center;font-size:13px}
+.trait .track{color:var(--primary-c)}
+details{border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-weight:700;font-size:14px}
+.formula{display:grid;gap:4px;margin-top:8px;font-size:12.5px;color:var(--muted)}
+/* 2つの未来 */
+.segs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;background:var(--cont);border-radius:var(--r-lg)}
+.seg{appearance:none;border:0;background:transparent;border-radius:var(--r);padding:8px 4px;font:600 13px var(--sans);color:var(--muted);cursor:pointer;min-height:40px}
+.seg[aria-pressed="true"]{background:var(--card);color:var(--fg);box-shadow:var(--shadow)}
+.plan{border-left:3px solid var(--primary)}
+.why{font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
+.futures{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fut{border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card);padding:12px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;min-width:0}
+.fut.b{border:2px solid var(--primary)}
+.fut .lab{font:700 12px var(--sans);border-radius:6px;padding:2px 10px;background:var(--low);color:var(--muted);width:100%}
+.fut.b .lab{background:var(--primary);color:var(--on-primary)}
+.fut svg{max-width:100%;height:auto}
+.pred{display:grid;gap:14px}
+.pred .h{display:flex;justify-content:space-between;gap:8px;font-size:13.5px;font-weight:700}
+.pred .vals{font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap}
+.pb{display:grid;grid-template-columns:4.6em 1fr;gap:8px;align-items:center;font-size:11.5px;color:var(--muted);margin-top:4px}
+.pt{position:relative;height:12px;border-radius:999px;background:var(--cont)}
+.pt .rg{position:absolute;top:0;bottom:0;border-radius:999px;opacity:.3}
+.pt .pm{position:absolute;top:-3px;bottom:-3px;width:3px;border-radius:2px}
+.note a{color:var(--primary);font-weight:700}
+.outbars{display:flex;flex-direction:column;gap:12px;margin-top:4px;padding-top:12px;border-top:1px solid var(--line)}
+.ob-flow{display:flex;align-items:center;gap:8px;font:700 12px var(--sans);color:var(--muted)}
+.ob-item{display:flex;flex-direction:column;gap:4px}
+.ob-wrap{position:relative;display:flex;flex-direction:column;gap:3px}
+.ob-row{display:grid;grid-template-columns:5.4em 1fr 2.4em;gap:8px;align-items:center}
+.ob{height:12px;border-radius:6px;background:var(--cont);overflow:hidden}
+.ob i{display:block;height:100%;border-radius:6px}
+.ob-v{text-align:right;font-variant-numeric:tabular-nums}
+.ob-ref{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--fg);opacity:.55}
+.pickrow{display:flex;gap:10px;align-items:center;font-weight:700;font-size:14px;padding:12px 14px;border:1.5px dashed var(--line2);border-radius:12px;cursor:pointer}
+.pickrow input{width:20px;height:20px;accent-color:var(--primary)}
+.tickets a{color:var(--primary);font-weight:700}
+.ev{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px;font-size:13.5px;line-height:1.85}
+.ev p{margin:0}
+.ev-h{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.ev-st{color:var(--primary);letter-spacing:.12em;font-size:15px}
+.ev-lv{font-size:12px;color:var(--muted)}
+.ev-ref{border-top:0;padding-top:0}
+.ev-ref summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--primary)}
+.ev-ref ol{margin:8px 0 0;padding-left:1.4em;font-size:12px;line-height:1.65;color:var(--muted);display:flex;flex-direction:column;gap:8px;word-break:break-word}
+.ev-ref a{color:var(--primary);font-weight:700}
+.note{font-size:12.5px;line-height:1.7;color:var(--muted);background:var(--low);border:1px solid var(--line);border-radius:var(--r-lg);padding:10px 12px}
+/* ホーム */
+.hero{background:var(--card);color:var(--fg);border:1.5px solid var(--fg);border-radius:22px;padding:16px;display:grid;grid-template-columns:1fr 128px;gap:8px;align-items:end;box-shadow:0 6px 0 var(--fg);margin-bottom:6px}
+.hero .chip{background:var(--primary);color:var(--on-primary);border-color:transparent;align-self:flex-start}
+.hero p.xs{color:var(--muted)}
+.hero .isle{position:relative;background:var(--low);border-radius:100px 100px 14px 14px;padding-top:6px}
+.hero .isle .av{position:absolute;left:50%;bottom:30%;transform:translateX(-50%)}
+.rounds{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;text-align:center}
+.rounds .c{width:30px;height:30px;margin:4px auto 0;border-radius:50%;display:grid;place-items:center;font:700 12px var(--sans);background:var(--cont);color:var(--faint);border:1px solid var(--line)}
+.rounds .c.done{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.rounds .c.next{border:2px solid var(--primary);color:var(--primary);background:var(--card)}
+/* 結果 */
+.delta{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.delta .ax .v{font-size:22px}
+/* マイページ */
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding-block:9px;border-top:1px solid var(--line)}
+.kv:first-child{border-top:0}
+.kv b{text-align:right}
+.idbox{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--low);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px}
+.idbox .mono{font-size:20px;font-weight:600;letter-spacing:.04em}
+/* シート・通知 */
+.scrim{position:fixed;inset:0;z-index:40;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;padding-inline:max(0px,env(safe-area-inset-left,0px)) max(0px,env(safe-area-inset-right,0px))}
+.sheet{width:100%;max-width:480px;max-height:92%;overflow:auto;background:var(--card);border-radius:20px 20px 0 0;padding:14px 20px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-up);animation:up .25s cubic-bezier(.2,.9,.2,1)}
+.sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line2);align-self:center}
+@keyframes up{from{transform:translateY(30px);opacity:.5}to{transform:none;opacity:1}}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;font-weight:600;padding:12px;border:1px dashed var(--line2);border-radius:var(--r-lg);cursor:pointer}
+.check input{width:18px;height:18px;margin-top:2px;accent-color:var(--bad)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:50;background:var(--inverse);color:var(--inverse-fg);border-radius:var(--r-lg);padding:10px 16px;font-size:13.5px;box-shadow:var(--shadow-up);max-width:calc(100vw - 32px)}
+/* 開発者ページ */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:14px;box-shadow:var(--shadow)}
+.kpi span{font-size:12px;color:var(--muted);font-weight:600}
+.kpi b{display:block;font:800 28px/1.2 var(--sans);font-variant-numeric:tabular-nums;margin-top:4px}
+.rgrid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+@media (max-width:720px){.rgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.alert{display:grid;grid-template-columns:8px 1fr auto;gap:12px;align-items:center;padding:12px 4px;border-top:1px solid var(--line);font-size:13.5px}
+.alert:first-child{border-top:0}
+.alert i{width:8px;height:8px;border-radius:50%;background:var(--bad)}
+.alert.w i{background:var(--warn)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card)}
+table{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;color:var(--muted);background:var(--low);font-size:12px}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+.grid2{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+@media (max-width:860px){.grid2{grid-template-columns:1fr}}
+@media (max-width:360px){.cbtn{transform:scale(.88)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* ---- 推し活の街（アイソメトリックの線画）とトップページ ---- */
+:root{--il-line:#141b2b;--il-ink:#141b2b;--il-white:#ffffff;--il-shade:#dce2f7;--il-ground:#e9edff;--il-side:#adc6ff;--il-side2:#d8e2ff;--il-road:#ffffff;--il-grass:#4edea3;--il-green:#00a86b;--il-green2:#006c49;--il-trunk:#825100;--il-blue:#2170e4;--il-blue2:#adc6ff;--il-red:#ba1a1a;--il-amber:#ffb95f;--il-pink:#ff5a7a;--il-pin:#0058be;--il-mist:#d8e2ff;--il-skin:#f3c9a5;--il-hair:#141b2b;
+  --l-band:var(--low);--l-ink:#0f172a;--display:"BBH Bartle","Archivo Black","Arial Black",sans-serif;--en:"Instrument Sans","Inter",sans-serif}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--il-ground:#d8e2ff;--l-ink:#060a14}}
+:root[data-theme="dark"]{--il-ground:#d8e2ff;--l-ink:#060a14}
+.app.land{max-width:none}
+.eyebrow{font:700 12px/1 var(--en);letter-spacing:.16em;color:var(--primary);margin:0}
+.display{font-family:var(--display);font-weight:400;line-height:.86;letter-spacing:-.01em;margin:0;color:var(--fg)}
+.display span{display:block}
+.display.sm{font-size:28px;color:#fff}
+.jp-xl{font:900 clamp(24px,4.4vw,40px)/1.4 "Zen Kaku Gothic New",var(--head);letter-spacing:.04em}
+.body{font-size:15px;line-height:2;color:var(--muted);max-width:40em}
+.tb{color:var(--good)}.tr{color:var(--bad)}
+.sp{display:none}@media (max-width:560px){.sp{display:inline}}
+.arr{width:18px;height:18px;flex:none}
+.btn{border-radius:999px}
+.btn.pill{gap:10px;padding-inline:20px 16px}
+.btn.big{min-height:60px;font-size:17px;padding-inline:28px 22px}
+/* 上の案内 */
+.lnav{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;padding-block:12px}
+.lnav .in{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.lnav .logo{margin-right:auto;font-size:22px}
+.pillnav{display:flex;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px;box-shadow:var(--shadow)}
+.pillnav button{appearance:none;border:0;background:none;font:600 13px var(--sans);color:var(--fg);padding:8px 14px;border-radius:999px;cursor:pointer}
+.pillnav button:hover{background:var(--low)}
+.lnav .btn{min-height:44px;font-size:14px}
+@media (max-width:760px){.pillnav{display:none}}
+/* ヒーロー */
+.lhero{position:relative;max-width:1240px;margin:0 auto;display:flex;flex-direction:column}
+.town-wrap{margin-inline:-8px}
+.town{display:block;width:100%;height:auto}
+.lhero{overflow:hidden;overflow:clip}
+.hero-copy{display:flex;flex-direction:column;gap:14px;padding:4px 0 36px}
+.lhero .display{font-size:clamp(52px,19vw,190px)}
+@media (max-width:899px){.town-wrap{width:136%;margin-left:-18%;margin-right:0}}
+.lhero .lead2{font-size:14px;line-height:1.9;color:var(--muted);max-width:30em;margin:0}
+.motto{margin:4px 0 0;font:900 clamp(20px,5.2vw,30px)/1.5 "Zen Kaku Gothic New",var(--head);letter-spacing:.06em}
+@media (min-width:900px){.lhero{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.4fr);align-items:end;gap:0;min-height:640px}.town-wrap{grid-column:2;grid-row:1;margin:0 -2% 0 -6%}.hero-copy{grid-column:1;grid-row:1;position:relative;z-index:2;padding:0 0 56px}.lhero .display{font-size:clamp(100px,10vw,150px)}}
+.pin{cursor:pointer}.pin:focus-visible{outline:none}.pin:focus-visible path:first-child{stroke-width:3;stroke:var(--primary-c)}
+.pin .bob,.bob{animation:bob 2.8s ease-in-out infinite}
+.pin:nth-of-type(2n) .bob{animation-delay:-1.2s}
+@keyframes bob{50%{transform:translateY(-4px)}}
+.stick{transform-box:fill-box;transform-origin:0% 100%;animation:sway 1.4s ease-in-out infinite alternate}
+@keyframes sway{from{transform:rotate(-12deg)}to{transform:rotate(14deg)}}
+.float{animation:floaty 7s ease-in-out infinite}
+@keyframes floaty{50%{transform:translate(-14px,8px)}}
+/* 帯 */
+.land .band{position:relative;margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));padding:72px max(16px,env(safe-area-inset-right,0px)) 88px max(16px,env(safe-area-inset-left,0px))}
+.band>.in,.lfoot>.in{max-width:1160px;margin:0 auto;display:flex;flex-direction:column;gap:32px}
+.wave{position:absolute;left:0;top:-58px;width:100%;height:60px;display:block}
+.message{background:var(--bg);padding-top:40px}
+.msg-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:40px;align-items:end}
+@media (max-width:860px){.msg-grid{grid-template-columns:1fr}}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tile{appearance:none;border:0;cursor:pointer;aspect-ratio:1/1;max-width:100%;border-radius:16px;background:var(--primary);color:var(--on-primary);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;position:relative;font:900 22px "Zen Kaku Gothic New",var(--head);box-shadow:0 8px 0 var(--primary-h);transition:transform .15s,box-shadow .15s}
+.tile.alt{background:var(--fg);color:var(--card);box-shadow:0 8px 0 color-mix(in srgb,var(--fg) 70%,#000)}
+.tile:hover{transform:translateY(3px);box-shadow:0 5px 0 var(--primary-h)}
+.tile .en{font:700 11px var(--en);letter-spacing:.14em;opacity:.8}
+.tile .arr{position:absolute;right:14px;bottom:14px}
+.axes-band{background:var(--l-band)}
+.sechead{display:flex;flex-direction:column;gap:12px}
+.sechead.inv .jp-xl{color:#fff}.sechead.inv .eyebrow{color:var(--primary-c)}
+.axcards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+@media (max-width:900px){.axcards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.axcards{grid-template-columns:1fr}}
+.axcard{position:relative;background:var(--card);border:1.5px solid var(--fg);border-radius:200px 200px 22px 22px;padding:14px 20px 22px;display:flex;flex-direction:column;gap:4px;box-shadow:0 6px 0 var(--fg);transition:transform .3s}
+.axcard.flash{transform:translateY(-6px);box-shadow:0 12px 0 var(--primary)}
+.axcard .arch{background:var(--low);border-radius:200px 200px 14px 14px;padding:10px 0 0;margin-bottom:10px}
+.mini{display:block;width:100%;height:auto;max-width:260px;margin:0 auto}
+.axcard .no{position:absolute;top:14px;left:18px;font:400 30px var(--display);color:var(--primary)}
+.small-en{font:700 11px var(--en);letter-spacing:.12em;color:var(--faint);margin:0}
+.axcard.result{border-color:var(--primary);box-shadow:0 6px 0 var(--primary)}
+.axcard.result .no{color:var(--bad)}
+.axcard h3{font:900 20px "Zen Kaku Gothic New",var(--head)}
+.flow-band{background:var(--l-ink);color:#e2e8f0}
+.flowcards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.flowcards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.flowcards{grid-template-columns:1fr}}
+.flowcards li{border:1px solid #1e293b;background:#141b2b;border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:8px}
+.flowcards .big{font:400 44px/1 var(--display);color:#adc6ff}
+.flowcards h3{color:#fff;font-size:17px}.flowcards p{font-size:13px;line-height:1.8;color:#94a3b8;margin:0}
+.road{display:flex;flex-direction:column;gap:14px;border-top:1px dashed #334155;padding-top:24px}
+.track4{display:grid;grid-template-columns:repeat(8,minmax(84px,1fr));overflow-x:auto;position:relative;padding:4px 0 6px}
+.mile{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font-size:12px;color:#94a3b8}
+.mile::before{content:"";position:absolute;top:10px;left:0;right:0;height:3px;background:#334155}
+.mile:first-child::before{left:50%}.mile:last-child::before{right:50%}
+.mile .dot{position:relative;width:22px;height:22px;border-radius:50%;background:#141b2b;border:3px solid #adc6ff}
+.mile.s .dot,.mile.f .dot{background:#2170e4;border-color:#fff}
+.mile b{color:#fff;font-size:13px}
+.about-band{background:var(--bg);padding-bottom:48px!important}
+.facts-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.facts-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.facts-grid{grid-template-columns:1fr}}
+.fact{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow)}
+.fno{font:700 11px var(--en);letter-spacing:.14em;color:var(--primary);background:var(--good-bg);border-radius:999px;padding:4px 10px;align-self:flex-start}
+.join-band{background:var(--bg);padding-top:0}
+.joincard{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;align-items:center;background:var(--card);border:1.5px solid var(--fg);border-radius:28px;padding:28px;box-shadow:0 8px 0 var(--fg)}
+@media (max-width:760px){.joincard{grid-template-columns:1fr;padding:20px}.joinart{order:-1}}
+.joinart{background:var(--low);border-radius:20px;padding:8px}
+.joincard .consent{padding:14px;border:1px dashed var(--line2);border-radius:14px}
+.lfoot{position:relative;background:var(--l-ink);color:#e2e8f0;margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));margin-bottom:-32px;padding:56px max(16px,env(safe-area-inset-right,0px)) calc(40px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:24px;line-height:1.9}
+@media (max-width:640px){.fgrid{grid-template-columns:1fr}}
+.totop{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:20;width:52px;height:52px;border-radius:50%;border:1.5px solid var(--fg);background:var(--primary);color:var(--on-primary);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 0 var(--fg)}
+.totop svg{width:22px;height:22px}
+.totop[hidden]{display:none}
+/* アプリ画面にも同じ言葉づかい：浮いた丸い上部バー・丸いボタン・英字の小見出し */
+.top{background:transparent;border-bottom:0;-webkit-backdrop-filter:none;backdrop-filter:none}
+.top .in{background:color-mix(in srgb,var(--card) 92%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 16px;box-shadow:var(--shadow)}
+.card{border-radius:20px}
+.view-eyebrow{margin-bottom:6px}
+.plan{border:1.5px solid var(--fg);border-left:6px solid var(--primary);box-shadow:0 5px 0 var(--fg)}
+</style>
+
+<div class="app" id="app"></div>
+
+<script src="config.js"></script>
+<script src="store.js"></script>
+<script src="avatar.js"></script>
+<script>window.OSHIFIT_Q={
+ "short_omit": [
+  "Q35",
+  "Q36",
+  "Q37",
+  "Q38",
+  "Q40",
+  "Q41",
+  "Q43",
+  "Q52",
+  "Q53",
+  "Q54",
+  "Q55",
+  "Q56",
+  "Q57",
+  "Q58",
+  "Q59",
+  "Q60",
+  "Q61"
+ ],
+ "short_omit_note": "短縮版（config.js の OSHIFIT_QSET=\"short\"）で聞かない項目。採点・提案・群の判定に使わない項目（気持ちと生活の10項目、したくなるときの7項目）。性別 Q2 は新規登録の画面で聞く。",
+ "sections": [
+  {
+   "id": "basic",
+   "title": "あなたご自身と推し活について",
+   "lead": "以下の質問には「主たる推し」（いま最も時間を使っている推しを1人・1組）について答えてください。",
+   "items": [
+    {
+     "id": "Q1",
+     "type": "number",
+     "text": "年齢"
+    },
+    {
+     "id": "Q2",
+     "type": "choice",
+     "text": "性別",
+     "opts": [
+      "男性",
+      "女性",
+      "その他",
+      "回答しない"
+     ]
+    },
+    {
+     "id": "Q3",
+     "type": "choice",
+     "text": "職業",
+     "opts": [
+      "学生",
+      "会社員・公務員",
+      "自営業・フリーランス",
+      "パート・アルバイト",
+      "主婦・主夫",
+      "その他"
+     ]
+    },
+    {
+     "id": "Q4",
+     "type": "choice",
+     "text": "主たる推しのジャンル",
+     "opts": [
+      "実在のアイドル",
+      "アニメ・漫画・ゲームのキャラクター",
+      "VTuber・配信者",
+      "俳優・舞台役者",
+      "声優",
+      "バンド・アーティスト",
+      "スポーツ選手",
+      "その他"
+     ]
+    },
+    {
+     "id": "Q5",
+     "type": "choice",
+     "text": "その推しを応援し始めてからの期間",
+     "opts": [
+      "半年未満",
+      "半年〜1年未満",
+      "1年〜3年未満",
+      "3年〜5年未満",
+      "5年以上"
+     ]
+    },
+    {
+     "id": "Q5b",
+     "type": "choice",
+     "text": "いま応援している推しの数（主たる推しを含む）",
+     "opts": [
+      "1人・1組",
+      "2人・2組",
+      "3人・3組以上"
+     ]
+    },
+    {
+     "id": "Q6",
+     "type": "choice",
+     "text": "推し活に使う1か月あたりの金額（目安）",
+     "opts": [
+      "5,000円未満",
+      "5,000円〜1万円未満",
+      "1万円〜3万円未満",
+      "3万円〜5万円未満",
+      "5万円以上",
+      "答えたくない"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "tipi",
+   "title": "あなた自身の性格について（TIPI-J）",
+   "lead": "以下の項目はどの程度当てはまりますか。直感でお答えください。",
+   "scale": [
+    "全く違うと思う",
+    "少し違うと思う",
+    "どちらでもない",
+    "少しそう思う",
+    "強くそう思う"
+   ],
+   "items": [
+    {
+     "id": "Q7",
+     "text": "活発で外向的だと思う"
+    },
+    {
+     "id": "Q8",
+     "text": "他人に不満をもち、もめごとを起こしやすいと思う"
+    },
+    {
+     "id": "Q9",
+     "text": "しっかりしていて、自分に厳しいと思う"
+    },
+    {
+     "id": "Q10",
+     "text": "心配性で、うろたえやすいと思う"
+    },
+    {
+     "id": "Q11",
+     "text": "新しいことが好きで、変わった考えをもつと思う"
+    },
+    {
+     "id": "Q12",
+     "text": "寡黙で静かだと思う"
+    },
+    {
+     "id": "Q13",
+     "text": "思いやりがあり、温かいと思う"
+    },
+    {
+     "id": "Q14",
+     "text": "だらしなく、うっかりしていると思う"
+    },
+    {
+     "id": "Q15",
+     "text": "冷静で、気分が安定していると思う"
+    },
+    {
+     "id": "Q16",
+     "text": "発想力が乏しく、平凡だと思う"
+    }
+   ]
+  },
+  {
+   "id": "freq",
+   "title": "推し活の中身（割合）",
+   "lead": "回数ではなく、あなたの推し活全体の中で、それぞれの活動がどのくらいの割合を占めているかをお答えください。",
+   "scale": [
+    "まったくしない",
+    "ごく一部（たまにする程度）",
+    "一部（いくつかある活動の一つ）",
+    "大きな部分（主な活動の一つ）",
+    "中心（推し活のほとんどがこれ）"
+   ],
+   "relative": true,
+   "items": [
+    {
+     "id": "Q17",
+     "text": "推しに関係する音楽を聴いている",
+     "tag": "watch"
+    },
+    {
+     "id": "Q18",
+     "text": "推しに関連する動画（YouTube、MVなど）を視聴している",
+     "tag": "watch"
+    },
+    {
+     "id": "Q19",
+     "text": "推しのライブやイベントに現地参加している",
+     "tag": "event"
+    },
+    {
+     "id": "Q20",
+     "text": "推しのCDやBlu-rayなどを購入している",
+     "tag": "goods"
+    },
+    {
+     "id": "Q21",
+     "text": "推しのグッズ（アクスタ、タオル等）を購入している",
+     "tag": "goods"
+    },
+    {
+     "id": "Q22",
+     "text": "推しが出演するテレビ番組やラジオをチェックしている",
+     "tag": "watch"
+    },
+    {
+     "id": "Q23",
+     "text": "推しに関連する雑誌や書籍を購入している",
+     "tag": "goods"
+    },
+    {
+     "id": "Q24",
+     "text": "推しのSNS（X、Instagram等）をフォロー・チェックしている",
+     "tag": "sns"
+    },
+    {
+     "id": "Q25",
+     "text": "SNSで推しに関する情報を発信・共有している",
+     "tag": "sns"
+    },
+    {
+     "id": "Q26",
+     "text": "推しの聖地巡礼（ロケ地めぐり等）を行っている",
+     "tag": "event"
+    },
+    {
+     "id": "Q27",
+     "text": "ファンクラブや有料会員サービスに入会している",
+     "tag": "goods"
+    },
+    {
+     "id": "Q28",
+     "text": "推しのコラボカフェやポップアップストアに行っている",
+     "tag": "event"
+    }
+   ]
+  },
+  {
+   "id": "life",
+   "title": "推し活を通じた気持ちと生活の変化",
+   "lead": "推し活をしている中でのあなたの気持ちや生活について、どの程度当てはまりますか。",
+   "scale": [
+    "全く当てはまらない",
+    "ほとんど当てはまらない",
+    "あまり当てはまらない",
+    "どちらともいえない",
+    "やや当てはまる",
+    "かなり当てはまる",
+    "非常に当てはまる"
+   ],
+   "items": [
+    {
+     "id": "Q29",
+     "text": "推し活をしていると、日々のストレスが解消されると感じる",
+     "tag": "benefit"
+    },
+    {
+     "id": "Q30",
+     "text": "推しの存在が、毎日の生きがい（活力）になっている",
+     "tag": "benefit"
+    },
+    {
+     "id": "Q31",
+     "text": "辛いことがあっても、推しのことを考えると乗り越えられる",
+     "tag": "benefit"
+    },
+    {
+     "id": "Q32",
+     "text": "推し活を通じて、自分に自信が持てるようになった",
+     "tag": "benefit"
+    },
+    {
+     "id": "Q33",
+     "text": "推し活をしている時間は、時間を忘れて没頭できる",
+     "tag": "benefit"
+    },
+    {
+     "id": "Q34",
+     "text": "推し活のコミュニティや活動の中で、自分の居場所があると感じる",
+     "tag": "benefit"
+    },
+    {
+     "id": "Q35",
+     "text": "推しのために、規則正しい生活（早起きなど）を心がけている",
+     "tag": "life"
+    },
+    {
+     "id": "Q36",
+     "text": "推し活の時間を確保するために、スケジュール管理が上手くなった",
+     "tag": "life"
+    },
+    {
+     "id": "Q37",
+     "text": "推しに見合うファンでいるために、健康や体型維持に気を使っている",
+     "tag": "life"
+    },
+    {
+     "id": "Q38",
+     "text": "推し活資金を確保するために、無駄遣いを減らし節約している",
+     "tag": "life"
+    },
+    {
+     "id": "Q39",
+     "text": "日々の生活の中で「幸せ」を感じる瞬間が増えた",
+     "tag": "benefit"
+    },
+    {
+     "id": "Q40",
+     "text": "情報収集能力が向上した",
+     "tag": "skill"
+    },
+    {
+     "id": "Q41",
+     "text": "推し活を通じて、新しい友人（推し友）ができた",
+     "tag": "social"
+    },
+    {
+     "id": "Q42",
+     "text": "この質問には必ず「2　ほとんど当てはまらない」を選んでください",
+     "tag": "attention",
+     "answer": 2
+    },
+    {
+     "id": "Q43",
+     "text": "家族やリアルな友人との間で、推し活の話を通じてコミュニケーションが円滑になった",
+     "tag": "social"
+    },
+    {
+     "id": "Q44",
+     "text": "推し活のために睡眠時間を削り、日常生活に支障が出ることがある",
+     "tag": "burden_sleep"
+    },
+    {
+     "id": "Q45",
+     "text": "推し活にお金を使いすぎて、生活費や将来の貯蓄に不安を感じることがある",
+     "tag": "burden_money"
+    },
+    {
+     "id": "Q46",
+     "text": "予算を超えてグッズを買ったり、ガチャを回したりして後悔することがよくある",
+     "tag": "burden_money"
+    },
+    {
+     "id": "Q47",
+     "text": "イベント参加や情報追跡を「しなければならない」という義務感（プレッシャー）を感じている",
+     "tag": "burden_duty"
+    },
+    {
+     "id": "Q48",
+     "text": "SNSで他のファン（同担など）の活動を見て、嫉妬したり落ち込んだりすることがある",
+     "tag": "burden_compare"
+    },
+    {
+     "id": "Q49",
+     "text": "ファンのコミュニティ内の人間関係に疲れを感じている",
+     "tag": "burden_duty"
+    },
+    {
+     "id": "Q50",
+     "text": "推し活が原因で、家族やリアルな友人との関係が悪くなったことがある",
+     "tag": "burden_sleep"
+    },
+    {
+     "id": "Q51",
+     "text": "推し活をしていないと不安になったり、気持ちが不安定になったりすることがある",
+     "tag": "burden_compare"
+    },
+    {
+     "id": "Q52",
+     "text": "推し活のために、ファッションや身だしなみ（メイク、美容院など）への意識が高まった",
+     "tag": "skill"
+    },
+    {
+     "id": "Q53",
+     "text": "推しを表現するために、創作スキル（イラスト、動画、文章など）が向上した",
+     "tag": "skill"
+    },
+    {
+     "id": "Q54",
+     "text": "誰かと協力して応援する（企画参加など）楽しさを知った",
+     "tag": "social"
+    }
+   ]
+  },
+  {
+   "id": "trig",
+   "title": "推し活をしたくなるとき",
+   "lead": "「推し活をしたい・推しにお金や時間を使いたい」と強く感じるのは、どのようなときですか。",
+   "scale": [
+    "全く当てはまらない",
+    "ほとんど当てはまらない",
+    "あまり当てはまらない",
+    "どちらともいえない",
+    "やや当てはまる",
+    "かなり当てはまる",
+    "非常に当てはまる"
+   ],
+   "items": [
+    {
+     "id": "Q55",
+     "text": "仕事や学校などで嫌なことがあり、ストレスから逃れたいとき",
+     "tag": "escape"
+    },
+    {
+     "id": "Q56",
+     "text": "日常生活で孤独感や不安を感じたとき",
+     "tag": "escape"
+    },
+    {
+     "id": "Q57",
+     "text": "何かを頑張った後の、自分へのご褒美として",
+     "tag": "reward"
+    },
+    {
+     "id": "Q58",
+     "text": "疲れているとき、癒やしや元気をもらいたいとき",
+     "tag": "recover"
+    },
+    {
+     "id": "Q59",
+     "text": "SNS等で、他のファンが盛り上がっている（買っている）のを見たとき",
+     "tag": "social_pull"
+    },
+    {
+     "id": "Q60",
+     "text": "気分に関わらず、毎日の生活の一部（習慣）として",
+     "tag": "habit"
+    },
+    {
+     "id": "Q61",
+     "text": "テンションを上げたいとき",
+     "tag": "reward"
+    }
+   ]
+  },
+  {
+   "id": "who5",
+   "title": "最近2週間の気分（WHO-5）",
+   "lead": "最近2週間のあなたの状態に最も近いものを選んでください。",
+   "scale": [
+    "まったくない",
+    "ほんのたまに",
+    "半分以下の期間を",
+    "半分以上の期間を",
+    "ほとんどいつも",
+    "いつも"
+   ],
+   "base": 0,
+   "items": [
+    {
+     "id": "W1",
+     "text": "明るく、楽しい気分で過ごした"
+    },
+    {
+     "id": "W2",
+     "text": "落ち着いた、リラックスした気分で過ごした"
+    },
+    {
+     "id": "W3",
+     "text": "意欲的で、活動的に過ごした"
+    },
+    {
+     "id": "W4",
+     "text": "ぐっすりと休め、気持ちよく目覚めた"
+    },
+    {
+     "id": "W5",
+     "text": "日常生活の中に、興味のあることがたくさんあった"
+    }
+   ]
+  },
+  {
+   "id": "shs",
+   "title": "ふだんの幸福感（日本版主観的幸福感尺度）",
+   "lead": "あなたにもっとも当てはまる数字を選んでください。（島井ほか, 2004）",
+   "scale": [
+    "非常に不幸",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "非常に幸福"
+   ],
+   "items": [
+    {
+     "id": "H1",
+     "text": "全般的にみて，わたしは自分のことを（　）であると考えている",
+     "scale": [
+      "非常に不幸",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "非常に幸福"
+     ]
+    },
+    {
+     "id": "H2",
+     "text": "わたしは，自分と同年輩の人と比べて，自分を（　）であると考えている",
+     "scale": [
+      "より不幸な人間",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "より幸福な人間"
+     ]
+    },
+    {
+     "id": "H3",
+     "text": "全般的にみて，非常に幸福な人たちがいます。この人たちは，どんな状況のなかでも，そこで最良のものをみつけて，人生を楽しむ人たちです。あなたは，どの程度，そのような特徴をもっていますか？",
+     "scale": [
+      "まったくない",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "とてもある"
+     ]
+    },
+    {
+     "id": "H4",
+     "text": "全般的にみて，非常に不幸な人たちがいます。この人たちは，うつ状態にあるわけではないのに，はたから考えるよりも，まったく幸せではないようです。あなたは，どの程度，そのような特徴をもっていますか？",
+     "scale": [
+      "まったくない",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "とてもある"
+     ],
+     "reverse": true
+    }
+   ]
+  },
+  {
+   "id": "pss",
+   "title": "最近1か月のストレス（PSS-J）",
+   "lead": "人がどのように感じたり振るまったりするかという例を挙げたものです。それぞれの項目について，そのようなことが，この１ヶ月間にどのくらいあったかを選んで下さい。（Mimura & Griffiths, 2008）",
+   "scale": [
+    "全くなし",
+    "ほとんどなし",
+    "ときどき",
+    "よくあった",
+    "何度もあった"
+   ],
+   "base": 0,
+   "items": [
+    {
+     "id": "P1",
+     "text": "この１ヶ月間，思いがけない事が起きて気が動転したことがどのくらいありましたか。"
+    },
+    {
+     "id": "P2",
+     "text": "この１ヶ月間，あなたの人生にとって重要な事柄を自分でコントロールすることが出来なかったと感じたことがどのくらいありましたか。"
+    },
+    {
+     "id": "P3",
+     "text": "この１ヶ月間，神経質になっている，あるいはストレスがたまっていると感じたことがどのくらいありましたか。"
+    },
+    {
+     "id": "P4",
+     "text": "この１ヶ月間，イライラするような問題をうまく処理したことがどのくらいありましたか。",
+     "reverse": true
+    },
+    {
+     "id": "P5",
+     "text": "この１ヶ月間，生活の中で起きた大きな変化に上手に適応していると感じたことがどのくらいありましたか。",
+     "reverse": true
+    },
+    {
+     "id": "P6",
+     "text": "この１ヶ月間，自分の個人的な問題を扱う能力に自信を感じたことがどのくらいありましたか。",
+     "reverse": true
+    },
+    {
+     "id": "P7",
+     "text": "この１ヶ月間，自分にとって良い方向に事が運んでいると感じたことがどのくらいありましたか。",
+     "reverse": true
+    },
+    {
+     "id": "P8",
+     "text": "この１ヶ月間，しなければならないことに全部はうまく取り組めていないということがどのくらいありましたか。"
+    },
+    {
+     "id": "P9",
+     "text": "この１ヶ月間，生活の中のいら立たしいことをコントロールすることがどのくらい出来ましたか。",
+     "reverse": true
+    },
+    {
+     "id": "P10",
+     "text": "この１ヶ月間，物事をうまく統制していると感じたことがどのくらいありましたか。",
+     "reverse": true
+    },
+    {
+     "id": "P11",
+     "text": "この１ヶ月間，あなたのコントロールのきかない範囲で起きた事に対して怒りを感じたことがどのくらいありましたか。"
+    },
+    {
+     "id": "P12",
+     "text": "この１ヶ月間，ふと気がつくと，成しとげなければならない事柄に考えをめぐらせていた，ということがどのくらいありましたか。"
+    },
+    {
+     "id": "P13",
+     "text": "この１ヶ月間，自分の時間の過ごし方をどのくらい自分でコントロール出来ましたか。",
+     "reverse": true
+    },
+    {
+     "id": "P14",
+     "text": "この１ヶ月間，大変な事があまりにも積み重なってしまって，乗り越えることが出来ないと感じたことが，どのくらいありましたか。"
+    }
+   ]
+  },
+  {
+   "id": "free",
+   "title": "最後に",
+   "lead": "",
+   "items": [
+    {
+     "id": "Q62",
+     "type": "text",
+     "text": "推し活に関する悩みや、ストレスがたまる・幸せを感じる具体的な場面があれば自由にお書きください（任意）",
+     "optional": true
+    }
+   ]
+  }
+ ],
+ "scoring": {
+  "axes": [
+   {
+    "key": "wb",
+    "name": "幸福度",
+    "items": [
+     "W1",
+     "W2",
+     "W3",
+     "W4",
+     "W5"
+    ],
+    "formula": "WHO-5の合計（0〜25）×4"
+   },
+   {
+    "key": "joy",
+    "name": "推し活の充実",
+    "items": [
+     "Q29",
+     "Q30",
+     "Q31",
+     "Q32",
+     "Q33",
+     "Q34",
+     "Q39"
+    ],
+    "formula": "7項目の平均を (平均−1)÷6×100"
+   },
+   {
+    "key": "sleep",
+    "name": "睡眠・生活",
+    "items": [
+     "Q44",
+     "Q50"
+    ],
+    "formula": "100 −（2項目の平均−1）÷6×100",
+    "reverse": true
+   },
+   {
+    "key": "money",
+    "name": "お金",
+    "items": [
+     "Q45",
+     "Q46"
+    ],
+    "formula": "100 −（2項目の平均−1）÷6×100",
+    "reverse": true
+   },
+   {
+    "key": "duty",
+    "name": "義務感・人間関係",
+    "items": [
+     "Q47",
+     "Q49"
+    ],
+    "formula": "100 −（2項目の平均−1）÷6×100",
+    "reverse": true
+   },
+   {
+    "key": "compare",
+    "name": "SNS・比較",
+    "items": [
+     "Q48",
+     "Q51"
+    ],
+    "formula": "100 −（2項目の平均−1）÷6×100",
+    "reverse": true
+   }
+  ],
+  "burnout": {
+   "items": [
+    "Q44",
+    "Q45",
+    "Q46",
+    "Q47",
+    "Q48",
+    "Q49",
+    "Q50",
+    "Q51"
+   ],
+   "formula": "8項目の平均を (平均−1)÷6×100（高いほど推し疲れ）"
+  },
+  "max": 7,
+  "groupA": "6軸のうち5軸以上（約8割）が60点以上、かつWHO-5の素点が13点以上",
+  "shs": {
+   "items": [
+    "H1",
+    "H2",
+    "H3",
+    "H4"
+   ],
+   "reverse": [
+    "H4"
+   ],
+   "formula": "4項目の平均（H4は8から引いて逆転）、1〜7"
+  },
+  "pss": {
+   "items": [
+    "P1",
+    "P2",
+    "P3",
+    "P4",
+    "P5",
+    "P6",
+    "P7",
+    "P8",
+    "P9",
+    "P10",
+    "P11",
+    "P12",
+    "P13",
+    "P14"
+   ],
+   "reverse": [
+    "P4",
+    "P5",
+    "P6",
+    "P7",
+    "P9",
+    "P10",
+    "P13"
+   ],
+   "formula": "14項目の合計（肯定的な7項目は4から引いて逆転）、0〜56、高いほどストレスが高い"
+  }
+ }
+};</script>
+<script>
+(function(){
+"use strict";
+const QN=window.OSHIFIT_Q, SC=QN.scoring;
+const DAY=864e5;
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const r0=x=>Math.round(x);
+const $=s=>document.querySelector(s); const app=$("#app");
+function blank(){return{answers:{},avatar:null,sc:null,plans:null,plan:null,group:null,decidedAt:null,weekly:[],wk:{},fin:{},final:null,offset:0,filled:false,
+  id:Array.from({length:8},()=>"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random()*32)]).join("").replace(/(.{4})/,"$1-")}}
+let S=blank();
+function now(){return Date.now()+S.offset*DAY}
+
+const allItems=QN.sections.flatMap(s=>s.items.map(i=>({...i,sec:s.id})));
+const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const SMAX=SC.max||7; // 気持ちと生活・したくなるときは7件法（1〜7）。頻度は割合の5段階
+function axisScore(ax,A){const v=ax.items.map(k=>A[k]);if(v.some(x=>x==null))return null;
+  if(ax.key==="wb") return v.reduce((a,b)=>a+b,0)*4;
+  const m=mean(v), s=(m-1)/(SMAX-1)*100; return ax.reverse?100-s:s;}
+function scores(A){const o={};SC.axes.forEach(ax=>o[ax.key]=axisScore(ax,A));
+  const b=SC.burnout.items.map(k=>A[k]); o.burnout=b.some(x=>x==null)?null:(mean(b)-1)/(SMAX-1)*100;
+  o.who5raw=["W1","W2","W3","W4","W5"].reduce((a,k)=>a+(A[k]??0),0);
+  const h=["H1","H2","H3","H4"].map(k=>k==="H4"&&A[k]!=null?8-A[k]:A[k]); o.shs=h.some(x=>x==null)?null:mean(h);
+  const ps=QN.sections.find(x=>x.id==="pss"); if(ps){const v=ps.items.map(i=>A[i.id]==null?null:(i.reverse?4-A[i.id]:A[i.id])); o.pss=v.some(x=>x==null)?null:v.reduce((a,b)=>a+b,0);} return o;}
+function isGood(sc){const n=SC.axes.filter(ax=>sc[ax.key]>=60).length; return {n,ok:n>=5&&sc.who5raw>=13};}
+function big5(A){const g=k=>A[k],r=k=>6-A[k],f=(a,b)=>r0((a+b-2)/8*100);
+  if(["Q7","Q8","Q9","Q10","Q11","Q12","Q13","Q14","Q15","Q16"].some(k=>A[k]==null))return null;
+  return{E:f(g("Q7"),r("Q12")),A:f(r("Q8"),g("Q13")),C:f(g("Q9"),r("Q14")),N:f(g("Q10"),r("Q15")),O:f(g("Q11"),r("Q16"))};}
+function freqOf(A,tag){const v=QN.sections.find(s=>s.id==="freq").items.filter(i=>i.tag===tag).map(i=>A[i.id]);return mean(v)}
+function tendency(A){ // 前研究（k-means、2クラスタ）の傾向に近い方。分離は弱いので参考表示
+  const b=big5(A),sns=freqOf(A,"sns");
+  return (sns>=3.5&&b&&b.E>=50)?{name:"高活動・SNS交流型",desc:"SNSでの交流や複数の活動を積極的に行う傾向。前研究では幸福度が高い一方、推し疲れもやや高めでした。"}
+   :{name:"低SNS・マイペース型",desc:"SNSは控えめで、自分のペースで楽しむ傾向。前研究では推し疲れが比較的低めでした。"};}
+
+/* ---------- プラン（弱い軸 × 性格） ---------- */
+const PLANS=[
+ {id:"sns23",axis:"sleep",title:"寝る30分前からSNSはお休みモード",how:"寝る時刻を決め、その30分前に通知をオフにして、スマホを手の届かない所に置く。夜に出た推しの投稿は翌朝まとめて見る",eff:16,trait:null}, // idは集計の互換のため sns23 のまま（旧：SNSは23時まで）
+ {id:"archive",axis:"sleep",title:"リアタイは週2回まで、ほかはアーカイブで",how:"見逃しは翌日の決めた時間に見る",eff:12,trait:"C"},
+ {id:"budget",axis:"money",title:"今月のグッズ予算を先に決める",how:"予算を決め、超えたら翌月に回す",eff:16,trait:"C"},
+ {id:"declutter",axis:"money",title:"グッズを棚卸しして、使わないものをフリマで次のファンへ",how:"月に1回、1年以上飾っていない・使っていないグッズを選び、フリマアプリで出品する。売上は次の推し活の予算に回す",eff:12,trait:"O"},
+ {id:"donate",axis:"wb",title:"使わないモノを寄付につなげる",how:"推しグッズはフリマで譲って売上の一部を寄付、本・CD・DVDは買取金額が寄付になるサービスへ、ぬいぐるみ・文具・おもちゃは寄付団体へ送る",eff:10,trait:"A"},
+ {id:"oneday",axis:"money",title:"欲しいグッズは1日おいてから決める",how:"カートに入れて24時間後にもう一度見る",eff:12,trait:"N"},
+ {id:"choose3",axis:"duty",title:"次の振り返りまでに追う推しの予定を3つまでに絞る",how:"推しの予定（配信・イベント・発売日など）を書き出し、追うものを3つまで選ぶ。残りは「今回は見送る」と決め、通知が来たら「リストにないから見送る」と自分に言う",eff:15,trait:null,multi:true}, // 推しが2人・2組以上（Q5b）で、義務感・人間関係が60点未満の人だけに出す
+ {id:"skipok",axis:"duty",title:"「行かない回」を1つ決めておく",how:"遠征やイベントは無理のない回だけ選ぶ",eff:12,trait:"C"},
+ {id:"mute",axis:"compare",title:"「当選」「〇〇円分」などの言葉に反応しない練習をする",how:"SNSでこうした言葉を見かけたら、ほかの人と比べる前にいったん画面を閉じ、ひと呼吸おいて「自分は自分の推し活」と心の中で言う",eff:15,trait:"N"},
+ {id:"snsonce",axis:"compare",title:"SNSを見るのは1日2回・各15分まで",how:"見る時間を決め、それ以外は通知オフ",eff:12,trait:"E-"},
+ {id:"party",axis:"joy",title:"友達と同時視聴の日をつくる",how:"週末に1回、感想を話しながら見る",eff:12,trait:"E"},
+ {id:"create",axis:"joy",title:"感想メモや創作で推しを残す",how:"視聴後に3行の感想、または絵・文章",eff:12,trait:"O"},
+ {id:"calm",axis:"joy",title:"寝る前15分は推しの曲だけの時間",how:"画面を見ずに音楽だけで過ごす",eff:10,trait:"A"},
+ {id:"event",axis:"joy",title:"行きたいイベントを1つ予定に入れる",how:"1か月以内に行けるイベントを1つ選び、日程と予算を先に決めておく",eff:12,trait:"E"},
+ {id:"good3",axis:"wb",title:"推しのおかげで良かったことを3つ書く",how:"週に2回、寝る前に推しに関する良かったことを3つメモする",eff:10,trait:null},
+];
+function traitFit(p,b){if(!p.trait||!b)return 0;const m={E:b.E,"E-":100-b.E,O:b.O,C:b.C,N:b.N,A:b.A}[p.trait];return (m-50)/50}
+/* 提案の選び方 v1.1：軸の得点を「ふつうの目安」と比べた不足分＋その活動の比重＋性格の合い方 */
+const REF={wb:52,joy:70,sleep:70,money:65,duty:70,compare:70};
+const ACT={sns23:"sns",archive:"watch",budget:"goods",oneday:"goods",declutter:"goods",skipok:"event",mute:"sns",snsonce:"sns",party:"watch",create:"watch",calm:"watch",event:"-event"};
+function actFit(p,A){const a=ACT[p.id];if(p.id==="choose3"){const f=QN.sections.find(s=>s.id==="freq").items.map(i=>A[i.id]).filter(v=>v!=null);return f.length?(mean(f)-1)/4:.3}
+  if(!a)return .3;const v=freqOf(A,a.replace("-",""));if(v==null||isNaN(v))return .3;const x=(v-1)/4;return a[0]==="-"?1-x:x}
+const isMulti=A=>A.Q5b!=null&&A.Q5b!=="1人・1組";
+function plansFor(sc,A){const b=big5(A);
+  const rank=PLANS.filter(p=>!p.multi||(isMulti(A)&&sc.duty<60)).map(p=>({p,s:(REF[p.axis]-sc[p.axis])+traitFit(p,b)*12+actFit(p,A)*18})).sort((x,y)=>y.s-x.s);
+  const out=[],used=new Set();for(const r of rank){if(out.length===3)break;if(used.has(r.p.axis))continue;out.push(r.p);used.add(r.p.axis)}
+  return out.map(p=>({id:p.id,why:whyText(p,sc,b,A)}));}
+/* 予算プランは、本人の金額の区分（Q6）から上限の目安（区分の約8割）を出す */
+const SPEND_CAP={"5,000円未満":3000,"5,000円〜1万円未満":6000,"1万円〜3万円未満":15000,"3万円〜5万円未満":30000,"5万円以上":45000};
+const yen=n=>n.toLocaleString("ja-JP")+"円";
+function planTitle(p){const c=SPEND_CAP[S.answers.Q6];return p.id==="budget"&&c?`推し活の予算を「月${yen(c)}まで」にする`:p.title}
+function planHow(p){const c=SPEND_CAP[S.answers.Q6];return p.id==="budget"&&c?`今は「${S.answers.Q6}」。その約8割の${yen(c)}を月の上限にし、先に予算を決めてから使う。超えそうなら翌月に回す。金額は目安なので、自分で決め直してもよい`:p.how}
+const DONATE_HTML=`<div class="note"><b>寄付先の例（2026年11月時点・送る前に各団体の受付条件を確認）</b><br>
+本・CD・DVD・ゲーム：チャリボン（買取金額をNPOなどへ寄付、1箱から送料無料）／ブックオフ「キモチと。」（宅配買取の金額を約100団体へ寄付）<br>
+ぬいぐるみ・おもちゃ・文具：国際子供友好協会（途上国の子どもへ手渡し）／ワールドギフト（寄付金が必要、途上国へ）／もったいないジャパン（国内外の福祉団体へ）<br>
+推しグッズ（アクスタ・缶バッジなど）：寄付団体ではほとんど受け付けていないため、フリマで次のファンに譲り、売上を「メルカリ寄付」（メルペイ残高から自治体・NPOへ）で寄付する</div>`;
+/* 本の紹介は提案カードではなく、根拠の参考文献（EVID.mute）に載せる */
+/* ---------- 提案の根拠（研究の確かさ・説明・参考文献） ----------
+   lv 3：同じ行動の介入研究（ランダム化比較試験など）で効果が確かめられている
+   lv 2：実験や、近い行動の介入研究がある
+   lv 1：調査研究や理論にもとづく（この形での効果の検証はこれから） */
+const EV_LV={3:"介入研究（ランダム化比較試験など）で効果が確かめられている",2:"実験や、近い行動の介入研究がある",1:"調査研究や理論にもとづく（この形での効果の検証はこれから）"};
+const doi=d=>"https://doi.org/"+d;
+const EVID={
+ sns23:{lv:3,t:"寝る直前にSNSを見る習慣は、夜ふかしや寝つきの悪さにつながります。米国の19〜32歳約1,700人の調査では、寝る前30分にSNSをよく見る人は、ほとんど見ない人に比べて睡眠の問題を抱える割合が約1.6倍でした。大学生38人のランダム化比較試験では、寝る30分前からスマホを使わない生活を4週間続けた人で、寝つくまでの時間が短くなり、睡眠時間が延び、前向きな気分も高まりました。\n【なぜ時刻ではなく「寝る30分前」か】研究で効果が確かめられているのは「寝る時刻の30分前から」という条件で、23時や22時といった決まった時刻ではありません。寝る時刻は人によって違うため、決まった時刻にすると、遅く寝る人には何時間も前から我慢することになって続きにくく、早く寝る人には効果が出にくくなります。そこで本人の寝る時刻から逆算する形にしています。厚生労働省の睡眠ガイドも、寝る前や寝床でのスマホなどの使用を避けるよう勧めています。",
+  r:[["He, J., Tu, Z., Xiao, L., Su, T., & Tang, Y. (2020). Effect of restricting bedtime mobile phone use on sleep, arousal, mood, and working memory: A randomized pilot trial. PLoS ONE, 15(2), e0228756.",doi("10.1371/journal.pone.0228756")],
+     ["Levenson, J. C., Shensa, A., Sidani, J. E., Colditz, J. B., & Primack, B. A. (2017). Social media use before bed and sleep disturbance among young adults in the United States: A nationally representative study. Sleep, 40(9), zsx113.",doi("10.1093/sleep/zsx113")],
+     ["厚生労働省 (2024). 健康づくりのための睡眠ガイド2023.","https://www.mhlw.go.jp/content/10904750/001222161.pdf"]]},
+ archive:{lv:1,t:"配信や番組を続けて見る（一気見する）ことが多い人ほど、寝る前に頭がさえてしまい、睡眠の質が下がり、疲れやすいという調査があります（ベルギーの18〜25歳423人）。リアルタイム視聴の回数を区切り、残りを翌日の決めた時間にアーカイブで見ることで、夜遅くの視聴を減らします。視聴の回数を減らす介入そのものの効果を確かめた研究はまだ少なく、根拠は調査研究にとどまります。",
+  r:[["Exelmans, L., & Van den Bulck, J. (2017). Binge viewing, sleep, and the role of pre-sleep arousal. Journal of Clinical Sleep Medicine, 13(8), 1001–1008.","https://pmc.ncbi.nlm.nih.gov/articles/PMC5529125"]]},
+ budget:{lv:1,t:"使う前に予算の枠を決めると、お金を「推し活の分」として分けて考えやすくなり、使いすぎに気づきやすくなります（心の会計）。また、お金の使い方を自分で管理できている感覚は、お金のストレスの少なさや生活の満足度と結びついています。上限を今の支出の約8割にしているのは、急に大きく減らすより続けやすくするためで、8割という数字は研究で決まったものではなくOshiFitの目安です。",
+  r:[["Thaler, R. H. (1999). Mental accounting matters. Journal of Behavioral Decision Making, 12(3), 183–206.",""],
+     ["Netemeyer, R. G., Warmath, D., Fernandes, D., & Lynch, J. G. (2018). How am I doing? Perceived financial well-being, its potential antecedents, and its relation to overall well-being. Journal of Consumer Research, 45(1), 68–89.",""]]},
+ declutter:{lv:1,t:"家の中の物が多すぎて片付かないと感じている人ほど、生活の満足度が低いという調査があります。使っていないグッズを次のファンに譲ることで、部屋の余裕と次の推し活の予算の両方をつくります。グッズを手放すことそのものの効果を確かめた研究はなく、根拠は調査研究です。",
+  r:[["Roster, C. A., Ferrari, J. R., & Jurkat, M. P. (2016). The dark side of home: Assessing possession 'clutter' on subjective well-being. Journal of Environmental Psychology, 46, 32–41.",""]]},
+ donate:{lv:2,t:"自分のためより人のためにお金を使ったほうが、その日の幸福感が高まることが実験で示されています（少額でも同じでした）。使わないモノを寄付につなげることで、手放すことを「誰かの役に立つ行動」に変えます。モノの寄付で同じ効果が出るかはまだ確かめられていません。",
+  r:[["Dunn, E. W., Aknin, L. B., & Norton, M. I. (2008). Spending money on others promotes happiness. Science, 319(5870), 1687–1688.",doi("10.1126/science.1150952")]]},
+ oneday:{lv:1,t:"すでに持っているものを思い出してから考えると、買いたい気持ちや払ってもよいと思う金額が下がることが実験で示されています。24時間おくのは、その間に持っているグッズを思い出し、勢いではなく本当に欲しいかで決めるためです。「24時間」という長さをほかの長さと比べた研究はなく、一般によく使われる目安です。",
+  r:[["Dholakia, U. M., Jung, J., & Chowdhry, N. (2018). Should I buy this when I have so much? Reflection on personal possessions as an anticonsumption strategy. Journal of Public Policy & Marketing, 37(2).",""]]},
+ choose3:{lv:1,t:"いくつもの目標が同時にぶつかり合っている人ほど、気分が落ち込みやすく、体の不調も多いことが分かっています。また「何でも最大限に追おう」とする人ほど幸福感が低い傾向があります。この提案は、追う予定を自分で選び、残りは見送ると先に決めることで、「しなければならない」という義務感（質問Q47）を下げることをねらっています。\n【なぜ3つか】人が同時に意識しておける物事は4つ前後とされます。3つはその範囲に収まり、推しが2人以上いる人にとって「全部」より少なくなる数です。ただし、2つ・3つ・4つを比べた研究はなく、3は研究で最適と示された数ではありません。そのため上限を「3つまで」とし、2つや1つでもよいことにしています。\n【リストを作るだけで変わるか】リストだけでは行動が変わりにくいため、「通知が来たら、リストにない予定は見送る」という「もし〜なら〜する」形の決めごとを加えています。この形の計画は、94の研究をまとめた分析で、目標の達成を中程度以上に高めることが示されています。効果は、振り返りごとのQ47（義務感）の変化と、最後の調査のPSS-J（ストレス）・WHO-5（気分）で確かめます。",
+  r:[["Emmons, R. A., & King, L. A. (1988). Conflict among personal strivings: Immediate and long-term implications for psychological and physical well-being. Journal of Personality and Social Psychology, 54(6), 1040–1048.",doi("10.1037/0022-3514.54.6.1040")],
+     ["Schwartz, B., Ward, A., Monterosso, J., Lyubomirsky, S., White, K., & Lehman, D. R. (2002). Maximizing versus satisficing: Happiness is a matter of choice. Journal of Personality and Social Psychology, 83(5), 1178–1197.",doi("10.1037/0022-3514.83.5.1178")],
+     ["Cowan, N. (2001). The magical number 4 in short-term memory: A reconsideration of mental storage capacity. Behavioral and Brain Sciences, 24(1), 87–114.","https://pubmed.ncbi.nlm.nih.gov/11515286/"],
+     ["Gollwitzer, P. M., & Sheeran, P. (2006). Implementation intentions and goal achievement: A meta-analysis of effects and processes. Advances in Experimental Social Psychology, 38, 69–119.",doi("10.1016/S0065-2601(06)38002-1")]]},
+ skipok:{lv:1,t:"FOMO（取り残される不安）が強い人ほど、気分が落ち込みやすく、生活の満足度が低いことが分かっています。「行かない回」を先に1つ決めておくと、当日に迷って無理をすることを防げます。前もって「この場合はこうする」と決めておく計画は、行動を変えやすいことが多くの研究で示されています。ただし、行かないと決めることで推し活の疲れが減るかを直接確かめた研究はまだありません。",
+  r:[["Przybylski, A. K., Murayama, K., DeHaan, C. R., & Gladwell, V. (2013). Motivational, emotional, and behavioral correlates of fear of missing out. Computers in Human Behavior, 29(4), 1841–1848.",doi("10.1016/j.chb.2013.02.014")],
+     ["Gollwitzer, P. M., & Sheeran, P. (2006). Implementation intentions and goal achievement: A meta-analysis of effects and processes. Advances in Experimental Social Psychology, 38, 69–119.",doi("10.1016/S0065-2601(06)38002-1")]]},
+ mute:{lv:1,t:"SNSで自分より良く見える人と比べること（上方比較）が多い人ほど自尊心が低いことが、調査と実験で示されています。比べてしまう言葉を見たときに、いったん画面を閉じてひと呼吸おくことで、比べる流れを止めることをねらいます。この方法そのものの効果を確かめた研究はまだなく、紹介している本は研究書ではなく一般向けの本です。",
+  r:[["Vogel, E. A., Rose, J. P., Roberts, L. R., & Eckles, K. (2014). Social comparison, social media, and self-esteem. Psychology of Popular Media Culture, 3(4), 206–222.",doi("10.1037/ppm0000047")],
+     ["草薙龍瞬 (2015). 反応しない練習：あらゆる悩みが消えていくブッダの超・合理的な「考え方」. KADOKAWA.（一般向けの本。やり方の参考として紹介）","https://ndlsearch.ndl.go.jp/books/R100000002-I026589689"]]},
+ snsonce:{lv:3,t:"大学生143人のランダム化比較試験で、Facebook・Instagram・Snapchatをそれぞれ1日10分（合計で約30分）に3週間制限したところ、孤独感と抑うつが下がりました。もともと抑うつが強かった人ほど効果が大きくなっていました。OshiFitの「1日2回・各15分」は合計30分で、この研究とほぼ同じ量です。",
+  r:[["Hunt, M. G., Marx, R., Lipson, C., & Young, J. (2018). No more FOMO: Limiting social media decreases loneliness and depression. Journal of Social and Clinical Psychology, 37(10), 751–768.",doi("10.1521/jscp.2018.37.10.751")]]},
+ party:{lv:2,t:"同じものを誰かと同時に体験すると、楽しい体験はより楽しく感じられることが実験で示されています（相手と話さなくても起こりました）。友達と感想を話しながら見ることで、推し活の楽しさをさらに強めます。",
+  r:[["Boothby, E. J., Clark, M. S., & Bargh, J. A. (2014). Shared experiences are amplified. Psychological Science, 25(12), 2209–2216.",doi("10.1177/0956797614551162")]]},
+ create:{lv:2,t:"とても良かった体験について1日20分・3日間書いた大学生は、書かなかった人より気分が良くなり、その後3か月の通院も少なかったという実験があります。視聴のあとに3行の感想を残すことは、推しで得た良い気持ちを書いて味わい直す小さな形です（3行という量は続けやすさを優先した目安です）。",
+  r:[["Burton, C. M., & King, L. A. (2004). The health benefits of writing about intensely positive experiences. Journal of Research in Personality, 38(2), 150–163.",""]]},
+ calm:{lv:2,t:"音楽を聴くと主観的な睡眠の質が良くなることが、13のランダム化比較試験（1,007人）をまとめたコクラン・レビューで示されています（証拠の確かさは中程度）。研究で使われたのは主にゆったりした曲なので、寝る前はテンポの速い曲より落ち着いた推しの曲を選びます。研究では1回25〜60分でしたが、続けやすさを優先して15分にしています。画面を見ないことで、寝る前のスマホも減らせます。",
+  r:[["Jespersen, K. V., Pando-Naude, V., Koenig, J., Jennum, P., & Vuust, P. (2022). Listening to music for insomnia in adults. Cochrane Database of Systematic Reviews, 8, CD010459.",doi("10.1002/14651858.CD010459.pub3")]]},
+ event:{lv:2,t:"物を買うのを待つときより、体験（イベントや旅行など）を待つときのほうが、楽しみな気持ちが大きいことが研究で示されています。1か月以内のイベントを1つ予定に入れることで、待っている間の楽しみも推し活の充実に加えます。日程と予算を先に決めるのは、お金や時間の負担を増やさないためです。",
+  r:[["Kumar, A., Killingsworth, M. A., & Gilovich, T. (2014). Waiting for merlot: Anticipatory consumption of experiential and material purchases. Psychological Science, 25(10), 1924–1931.",""]]},
+ good3:{lv:3,t:"「その日の良かったことを3つ書く」練習を1週間続けた人は、6か月後まで幸福感が高く、抑うつ症状が低いままだったというランダム化比較試験があります。また、感謝を書き出す練習は、週3回より週1回のほうが効果が出たという研究があり、回数が多すぎると効果が薄れる可能性があります。そこでOshiFitでは週2回にしています。",
+  r:[["Seligman, M. E. P., Steen, T. A., Park, N., & Peterson, C. (2005). Positive psychology progress: Empirical validation of interventions. American Psychologist, 60(5), 410–421.","https://pubmed.ncbi.nlm.nih.gov/16045394/"],
+     ["Lyubomirsky, S., Sheldon, K. M., & Schkade, D. (2005). Pursuing happiness: The architecture of sustainable change. Review of General Psychology, 9(2), 111–131.",doi("10.1037/1089-2680.9.2.111")]]}
+};
+function evidenceHTML(id){const e=EVID[id];if(!e)return"";const st="★".repeat(e.lv)+"☆".repeat(3-e.lv);
+  return`<div class="ev"><p class="ev-h"><b>この提案の根拠</b><span class="ev-st" aria-label="研究の確かさ 3段階中${e.lv}">${st}</span><span class="ev-lv">${EV_LV[e.lv]}</span></p>${e.t.split("\n").map(x=>`<p>${esc(x).replace(/^【(.+?)】/,'<b class="ev-q">$1</b><br>')}</p>`).join("")}<details class="ev-ref"><summary>参考文献（${e.r.length}件）</summary><ol>${e.r.map(([c,u])=>`<li>${esc(c)}${u?` <a href="${u}" target="_blank" rel="noopener">リンク</a>`:""}</li>`).join("")}</ol></details></div>`}
+
+/* 外向的（外向性60以上）なのに動画視聴（Q18）が中心で、現地参加（Q19）が少ないスポーツファンには、
+   「行きたいイベントを1つ予定に入れる」に公式のチケット販売ページを添え、自分で調べる手間を減らす。
+   リンクは球団の公式ページだけ（転売・仲介サイトや紹介料つきのリンクは使わない） */
+const TICKETS=[["阪神タイガース（阪神甲子園球場ほか）","https://hanshintigers.jp/ticket/"],["読売ジャイアンツ（東京ドームほか）","https://www.giants.jp/ticket/first-team/"]];
+function ticketFit(A){const b=big5(A);return !!b&&b.E>=60&&(A.Q18??0)>=4&&(A.Q19??5)<=2&&A.Q4==="スポーツ選手"}
+function ticketHTML(A){if(!ticketFit(A))return"";return`<div class="note tickets"><b>現地観戦のチケット（球団の公式販売ページ）</b><br>あなたは外向性が高く、推し活は動画を見ることが中心です。まずは1試合、現地で観てみませんか。${TICKETS.map(([n,u])=>`<br><a href="${u}" target="_blank" rel="noopener">${n}</a>`).join("")}<br><span class="xs muted">販売開始日は試合ごとに違います。転売サイトではなく公式ページから購入してください。予算は先に決めておきましょう。</span></div>`}
+const ACTNAME={sns:"SNS",watch:"視聴",goods:"グッズ",event:"現地イベント"};
+const AXNAME=Object.fromEntries(SC.axes.map(a=>[a.key,a.name]));
+function whyText(p,sc,b,A){const v=r0(sc[p.axis]);const t=[v>=60?`「${AXNAME[p.axis]}」は${v}点で良好（今の状態を保つための提案）`:`「${AXNAME[p.axis]}」が${v}点`];const a=ACT[p.id];
+  if(p.id==="event"&&A&&ticketFit(A))t.push("外向性が高く、動画視聴が中心で、現地参加が少ない");
+  if(p.multi&&A)t.push(`推しが${A.Q5b==='2人・2組'?'2人・2組':'3人・3組以上'}`);
+  if(A&&a&&actFit(p,A)>=.6)t.push(a[0]==="-"?`${ACTNAME[a.slice(1)]}は少なめ`:`${ACTNAME[a]}が推し活の大きな部分`);
+  if(p.trait&&b&&traitFit(p,b)>0.1)t.push({E:"外向性が高め",["E-"]:"ひとりで楽しむ傾向",O:"開放性が高め",C:"計画的な傾向",N:"気持ちが揺れやすい傾向",A:"人を大切にする傾向"}[p.trait]);
+  return t.join("・");}
+const planById=id=>PLANS.find(p=>p.id===id);
+/* 予測：プランA＝今のまま（現在の得点）、プランB＝プランの軸が eff 点改善し、幸福度は改善の1/4だけ上がる（仮定 v1.0）
+   80%の幅：各軸 ±15、幸福度 ±12（開始時。研究では実測から推定し直す） */
+function predictMulti(sc,ids){let B={...sc};const ps=ids.map(planById);
+  ps.forEach(p=>{B[p.axis]=clamp(B[p.axis]+p.eff,0,100); if(p.axis!=="wb") B.wb=clamp(B.wb+p.eff/4,0,100);
+    if(p.axis!=="joy"&&p.axis!=="wb") B.burnout=clamp(B.burnout-p.eff/4,0,100); else B.joy=clamp(B.joy+p.eff,0,100);});
+  if(sc.pss!=null&&sc.burnout!=null) B.pss=clamp(sc.pss*(1+(B.burnout-sc.burnout)/Math.max(sc.burnout,1)*.25),0,56); // 仮定：推し疲れの変化の1/4の割合でPSS-Jも動く
+  return{A:sc,B,hw:15+5*(ids.length-1),hwWb:12+4*(ids.length-1),plans:ps};}
+const planIds=()=>!S.plan?[]:(S.plan.ids&&S.plan.ids.length?S.plan.ids:[S.plan.id]);
+function predict(sc,planId){const p=planById(planId);const B={...sc};
+  B[p.axis]=clamp(sc[p.axis]+p.eff,0,100); if(p.axis!=="wb") B.wb=clamp(sc.wb+p.eff/4,0,100);
+  if(p.axis!=="joy"&&p.axis!=="wb") B.burnout=clamp(sc.burnout-p.eff/4,0,100); else B.joy=clamp(sc.joy+p.eff,0,100);
+  return{A:sc,B,hw:15,hwWb:12,plan:p};}
+
+/* アバターは avatar.js（Mii を参考にしたパーツ式。写真は使わない） */
+function defAv(){return window.OFAvatar.defaults(S.answers&&S.answers.Q2)}
+function avatar(av,mood,size=120){if(av&&av.v!==2)av=null;return window.OFAvatar.render(av||defAv(),mood,size)}
+/* アバターの表情：6軸の平均が50未満＝疲れ気味、50〜64＝ふつう、65以上＝元気（数値の区分だけに連動） */
+function axMean(sc){return mean(SC.axes.map(a=>sc[a.key]))}
+function moodOf(sc){const m=axMean(sc);return m>=65?"bright":m<50?"tired":"neutral"}
+
+/* ---------- 共通 ---------- */
+const MODE=window.OSHIFIT_MODE||"demo", STUDY=MODE==="study"; // 研究版は保存あり・編集者モードなし
+let EDIT=!STUDY, VIEW="start", SV={}, LOCK=false, DIR="in", KEEP=false;
+/* 質問文の欄を、同じ節（同じ選び方）でいちばん長い質問文に合わせた高さで固定する。選択肢が毎回同じ高さから始まるので、
+   同じ選び方の質問が続くとき「どちらでもない」などが前の質問と同じ場所に来る（答えても画面は上に戻らない） */
+const QH={};
+function fitCard(key,items){const h=app.querySelector(".qhead");if(!h)return;const it0=items[SV[key].i],w=h.clientWidth;const k=key+":"+it0.sec+":"+w;
+  if(!QH[k]){const m=document.createElement("div");m.className="qhead";m.style.cssText=`position:absolute;visibility:hidden;left:-9999px;width:${w}px;min-height:0`;document.body.appendChild(m);let mx=0;
+    items.filter(it=>it.sec===it0.sec).forEach(it=>{m.innerHTML=`${it.lead?`<p class="lead">${esc(it.lead)}</p>`:""}<h2 class="qtext">${esc(it.text)}</h2>`;mx=Math.max(mx,m.offsetHeight)});m.remove();QH[k]=Math.min(mx,Math.round(innerHeight*.35))}
+  h.style.minHeight=QH[k]+"px"}
+addEventListener("resize",()=>{if(SV[VIEW])render()});
+function toast(t){document.querySelectorAll(".toast").forEach(x=>x.remove());const d=document.createElement("div");d.className="toast";d.setAttribute("role","status");d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2400)}
+const ICON={home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',future:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',note:'<path d="M5 3h10l4 4v14H5z"/><path d="M9 12h6M9 16h6"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>'};
+function tabbar(cur){const T=[["home","ホーム","home"],["analysis","分析","chart"],["future","未来","future"],["checkin","記録","note"],["mypage","マイページ","user"]];
+  return`<nav class="tabbar" aria-label="メニュー"><div class="in">${T.map(([v,l,i])=>`<a class="tab" href="#${v}" ${v===cur?'aria-current="page"':""}><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[i]}</svg>${l}</a>`).join("")}</div></nav>`}
+const SCREENS=[["start","1 はじめに"],["q","2 質問（1問ずつ）"],["avatar","3 アバター制作"],["analysis","4 分析"],["future","5 2つの未来（提案）"],["home","ホーム"],["checkin","6 3回目の振り返り"],["final","7 最後の調査"],["result","7 4週間の結果"],["mypage","8 マイページ"],["withdraw","9 辞退の確認"],["withdrawn","9 辞退の完了"],["admin","10 開発者ページ"]];
+function editbar(){if(!EDIT)return"";const i=SCREENS.findIndex(s=>s[0]===VIEW);
+  return`<div class="editbar" role="toolbar" aria-label="編集者モード"><button id="ed-prev" ${i<=0?"disabled":""}>‹ 前へ</button><select id="ed-sel" aria-label="画面を選ぶ">${SCREENS.map(([k,n])=>`<option value="${k}" ${k===VIEW?"selected":""}>${n}</option>`).join("")}</select><button id="ed-next" ${i>=SCREENS.length-1?"disabled":""}>次へ ›</button>
+   <div class="tools"><span>編集者モード（回答しなくても移動できます。何も保存しません）</span><button id="ed-fill">回答を埋める</button><button id="ed-day">＋4日</button><button id="ed-reset">最初から</button><button id="ed-off">閉じる</button></div></div>`}
+function header(right){return`<header class="top"><div class="in"><span class="row" style="gap:8px"><button class="logo" id="logo" aria-label="OshiFit"><i aria-hidden="true"></i>OshiFit</button><span class="tag">${VIEW==="admin"?"開発者ページ":"研究版"}</span></span>${right?`<span class="ctx">${right}</span>`:""}</div></header>${editbar()}`}
+function stepper(i){return`<ol class="stepper" aria-label="進み具合">${["質問","アバター","分析","2つの未来"].map((t,j)=>`<li class="${j<i?"done":j===i?"now":""}" ${j===i?'aria-current="step"':""}>${t}</li>`).join("")}</ol>`}
+function dock(back,label,id,dis,note){return`<div class="dock"><div class="in">${back?`<button class="btn back" id="${back}">戻る</button>`:""}<button class="btn primary" id="${id}" ${dis?"disabled":""}>${label}</button></div>${note?`<p class="note">${note}</p>`:""}</div>`}
+
+/* ---------- 回答の自動補完（編集者モード・直接表示用） ---------- */
+const allIt=QN.sections.flatMap(s=>s.items.map(i=>({...i,sec:s})));
+function midVal(it){const s=it.sec;if(it.type==="number")return 21;if(it.type==="choice")return it.opts[Math.min(2,it.opts.length-1)];if(it.type==="text")return null;if(it.id==="Q42")return 2;
+  const L=it.scale||s.scale,b=s.base??1;return b+Math.floor(L.length/2)}
+function fillBase(){let n=0;allIt.forEach(it=>{if(S.answers[it.id]==null&&it.type!=="text"){const v=midVal(it);if(v!=null){S.answers[it.id]=v;n++}}});if(n)S.filled=true;S.avatar=S.avatar||defAv();return n}
+function ensureBase(){if(!STUDY)fillBase();S.sc=scores(S.answers);if(!S.plans)S.plans=plansFor(S.sc,S.answers);return S.sc}
+function ensureGroup(){ensureBase();if(!S.group&&!STUDY){S.group="B";S.plan={id:S.plans[0].id,ids:S.plans.slice(0,2).map(x=>x.id),accepted:true};S.decidedAt=now()-12*DAY}}
+
+/* ---------- 質問を1問ずつ（選ぶと次へ） ---------- */
+function mkItem(it,s){const base={id:it.id,text:it.text,sec:s.title,lead:s.lead};
+  if(it.type==="number")return{...base,kind:"number"};
+  if(it.type==="choice")return{...base,kind:"list",labels:it.opts,vals:it.opts};
+  if(it.type==="text")return{...base,kind:"text",optional:!!it.optional};
+  const L=it.scale||s.scale,b=s.base??1;return{...base,kind:L.length===7?"circle":"list",labels:L,vals:L.map((_,j)=>b+j)}}
+/* 質問の数を減らす（config.js の OSHIFIT_QSET="short"）。採点・提案・分析に使わない項目を省き、性別（Q2）は新規登録で聞く */
+const OMIT=new Set(["Q2",...((window.OSHIFIT_QSET||"short")==="short"?(QN.short_omit||[]):[])]);
+const BASE_ITEMS=QN.sections.flatMap(s=>s.items.filter(it=>!OMIT.has(it.id)).map(it=>mkItem(it,s)));
+const AGREE7=["全く当てはまらない","ほとんど当てはまらない","あまり当てはまらない","どちらともいえない","やや当てはまる","かなり当てはまる","非常に当てはまる"];
+function itemOf(id){return BASE_ITEMS.find(i=>i.id===id)}
+function checkItems(){const ps=(planIds().length?planIds():["sns23"]).map(planById), sec="振り返り", lead="前回の振り返りから今日までについて答えてください。", A=v=>({kind:"circle",labels:AGREE7,vals:AGREE7.map((_,j)=>j+1)});
+  const L=ps.map(p=>({id:"did_"+p.id,sec,lead,text:`${S.group==="B"?"提案（プランB）":"提示された提案"}「${planTitle(p)}」を、前回の振り返りから今日までに行いましたか`,kind:"list",labels:["行った","一部行った","行わなかった"],vals:[0,1,2]}));
+  ["Q44","Q45","Q47","Q48"].forEach(k=>L.push({id:k,sec,lead,text:itemOf(k).text,...A()}));
+  L.push({id:"joy",sec,lead,text:"推し活をしているときに幸せを感じた",...A()});
+  L.push({id:"stress",sec,lead:"",text:"前回の振り返りと比べて、推し活のストレスは",kind:"list",labels:["減った","変わらない","増えた"],vals:[0,1,2]});
+  L.push({id:"happy",sec,lead:"",text:"前回の振り返りと比べて、推し活中の幸福感は",kind:"list",labels:["上がった","変わらない","下がった"],vals:[0,1,2]});
+  if(nextNo()===3)QN.sections.find(s=>s.id==="who5").items.forEach(it=>L.push({...mkItem(it,QN.sections.find(s=>s.id==="who5")),sec:"3回目のみ：最近2週間の気分（WHO-5）"}));
+  return L}
+const AGREE5U=["まったくそう思わない","あまりそう思わない","どちらともいえない","ややそう思う","とてもそう思う"];
+const USE=[["J1","自分の推し活のどの仕方がストレスにつながっているかに気づいた"],["J2","推し活の仕方を見直そうと思った"],["K1","OshiFitは自分の推し活を見直すのに役立った"],["K2","OshiFitは使いやすかった"],["K3","示された提案は自分に合っていた"],["K4","未来の見込みを見て不安になった"],["K5","これからもOshiFitを使いたい"]];
+function finalItems(){const ids=["W1","W2","W3","W4","W5","H1","H2","H3","H4",...QN.sections.find(s=>s.id==="pss").items.map(i=>i.id),"Q29","Q30","Q31","Q32","Q33","Q34","Q39","Q44","Q45","Q46","Q47","Q48","Q49","Q50","Q51"];
+  const L=ids.map(itemOf);if(S.group!=="A")USE.forEach(([id,text])=>L.push({id,text,sec:"OshiFitを使ってみて",lead:"",kind:"list",labels:AGREE5U,vals:AGREE5U.map((_,j)=>j+1)}));
+  if(S.group==="B")L.push({id:"how",text:"提案（プランB）を行ってみて、どのように変わりましたか（任意）",sec:"最後に",lead:"",kind:"text",optional:true});return L}
+
+function vSurvey(key,items,store,title,ctx,onDone,stepIdx){
+  const st=SV[key]||(SV[key]={i:0}); st.i=clamp(st.i,0,items.length-1);
+  const it=items[st.i], n=items.length, val=store[it.id], has=val!=null&&val!=="";
+  const left=Math.max(1,Math.ceil((n-st.i)*10/60));
+  let input="";
+  if(it.kind==="circle"){const sz=[44,38,32,28,32,38,44];
+    input=`<div class="ends" aria-hidden="true"><span>${esc(it.labels[0])}</span><span>${esc(it.labels[6])}</span></div>
+     <div class="circles" role="radiogroup" aria-label="${esc(it.text)}">${it.vals.map((v,j)=>`<button class="cbtn" role="radio" data-j="${j}" aria-checked="${val===v}" aria-label="${j+1}：${esc(it.labels[j]||"")}" style="width:${sz[j]}px;height:${sz[j]}px">${j+1}</button>`).join("")}</div>
+     <p class="chosen" aria-live="polite">${has?esc(it.labels[it.vals.indexOf(val)]||`${it.vals.indexOf(val)+1}`):""}</p>`}
+  else if(it.kind==="list"){input=`<div class="olist" role="radiogroup" aria-label="${esc(it.text)}">${it.labels.map((l,j)=>`<button class="obtn" role="radio" data-j="${j}" aria-checked="${val===it.vals[j]}"><span class="dot" aria-hidden="true"></span><span>${esc(l)}</span></button>`).join("")}</div>`}
+  else if(it.kind==="number"){input=`<input class="field" id="f-num" type="number" inputmode="numeric" min="18" max="99" value="${has?val:""}" placeholder="例：21">`}
+  else input=`<textarea class="field" id="f-text" maxlength="400" placeholder="自由にお書きください">${esc(val||"")}</textarea>`;
+  const auto=it.kind==="circle"||it.kind==="list";
+  app.innerHTML=header(ctx)+`<main class="stack" style="padding-top:14px">${stepIdx!=null?stepper(stepIdx):""}
+   <div class="qprog"><div class="meta"><span>${esc(it.sec)}</span><span class="mono">${st.i+1} / ${n}</span></div><div class="bar"><i style="width:${r0((st.i)/n*100)}%"></i></div><div class="meta"><span>${esc(title)}</span><span>あと約${left}分</span></div></div>
+   <article class="card qcard ${DIR}">
+     <div class="row" style="justify-content:space-between"><span class="qid">${esc(it.id)}</span><span class="xs muted">${auto?"選ぶと次の質問へ進みます":it.optional?"空欄のままでも進めます":"入力して「次へ」"}</span></div>
+     <div class="qhead">${it.lead?`<p class="lead">${esc(it.lead)}</p>`:""}<h2 class="qtext">${esc(it.text)}</h2></div><div class="ans">${input}</div>
+   </article></main>
+   <div class="dock"><div class="in"><button class="btn back" id="sv-prev" ${st.i===0?"disabled":""}>前の質問</button><button class="btn primary" id="sv-next" ${has||it.optional?"":"disabled"}>${st.i===n-1?"回答を終える":"次へ"}</button></div></div>`;
+  DIR="in";
+  fitCard(key,items);
+  const next=()=>{LOCK=false;if(st.i<n-1){st.i++;DIR="in";KEEP=true;render()}else onDone()};
+  app.querySelectorAll("[data-j]").forEach(b=>b.onclick=()=>{if(LOCK)return;LOCK=true;store[it.id]=it.vals[+b.dataset.j];saveDraft(key);
+    app.querySelectorAll("[data-j]").forEach(x=>x.setAttribute("aria-checked",String(x===b)));const c=app.querySelector(".chosen");if(c)c.textContent=it.labels[+b.dataset.j]||"";
+    setTimeout(next,300)});
+  const num=$("#f-num"); if(num){num.oninput=()=>{const v=parseInt(num.value,10);store[it.id]=isNaN(v)?null:v;saveDraft(key);$("#sv-next").disabled=!(v>=18&&v<=99)};num.focus()}
+  const tx=$("#f-text"); if(tx)tx.oninput=()=>{store[it.id]=tx.value;saveDraft(key)};
+  $("#sv-prev").onclick=()=>{if(st.i>0){st.i--;DIR="back";KEEP=true;render()}};
+  $("#sv-next").onclick=next;
+  wire();}
+
+/* ---------- 画面 ---------- */
+/* ---------- アイソメトリックの線画（推し活の街） ---------- */
+const ISO_C=Math.cos(Math.PI/6);
+function isoKit(u,ox,oy){
+  const P=(x,y,z=0)=>[ox+(x-y)*ISO_C*u, oy+(x+y)*.5*u-z*u];
+  const f=n=>n.toFixed(1), pts=a=>a.map(p=>P(...p).map(f).join(",")).join(" ");
+  const out=[], add=s=>out.push(s);
+  const poly=(a,fill,extra="")=>add(`<polygon points="${pts(a)}" fill="${fill}" ${extra}/>`);
+  const K={P,add,poly,u,
+    box(x,y,z,w,d,h,c={}){
+      poly([[x,y+d,z],[x+w,y+d,z],[x+w,y+d,z+h],[x,y+d,z+h]],c.left||"var(--il-shade)");
+      poly([[x+w,y,z],[x+w,y+d,z],[x+w,y+d,z+h],[x+w,y,z+h]],c.right||"var(--il-white)");
+      poly([[x,y,z+h],[x+w,y,z+h],[x+w,y+d,z+h],[x,y+d,z+h]],c.top||"var(--il-white)")},
+    onX(X,y,z,dy,dz,fill,extra){poly([[X,y,z],[X,y+dy,z],[X,y+dy,z+dz],[X,y,z+dz]],fill,extra)},
+    onY(Y,x,z,dx,dz,fill,extra){poly([[x,Y,z],[x+dx,Y,z],[x+dx,Y,z+dz],[x,Y,z+dz]],fill,extra)},
+    flat(x,y,z,w,d,fill,extra){poly([[x,y,z],[x+w,y,z],[x+w,y+d,z],[x,y+d,z]],fill,extra)},
+    roof(x,y,z,w,d,h,fill){poly([[x,y+d/2,z+h],[x+w,y+d/2,z+h],[x+w,y+d,z],[x,y+d,z]],fill);poly([[x+w,y,z],[x+w,y+d,z],[x+w,y+d/2,z+h]],"var(--il-white)")},
+    pyramid(x,y,z,w,d,h,fill){const c=[x+w/2,y+d/2,z+h];poly([[x,y+d,z],[x+w,y+d,z],c],fill);poly([[x+w,y,z],[x+w,y+d,z],c],"var(--il-shade)")},
+    shapeY(Y,cx,cz,xy,fill,extra){poly(xy.map(([a,b])=>[cx+a,Y,cz+b]),fill,extra)},
+    shapeX(X,cy,cz,yz,fill,extra){poly(yz.map(([a,b])=>[X,cy+a,cz+b]),fill,extra)},
+    tree(x,y,s=1,fill="var(--il-green)"){const[a,b]=P(x,y,0),[c,d]=P(x,y,2.2*s);
+      add(`<rect x="${f(a-.22*u)}" y="${f(d)}" width="${f(.44*u)}" height="${f(b-d)}" rx="2" fill="var(--il-trunk)"/><ellipse cx="${f(c)}" cy="${f(d-.9*s*u)}" rx="${f(1.15*s*u)}" ry="${f(1.35*s*u)}" fill="${fill}"/>`)},
+    cone(x,y,s=1,fill="var(--il-green2)"){const[a,b]=P(x,y,0),[,d]=P(x,y,4.2*s);
+      add(`<rect x="${f(a-.2*u)}" y="${f(b-1.1*u)}" width="${f(.4*u)}" height="${f(1.1*u)}" rx="2" fill="var(--il-trunk)"/><path d="M${f(a)} ${f(d)} L${f(a+1.05*s*u)} ${f(b-.9*u)} Q${f(a)} ${f(b-.5*u)} ${f(a-1.05*s*u)} ${f(b-.9*u)}Z" fill="${fill}"/>`)},
+    person(x,y,z,shirt,stick,flip,sit){const[a,b]=P(x,y,z),k=u/12,s=flip?-1:1,h=sit?16:24;
+      add(`<g transform="translate(${f(a)} ${f(b)}) scale(${f(k*s)} ${f(k)})">`+
+        (stick?`<g class="stick"><line x1="5" y1="${-h+2}" x2="11" y2="${-h-12}" stroke="${stick}" stroke-width="7" opacity=".28" stroke-linecap="round"/><line x1="5" y1="${-h+2}" x2="11" y2="${-h-12}" stroke="${stick}" stroke-width="3.2" stroke-linecap="round"/></g>`:"")+
+        `<path d="M-6 0 V${-h+8} Q-6 ${-h} 0 ${-h} Q6 ${-h} 6 ${-h+8} V0Z" fill="${shirt}"/>${stick?`<path d="M3 ${-h+6} L6 ${-h+1}" fill="none" stroke-width="2.4" stroke-linecap="round"/>`:""}<circle cx="0" cy="${-h-6}" r="5.6" fill="var(--il-skin)"/><path d="M-5.6 ${-h-7} Q0 ${-h-15} 5.6 ${-h-7}Z" fill="var(--il-hair)"/></g>`)},
+    pin(x,y,z,label,key){const[a,b]=P(x,y,z);
+      add(`<g class="pin" data-ax="${key}" transform="translate(${f(a)} ${f(b)})" tabindex="0" role="button" aria-label="${label}の説明へ"><g class="bob"><path d="M0 0 C-4 -8 -13 -14 -13 -24 A13 13 0 1 1 13 -24 C13 -14 4 -8 0 0Z" fill="var(--il-pin)"/><path d="M0 -17.5 C-6 -21.5 -7.5 -25 -5 -28 C-3 -30 -1 -29.4 0 -27.5 C1 -29.4 3 -30 5 -28 C7.5 -25 6 -21.5 0 -17.5Z" fill="#fff" stroke="none"/>
+        <g transform="translate(16 -34)"><rect x="0" y="-11" rx="10" height="21" width="${label.length*12+16}" fill="var(--il-white)"/><text x="8" y="4" font-size="12" font-weight="700" fill="var(--il-ink)" stroke="none">${label}</text></g></g></g>`)},
+    heartY(Y,cx,cz,s,fill){const xy=[];for(let i=0;i<40;i++){const t=i/40*2*Math.PI;xy.push([s*16*Math.sin(t)**3/16,s*(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t))/16])}K.shapeY(Y,cx,cz,xy,fill)},
+    circleY(Y,cx,cz,r,fill){const xy=[];for(let i=0;i<32;i++){const t=i/32*2*Math.PI;xy.push([r*Math.cos(t),r*Math.sin(t)])}K.shapeY(Y,cx,cz,xy,fill)},
+    svg(vb,cls,label){return`<svg viewBox="${vb}" class="${cls}" role="img" aria-label="${label}" stroke="var(--il-line)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">${out.join("")}</svg>`}};
+  return K}
+
+/* 推し活の街。5つの建物が5つの要素、公園が結果の幸福度に対応する（ピンを押すと説明へ移動） */
+function townSVG(){
+  const K=isoKit(12,430,150), O=[];
+  const at=(x,y,fn)=>O.push({k:x+y,fn});
+  // 島と道
+  K.box(0,0,-2.4,40,40,2.4,{top:"var(--il-ground)",left:"var(--il-side)",right:"var(--il-side2)"});
+  K.flat(0,18,0,40,3.4,"var(--il-road)");K.flat(24.6,0,0,3.4,40,"var(--il-road)");
+  for(let i=1;i<40;i+=3)if(i<24||i>28)K.flat(i,19.5,0,1.4,.35,"var(--il-line)","stroke='none'");
+  for(let i=1;i<40;i+=3)if(i<18||i>21.5)K.flat(26.1,i,0,.35,1.4,"var(--il-line)","stroke='none'");
+  K.flat(2,31,0,20,7,"var(--il-grass)");K.flat(29,31,0,9,7,"var(--il-grass)");
+  // 1 ライブ会場（推し活の充実）
+  at(10,8,()=>{K.box(3,3,0,14,9,4,{top:"var(--il-mist)"});for(let i=0;i<7;i++)K.onY(12,3.6+i*1.95,.8,1.2,2.4,"var(--il-blue2)");
+    K.box(5,6,4,10,.7,6,{left:"var(--il-ink)",right:"var(--il-ink)",top:"var(--il-ink)"});K.heartY(6.7,10,7,2.2,"var(--il-pink)");
+    K.box(6.5,6.4,10,7,.2,1,{left:"var(--il-amber)",right:"var(--il-amber)",top:"var(--il-amber)"});
+    K.pin(10,6,13.5,"推し活の充実","joy")});
+  at(10,15,()=>{const C=["var(--il-blue)","var(--il-red)","var(--il-green)","var(--il-amber)","var(--il-blue)","var(--il-red)","var(--il-amber)"];
+    [[5,13.6],[7.2,14.6],[9.4,13.5],[11.6,14.7],[13.8,13.6],[6.4,16.2],[12.6,16.3]].forEach(([x,y],i)=>K.person(x,y,0,C[i],["#2170e4","#ff5a7a","#00c27a","#ffb020"][i%4],i%2,false))});
+  // 2 SNSの塔（SNS・比較）
+  at(23,5,()=>{K.box(20,3,0,4.2,3.2,15,{right:"var(--il-ink)"});K.onX(24.2,3.45,1.5,2.3,12,"var(--il-blue)");
+    [[3.8,11],[4.4,8.6],[3.8,6.2]].forEach(([y,z],i)=>K.onX(24.2,y,z,1.5,1.6,i===1?"var(--il-amber)":"var(--il-white)"));
+    K.box(21.6,4.2,15,.9,.9,2.6,{});K.pin(22,4.6,19.5,"SNS・比較","compare")});
+  // 3 グッズの店
+  at(34,8,()=>{K.box(30,5,0,8,6,6,{top:"var(--il-mist)"});K.onY(11,31,0,2.2,3.6,"var(--il-blue2)");K.onY(11,34.2,1.6,3,2.4,"var(--il-white)");
+    for(let i=0;i<8;i++)K.poly([[30+i,11,4.4],[31+i,11,4.4],[31+i,12.6,3.6],[30+i,12.6,3.6]],i%2?"var(--il-white)":"var(--il-red)");
+    K.box(31,6,6,6,.4,2,{left:"var(--il-amber)",right:"var(--il-amber)",top:"var(--il-amber)"})});
+  // 4 時計の塔（義務感：時間の使い方）
+  at(20,15,()=>{K.box(18.6,13.2,0,3,3,11,{});K.circleY(16.2,20.1,8.6,1.05,"var(--il-white)");
+    const[a,b]=K.P(20.1,16.2,8.6);K.add(`<path d="M${a} ${b} l0 -8 M${a} ${b} l6 2" stroke-width="2"/>`);K.pyramid(18.6,13.2,11,3,3,3.2,"var(--il-red)")});
+  // 5 家（睡眠・生活）
+  at(7,26,()=>{K.box(3,23,0,8,6,5,{});K.roof(3,23,5,8,6,3.6,"var(--il-red)");K.onY(29,4.2,0,1.8,3.2,"var(--il-blue)");K.onY(29,7,1.8,2.6,1.8,"var(--il-amber)");K.onX(11,24.2,1.8,1.6,1.8,"var(--il-amber)");
+    const[a,b]=K.P(7,26,13);K.add(`<g class="zz" stroke="none"><path d="M${a-24} ${b-10} a11 11 0 1 0 12 -14 a9 9 0 1 1 -12 14Z" fill="var(--il-amber)" stroke="var(--il-line)" stroke-width="1.5"/><text x="${a-4}" y="${b-10}" font-size="15" font-weight="800" fill="var(--il-blue)">Z</text><text x="${a+10}" y="${b-22}" font-size="11" font-weight="800" fill="var(--il-blue)">z</text></g>`);
+    K.pin(4,24,10.5,"睡眠・生活","sleep")});
+  // 6 貯金の建物（お金）
+  at(17,27,()=>{K.box(13.5,24,0,7,6,6,{top:"var(--il-mist)"});for(let i=0;i<4;i++)K.onY(30,14.2+i*1.7,.4,.8,4.4,"var(--il-white)");K.pyramid(13.5,24,6,7,6,2.2,"var(--il-amber)");
+    K.circleY(30.02,17,5.2,.75,"var(--il-amber)");
+    [[22,29.6],[22.9,30.4]].forEach(([x,y],i)=>{for(let j=0;j<3+i;j++){const[a,b]=K.P(x,y,j*.45);K.add(`<ellipse cx="${a}" cy="${b}" rx="${.75*K.u}" ry="${.4*K.u}" fill="var(--il-amber)"/>`)}});
+    K.pin(16,26,10,"お金","money")});
+  // 7 カフェ（仲間・人間関係）
+  at(33,26,()=>{K.box(30,23.5,0,6,5,4.4,{});for(let i=0;i<6;i++)K.poly([[30+i,28.5,3.8],[31+i,28.5,3.8],[31+i,30,3],[30+i,30,3]],i%2?"var(--il-white)":"var(--il-green)");K.onY(28.5,31,0,1.6,2.8,"var(--il-blue2)");
+    K.person(32.2,31.6,0,"var(--il-blue)",null,0,false);K.person(35,32.6,0,"var(--il-red)",null,1,false);
+    const[a,b]=K.P(33.6,31.8,4.4);K.add(`<g class="bob"><rect x="${a-14}" y="${b-16}" width="28" height="20" rx="8" fill="var(--il-white)"/><path d="M${a} ${b+0} l-3 6 l8 -6" fill="var(--il-white)"/><path d="M${a} ${b-2.5} c-6 -4 -7 -7.5 -4.5 -10 c2 -2 3.6 -1.2 4.5 .6 c.9 -1.8 2.5 -2.6 4.5 -.6 c2.5 2.5 1.5 6 -4.5 10z" fill="var(--il-pink)" stroke="none"/></g>`);
+    K.pin(31,24,8.5,"義務感・人間関係","duty")});
+  // 8 公園（幸福度）
+  at(13,35,()=>{[[4,32.5,1],[8,36.5,.9],[19.5,33,1.1]].forEach(([x,y,s])=>K.tree(x,y,s));K.cone(15.5,32.2,.8);
+    K.box(10.5,35,0,4,1.2,.8,{top:"var(--il-amber)"});K.person(11.6,35.4,.8,"var(--il-green)",null,0,true);K.person(13.4,35.4,.8,"var(--il-amber)",null,1,true);
+    K.pin(12,34,5.5,"幸福度（結果）","wb")});
+  // 遠征バス
+  at(27,30,()=>{K.box(25.2,27,0,2.4,6,2.6,{left:"var(--il-blue)",right:"var(--il-blue)",top:"var(--il-white)"});for(let i=0;i<4;i++)K.onX(27.6,27.6+i*1.3,1.3,.9,.9,"var(--il-white)")});
+  // 木
+  at(2,15,()=>{K.cone(1.6,14.4,.9);K.tree(1.8,17.2,.8)});at(30,2,()=>{K.tree(28.6,1.6,.8);K.cone(39,2,.8)});at(38,15,()=>{K.tree(38.4,14.6,.9);K.cone(36.3,15.6,.7)});at(37,37,()=>{K.tree(37.2,36,.8)});
+  O.sort((a,b)=>a.k-b.k).forEach(o=>o.fn());
+  // 空のもの（気球・雲・鳥）
+  K.add(`<g class="float"><path d="M780 70 c0 -34 -50 -34 -50 0 c0 18 18 30 22 40 h6 c4 -10 22 -22 22 -40z" fill="var(--il-blue)"/><path d="M755 36 c-9 10 -9 54 -1 74 M755 36 c9 10 9 54 1 74" fill="none"/><rect x="747" y="114" width="16" height="12" rx="2" fill="var(--il-amber)"/><path d="M752 110 v4 M758 110 v4" /><text x="755" y="76" text-anchor="middle" font-size="10" font-weight="800" fill="#fff" stroke="none">Fit</text></g>`);
+  K.add(`<path d="M86 96 c0 -14 22 -18 28 -6 c4 -10 24 -8 24 6 c10 0 12 14 0 14 h-48 c-12 0 -14 -14 -4 -14z" fill="var(--il-white)"/><path d="M590 30 c0 -10 16 -13 20 -4 c3 -7 17 -6 17 4 c7 0 9 10 0 10 h-34 c-9 0 -10 -10 -3 -10z" fill="var(--il-white)"/>`);
+  K.add(`<path d="M300 60 q6 -6 12 0 q6 -6 12 0 M340 44 q5 -5 10 0 q5 -5 10 0" fill="none" stroke-width="1.8"/>`);
+  return K.svg("10 20 850 650","town","推し活の街のイラスト。ライブ会場、SNSの塔、家、貯金の建物、カフェ、公園の6か所に、6つの軸のピンが立っている")}
+
+/* 小さな島：建物ひとつ＋木（軸のカードやホームの挿絵に使う） */
+function miniSVG(kind){const K=isoKit(9,120,52);K.box(0,0,-1.6,14,14,1.6,{top:"var(--il-ground)",left:"var(--il-side)",right:"var(--il-side2)"});
+  const T={
+   joy:()=>{K.box(2,2,0,10,6,3,{top:"var(--il-mist)"});K.box(3.5,4,3,7,.6,4.5,{left:"var(--il-ink)",right:"var(--il-ink)",top:"var(--il-ink)"});K.heartY(4.62,7,5.2,1.6,"var(--il-pink)");K.person(5,10.5,0,"var(--il-blue)","#ff5a7a",0);K.person(8.5,10.8,0,"var(--il-red)","#2170e4",1)},
+   compare:()=>{K.box(5,4,0,3.6,3,11,{right:"var(--il-ink)"});K.onX(8.6,4.4,1.4,2.2,8.4,"var(--il-blue)");K.onX(8.6,4.7,7,1.5,1.4,"var(--il-white)");K.onX(8.6,4.7,4.4,1.5,1.4,"var(--il-amber)");K.tree(11,10,.8)},
+   sleep:()=>{K.box(3,4,0,7,6,4.4,{});K.roof(3,4,4.4,7,6,3.2,"var(--il-red)");K.onY(10,4,0,1.6,2.8,"var(--il-blue)");K.onY(10,6.5,1.6,2.2,1.6,"var(--il-amber)");K.tree(11.6,11,.7)},
+   money:()=>{K.box(3,4,0,7,6,5,{top:"var(--il-mist)"});for(let i=0;i<4;i++)K.onY(10,3.6+i*1.7,.4,.8,3.6,"var(--il-white)");K.pyramid(3,4,5,7,6,2,"var(--il-amber)");[[11.4,11]].forEach(([x,y])=>{for(let j=0;j<4;j++){const[a,b]=K.P(x,y,j*.5);K.add(`<ellipse cx="${a}" cy="${b}" rx="${.8*K.u}" ry="${.42*K.u}" fill="var(--il-amber)"/>`)}})},
+   duty:()=>{K.box(3,3,0,6,5,4,{});for(let i=0;i<6;i++)K.poly([[3+i,8,3.4],[4+i,8,3.4],[4+i,9.4,2.7],[3+i,9.4,2.7]],i%2?"var(--il-white)":"var(--il-green)");K.person(5,11,0,"var(--il-blue)",null,0);K.person(8,11.6,0,"var(--il-red)",null,1);K.box(10.5,3,0,2,2,8,{});K.circleY(5.02,11.5,6.2,.7,"var(--il-white)")},
+   wb:()=>{K.tree(4,4,1);K.tree(10,3.5,.8);K.cone(3,9,.8);K.box(6,8,0,4,1.2,.8,{top:"var(--il-amber)"});K.person(7,8.4,.8,"var(--il-green)",null,0,true);K.person(8.8,8.4,.8,"var(--il-amber)",null,1,true)},
+   base:()=>{K.tree(2.5,2.5,.8);K.cone(11.5,2,.7);K.cone(2,11,.6)},
+   home:()=>{K.box(2,3,0,7,6,4.4,{});K.roof(2,3,4.4,7,6,3.2,"var(--il-red)");K.onY(9,3,0,1.6,2.8,"var(--il-blue)");K.onY(9,5.5,1.6,2.2,1.6,"var(--il-amber)");K.tree(11.6,4,.8);K.cone(12,9,.7)}};
+  (T[kind]||T.home)();return K.svg("0 -14 240 204","mini","")}
+
+/* ---------- はじめに（ブランドのトップページ） ---------- */
+const AXDESC={joy:["ライブ会場","推し活が楽しく、満たされているか"],compare:["SNSの塔","ほかの人と比べて苦しくなっていないか"],sleep:["家","夜ふかしや生活リズムの乱れはないか"],money:["貯金の建物","お金の使い方に無理はないか"],duty:["カフェ","「行かなきゃ」の義務感や人づきあいの負担"],wb:["公園","5つの要素の結果としての幸福度（WHO-5）"]};
+const ARROW='<svg class="arr" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function wave(fill,flip){return`<svg class="wave${flip?" flip":""}" viewBox="0 0 1440 80" preserveAspectRatio="none" aria-hidden="true"><path d="M0 48 C180 8 320 8 470 36 S760 78 930 44 S1260 0 1440 34 V80 H0Z" fill="${fill}"/></svg>`}
+function vStart(){app.className="app land";
+  const axes=SC.axes.filter(a=>a.key!=="wb").map((a,i)=>({...a,no:i+1,d:AXDESC[a.key]})),wbAx=SC.axes.find(a=>a.key==="wb");
+  app.innerHTML=`<header class="lnav"><div class="in"><button class="logo" id="logo" aria-label="OshiFit"><i aria-hidden="true"></i>OshiFit</button>
+     <nav class="pillnav" aria-label="ページ内"><button data-go="sec-axes">5つの要素</button><button data-go="sec-flow">進め方</button><button data-go="sec-about">研究について</button></nav>
+     <button class="btn primary pill" data-go="sec-join">参加する${ARROW}</button></div></header>${editbar()}
+   <section class="lhero"><div class="town-wrap">${townSVG()}</div>
+     <div class="hero-copy"><p class="eyebrow">OSHI-KATSU × WELL-BEING</p><h1 class="display" aria-label="LOVE LONG"><span>LOVE</span><span>LONG</span></h1>
+     <p class="motto">OshiFitで推し活を<br class="sp">持続可能に！</p><p class="lead2">好きな気持ちを長く続けるための、推し活のセルフチェックと小さな工夫。大学の研究アプリです。</p></div></section>
+   <section class="band message"><div class="in"><div class="msg-grid"><div class="stack" style="gap:18px">
+     <h2 class="jp-xl">好きな気持ちを、<br>すり減らさないために。</h2>
+     <p class="body">推し活は、毎日を明るくしてくれます。一方で、グッズや遠征のお金、夜ふかし、SNSでのほかの人との比較、「行かなきゃ」という義務感で、知らないうちに疲れてしまうこともあります。</p>
+     <p class="body">OshiFitは、あなたの推し活を、幸福度とストレスを左右する5つの要素で見える化し、「今のまま」と「小さな工夫を試す」の2つの未来を並べて見せる、大学の研究アプリです。推し活をやめるためではなく、長く楽しく続けるために使います。</p></div>
+     <div class="tiles"><button class="tile" data-go="sec-axes"><span class="en">5 FACTORS</span><b>5つの要素</b>${ARROW}</button><button class="tile alt" data-go="sec-flow"><span class="en">HOW IT WORKS</span><b>進め方</b>${ARROW}</button></div></div></div></section>
+   <section class="band axes-band" id="sec-axes">${wave("var(--l-band)")}<div class="in"><div class="sechead"><p class="eyebrow">5 FACTORS → WELL-BEING</p><h2 class="jp-xl">5つの要素が、幸福度とストレスを決める</h2><p class="body">街の5つの場所が、推し活の5つの要素です。この5つの状態から、結果として公園の「幸福度」と「ストレス度」が決まると考えます。どの要素も点数が高いほど良い向きで、60点以上を<b class="tb">青</b>、60点未満を<b class="tr">赤</b>で表示します。</p></div>
+     <div class="axcards">${axes.map(a=>`<article class="axcard" id="ax-${a.key}"><div class="arch">${miniSVG(a.key)}</div><span class="no">0${a.no}</span><p class="en small-en">${a.d[0]}</p><h3>${a.name}</h3><p class="small muted">${a.d[1]}</p></article>`).join("")}<article class="axcard result" id="ax-wb"><div class="arch">${miniSVG("wb")}</div><span class="no">→</span><p class="en small-en">RESULT ／ 公園</p><h3>幸福度とストレス度</h3><p class="small muted">5つの要素の結果。幸福度はWHO-5（最近2週間の気分）、ストレス度はPSS-J（最近1か月）で測ります。</p></article></div></div></section>
+   <section class="band flow-band" id="sec-flow">${wave("var(--l-ink)")}<div class="in"><div class="sechead inv"><p class="eyebrow">HOW IT WORKS</p><h2 class="jp-xl">最初の15分と、4週間の振り返り</h2></div>
+     <ol class="flowcards">${[["質問に答える","今の推し活と気分について、約${BASE_ITEMS.length}問。選ぶと自動で次の質問へ進みます。"],["アバターを作る","顔の形・髪型・色を選んで、自分に似せた分身を作ります。写真は使いません。"],["6つの軸を見る","良いところは青、見直したいところは赤。算出の根拠も見られます。"],["2つの未来を比べる","今のまま（A）と、提案を試す（B）。4週間後の見込みを並べます。"]].map(([t,d],i)=>`<li><span class="big">0${i+1}</span><h3>${t}</h3><p>${d}</p></li>`).join("")}</ol>
+     <div class="road"><p class="eyebrow">4 WEEKS</p><div class="track4">${[0,4,8,12,16,20,24,28].map((d,i)=>`<div class="mile ${i===0?"s":i===7?"f":""}"><span class="dot"></span><b>${i===0?"開始":i===7?"最後の調査":`${i}回目`}</b><span>${i===0?"0日目":i===7?"28日目〜":`${d}日目ごろ`}</span></div>`).join("")}</div>
+     <p class="xs" style="color:var(--ink-muted)">振り返りは前回から4日以上あけて、4〜5日ごとに6回（各約2分）。3回目だけ、最近2週間の気分（WHO-5）も答えます。</p></div></div></section>
+   <section class="band about-band" id="sec-about">${wave("var(--bg)")}<div class="in"><div class="sechead"><p class="eyebrow">ABOUT THE STUDY</p><h2 class="jp-xl">安心して参加してもらうために</h2></div>
+     <div class="facts-grid">${[["写真は使わない","アバターは写真を使わず、顔の形や髪型を自分で選んで作ります。"],["メールはログインだけに使う","メールアドレスはログインのためだけに使い、回答とは別に管理します。名前は集めません。"],["いつでもやめられる","マイページから参加をやめられます。それまでの回答は、同意いただいたとおり研究に使います。不利益はありません。"],["プレ実験の方も歓迎","プレ実験に参加した方も参加できます。マイページの研究用の番号を研究者にお知らせください。"]].map(([t,d],i)=>`<div class="fact"><span class="fno">${["AVATAR","PRIVACY","OPT-OUT","PILOT"][i]}</span><h3>${t}</h3><p class="small muted">${d}</p></div>`).join("")}</div></div></section>
+   <section class="band join-band" id="sec-join"><div class="in"><div class="joincard"><div class="stack" style="gap:12px"><p class="eyebrow">JOIN</p><h2 class="jp-xl">さっそく、はじめてみる</h2>
+       <ul class="facts"><li>約${BASE_ITEMS.length}の質問（約${Math.max(8,Math.round(BASE_ITEMS.length*10/60))}分）</li><li>約4週間、4〜5日ごとに6回の振り返り（各約2分）。28日目以降に最後の調査</li><li>メールアドレスで登録し、次からはログインして続きから答えられます</li></ul>
+       <div class="row" style="flex-wrap:wrap;gap:10px"><a class="btn primary pill big" id="go" href="#signup">新規登録してはじめる${ARROW}</a><a class="btn pill big" id="to-login" href="#login">ログイン</a></div></div><div class="joinart">${miniSVG("home")}</div></div></div></section>
+   <footer class="lfoot">${wave("var(--l-ink)")}<div class="in"><div class="fgrid"><div><p class="display sm">OshiFit</p><p class="small">OshiFitで推し活を持続可能に！</p></div>
+     <div class="small"><b>大阪工業大学大学院 情報科学研究科</b><br>倫理審査 承認済みの研究です<br>問い合わせ先：<span class="mono">m1m02530106@oit.ac.jp</span></div></div><p class="xs" style="color:var(--ink-muted)">© 2026 OshiFit 研究プロジェクト</p></div></footer>
+   <button class="totop" id="totop" aria-label="ページの先頭へ" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
+  const to=id=>{const e=document.getElementById(id);if(e)e.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})};
+  app.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>to(b.dataset.go));
+  app.querySelectorAll(".pin").forEach(p=>{const g=()=>{to("sec-axes");const c=document.getElementById("ax-"+p.dataset.ax);if(c){c.classList.add("flash");setTimeout(()=>c.classList.remove("flash"),1600)}};p.onclick=g;p.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();g()}}});
+  $("#totop").onclick=()=>scrollTo({top:0,behavior:"smooth"});
+  const tt=$("#totop");onscroll=()=>{if(tt.isConnected)tt.hidden=scrollY<500};
+  wire()}
+
+/* ---------- 新規登録・ログイン（メールアドレスとパスワード。Firebase Authentication） ---------- */
+const AUTH_ERR={"auth/email-already-in-use":"このメールアドレスは登録済みです。「ログイン」から入ってください。","auth/invalid-email":"メールアドレスの形が正しくありません。","auth/weak-password":"パスワードは8文字以上にしてください。","auth/invalid-credential":"メールアドレスかパスワードが違います。","auth/wrong-password":"メールアドレスかパスワードが違います。","auth/user-not-found":"このメールアドレスは登録されていません。","auth/too-many-requests":"試行が多すぎます。しばらくしてからお試しください。","auth/network-request-failed":"通信できませんでした。通信を確認してください。","auth/popup-closed-by-user":"ログインの画面が閉じられました。もう一度お試しください。","auth/popup-blocked":"ポップアップが止められました。ブラウザの設定でこのサイトのポップアップを許可してください。","auth/account-exists-with-different-credential":"このメールアドレスは別の方法（メール・Google・Microsoft のどれか）で登録済みです。登録したときの方法でログインしてください。"};
+const authMsg=e=>AUTH_ERR[e&&e.code]||"うまくいきませんでした。もう一度お試しください。";
+function vSignup(){const opts=QN.sections[0].items.find(i=>i.id==="Q2").opts, logged=STUDY&&OFStore.email;
+  app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">SIGN UP</p><h2>${logged?"登録の続き":"新規登録"}</h2><p class="small muted">登録すると、質問 → アバター → 分析 → 2つの未来 の順に進みます。途中でやめても、ログインすれば続きから答えられます。</p></div>
+   <section class="card">${logged?`<p class="small">ログイン中：<b>${esc(OFStore.email)}</b></p>`:`
+    <label class="stack" style="gap:4px"><b class="small">メールアドレス</b><input class="field" id="su-mail" type="email" autocomplete="email" inputmode="email"></label>
+    <label class="stack" style="gap:4px"><b class="small">パスワード（8文字以上）</b><input class="field" id="su-pw" type="password" autocomplete="new-password" minlength="8"></label>
+    <p class="xs muted">または、性別を選んで同意したあと、下のボタンで Google・Microsoft のアカウントで登録できます。</p>`}
+    <div class="stack" style="gap:6px"><b class="small">性別（アバターで選べる髪型が変わります）</b><div class="olist" role="radiogroup" aria-label="性別">${opts.map((o,j)=>`<button class="obtn" role="radio" data-g="${esc(o)}" aria-checked="${S.answers.Q2===o}"><span class="dot" aria-hidden="true"></span><span>${j+1}　${esc(o)}</span></button>`).join("")}</div></div>
+    <p class="xs muted">メールアドレスはログインのためだけに使い、回答とは別に管理します。研究の結果に名前やメールアドレスが出ることはありません。</p>
+    <label class="consent card" for="agree"><input type="checkbox" id="agree">説明を読み、研究への参加に同意します</label>
+    ${logged?"":`<div class="row" style="flex-wrap:wrap"><button class="btn sm" id="su-google" disabled>Google で登録</button><button class="btn sm" id="su-ms" disabled>Microsoft で登録</button></div>`}
+    <p class="small" id="su-msg" role="alert" style="color:var(--bad)"></p></section></main>
+   ${dock("su-back","登録して質問へ","su-go",true)}`;
+  const ok=()=>{const base=$("#agree").checked&&!!S.answers.Q2;$("#su-go").disabled=!(base&&(logged||($("#su-mail").value.includes("@")&&$("#su-pw").value.length>=8)));["#su-google","#su-ms"].forEach(id=>{if($(id))$(id).disabled=!base})};
+  const soc=async kind=>{if(!STUDY){S.consented=true;return go("q")}$("#su-msg").textContent="";
+    try{const saved=await OFStore.social(kind);if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers);return render()}await OFStore.begin(S);S.consented=true;go("q")}
+    catch(e){console.error(e);$("#su-msg").textContent=authMsg(e)}};
+  if($("#su-google")){$("#su-google").onclick=()=>soc("google");$("#su-ms").onclick=()=>soc("microsoft")}
+  app.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{S.answers.Q2=b.dataset.g;app.querySelectorAll("[data-g]").forEach(x=>x.setAttribute("aria-checked",String(x===b)));ok()});
+  app.querySelectorAll("input").forEach(x=>x.oninput=x.onchange=ok);
+  $("#su-back").onclick=()=>go("start");
+  $("#su-go").onclick=async()=>{const b=$("#su-go");b.disabled=true;$("#su-msg").textContent="";
+    if(STUDY){try{if(!logged)await OFStore.signup($("#su-mail").value.trim(),$("#su-pw").value);await OFStore.begin(S)}catch(e){console.error(e);$("#su-msg").textContent=authMsg(e);b.disabled=false;return}}
+    S.consented=true;go("q")};wire()}
+function vLogin(){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">LOGIN</p><h2>ログイン</h2><p class="small muted">登録したメールアドレスとパスワードで、続きから答えられます。</p></div>
+   <section class="card"><label class="stack" style="gap:4px"><b class="small">メールアドレス</b><input class="field" id="li-mail" type="email" autocomplete="email" inputmode="email"></label>
+    <label class="stack" style="gap:4px"><b class="small">パスワード</b><input class="field" id="li-pw" type="password" autocomplete="current-password"></label>
+    <p class="small" id="li-msg" role="alert"></p><div class="row" style="flex-wrap:wrap"><button class="btn sm" id="li-google">Google でログイン</button><button class="btn sm" id="li-ms">Microsoft でログイン</button></div><button class="btn sm" id="li-reset">パスワードを忘れたとき（再設定のメールを送る）</button></section></main>
+   ${dock("li-back","ログイン","li-go")}`;
+  const msg=(t,bad)=>{const m=$("#li-msg");m.textContent=t;m.style.color=bad?"var(--bad)":"var(--muted)"};
+  $("#li-back").onclick=()=>go("start");
+  $("#li-reset").onclick=async()=>{const m=$("#li-mail").value.trim();if(!m)return msg("メールアドレスを入れてください",true);if(!STUDY)return msg("展示用では送りません");try{await OFStore.resetPassword(m);msg("再設定のメールを送りました。届いたメールの手順で新しいパスワードにしてください。")}catch(e){msg(authMsg(e),true)}};
+  const soc=async kind=>{if(!STUDY){S.consented=true;return go("home")}try{const saved=await OFStore.social(kind);if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers);render()}else go("signup")}catch(e){console.error(e);msg(authMsg(e),true)}};
+  $("#li-google").onclick=()=>soc("google");$("#li-ms").onclick=()=>soc("microsoft");
+  $("#li-go").onclick=async()=>{if(!STUDY){S.consented=true;return go("home")}const b=$("#li-go");b.disabled=true;
+    try{const saved=await OFStore.login($("#li-mail").value.trim(),$("#li-pw").value);if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers)}render()}
+    catch(e){console.error(e);msg(authMsg(e),true);b.disabled=false}};wire()}
+
+function vQ(){if(!SV.q&&STUDY){const i=BASE_ITEMS.findIndex(it=>S.answers[it.id]==null&&!it.optional);SV.q={i:i<0?BASE_ITEMS.length-1:i}} // 途中から再開
+  vSurvey("q",BASE_ITEMS,S.answers,"質問に答える",null,()=>{S.sc=scores(S.answers);S.plans=null;S.baselineDone=true;if(STUDY)OFStore.baseline(S);toast("質問はこれで終わりです");go("avatar")},0)}
+let AVTAB="hair";
+function vAvatar(){const A=window.OFAvatar,gender=S.answers.Q2;
+  if(!S.avatar||S.avatar.v!==2)S.avatar=A.defaults(gender);const av=S.avatar;av.gender=gender||null;
+  const styles=A.stylesFor(gender);if(!styles.some(([k])=>k===av.hair))av.hair=styles[0][0];
+  const TABS=[["face","顔の形"],["skin","肌の色"],["hair","髪型"],["hairColor","髪の色"],["brow","まゆ"],["eye","目"],["eyeColor","目の色"],["nose","鼻"],["mouth","口"],["glasses","めがね"],...(gender==="女性"?[]:[["beard","ひげ"]]),["shirt","服の色"]];
+  if(!TABS.some(t=>t[0]===AVTAB))AVTAB="hair";
+  const LISTS={face:A.FACE,brow:A.BROW,eye:A.EYE,nose:A.NOSE,mouth:A.MOUTH,glasses:A.GLASSES,beard:A.BEARD};
+  const COLORS={skin:A.SKIN,hairColor:A.PALETTE,eyeColor:A.EYE_COLOR,shirt:A.PALETTE};
+  let grid="";
+  if(AVTAB==="hair")grid=`<div class="avgrid">${styles.map(([k,n])=>`<button class="avopt" data-k="hair" data-v="${k}" aria-pressed="${av.hair===k}">${A.render({...av,hair:k},"neutral",62)}<span>${esc(n)}</span></button>`).join("")}</div>`;
+  else if(COLORS[AVTAB])grid=`<div class="swgrid">${COLORS[AVTAB].map((c,i)=>`<button class="sw" data-k="${AVTAB}" data-v="${i}" aria-pressed="${av[AVTAB]===i}" aria-label="${TABS.find(t=>t[0]===AVTAB)[1]} ${i+1}" style="background:${c}"></button>`).join("")}</div>`;
+  else grid=`<div class="avgrid">${LISTS[AVTAB].map((n,i)=>`<button class="avopt" data-k="${AVTAB}" data-v="${i}" aria-pressed="${av[AVTAB]===i}">${A.render({...av,[AVTAB]:i},"neutral",62)}<span>${esc(n)}</span></button>`).join("")}</div>`;
+  app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(1)}<div><p class="eyebrow view-eyebrow">AVATAR</p><h2>アバターを作る</h2><p class="small muted">自分に似せて作ってください。4週間後の2つの未来を、この分身で見比べます。</p></div>
+   <section class="card avstage"><div class="avprev">${A.render(av,"neutral",150)}</div><button class="btn sm" id="av-rand">おまかせ</button></section>
+   <section class="card" style="gap:10px"><div class="avtabs" role="tablist">${TABS.map(([k,l])=>`<button class="avtab" role="tab" data-tab="${k}" aria-selected="${AVTAB===k}">${l}</button>`).join("")}</div>${grid}</section></main>
+   ${dock("av-back","結果を見る","av-go")}`;
+  app.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{AVTAB=b.dataset.tab;keep(vAvatar)});
+  app.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{const k=b.dataset.k;av[k]=k==="hair"?b.dataset.v:+b.dataset.v;keep(vAvatar)});
+  $("#av-rand").onclick=()=>{const r=n=>Math.floor(Math.random()*n);Object.assign(av,{face:r(A.FACE.length),skin:r(A.SKIN.length),hair:styles[r(styles.length)][0],hairColor:r(18),brow:r(A.BROW.length),eye:r(A.EYE.length),eyeColor:r(3),nose:r(A.NOSE.length-1),mouth:r(A.MOUTH.length),shirt:r(36)});keep(vAvatar)};
+  $("#av-back").onclick=()=>go("q");$("#av-go").onclick=()=>{S.avatarDone=true;if(STUDY)OFStore.avatar(S);go("analysis")};wire()}
+/* レーダーは幸福度とストレスを決める5つの要素。幸福度・ストレス度は結果として下の横棒で示す */
+const FACTORS=()=>SC.axes.filter(a=>a.key!=="wb");const FV=sc=>FACTORS().map(a=>sc[a.key]),FN=()=>FACTORS().map(a=>a.name);
+const pss100=sc=>sc.pss==null?null:sc.pss/56*100;
+function outBars(rows,labels){
+  const one=(v,good,i)=>`<div class="ob-row"><span class="xs muted">${labels[i]}</span><div class="ob"><i style="width:${clamp(v,0,100)}%;background:${good?"var(--good)":"var(--bad)"};opacity:${i===0&&labels.length>1?.4:1}"></i></div><b class="ob-v">${r0(v)}</b></div>`;
+  return`<div class="outbars"><div class="ob-flow" aria-hidden="true"><span>5つの要素</span><svg viewBox="0 0 40 12" width="40" height="12"><path d="M2 6h32M28 1l6 5-6 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>幸福度とストレス度</span></div>${rows.filter(r=>r[1].every(v=>v!=null)).map(([n,vals,good,ref,desc])=>`<div class="ob-item"><div class="row" style="justify-content:space-between"><b class="small">${n}</b></div>
+   <div class="ob-wrap">${vals.map((v,i)=>one(v,good,i)).join("")}${ref!=null?`<span class="ob-ref" style="left:calc(5.4em + 8px + (100% - 7.8em - 16px) * ${ref/100})"></span>`:""}</div></div>`).join("")}</div>`}
+function radar(series,labels){const W=320,H=300,cx=160,cy=150,R=100,n=labels.length,ang=i=>-Math.PI/2+i*2*Math.PI/n,pt=(i,v)=>[cx+Math.cos(ang(i))*R*v/100,cy+Math.sin(ang(i))*R*v/100];
+  const ring=v=>Array.from({length:n},(_,i)=>pt(i,v).join(",")).join(" ");
+  let g=[20,40,80,100].map(v=>`<polygon points="${ring(v)}" fill="none" stroke="var(--line)"/>`).join("")+`<polygon points="${ring(60)}" fill="none" stroke="var(--primary)" stroke-dasharray="3 3" opacity=".6"/>`;
+  g+=Array.from({length:n},(_,i)=>{const[x,y]=pt(i,100);return`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--line)"/>`}).join("");
+  series.forEach(s=>{g+=`<polygon points="${s.v.map((v,i)=>pt(i,v).join(",")).join(" ")}" fill="${s.fill}" fill-opacity="${s.op??.12}" stroke="${s.stroke}" stroke-width="2" ${s.dash?'stroke-dasharray="4 3"':""}/>`;
+    if(s.dots)g+=s.v.map((v,i)=>{const[x,y]=pt(i,v);return`<circle cx="${x}" cy="${y}" r="4" fill="${v>=60?"var(--good)":"var(--bad)"}" stroke="var(--card)" stroke-width="1.5"/>`}).join("")});
+  const main=series[series.length-1].v;
+  g+=labels.map((l,i)=>{const[x,y]=pt(i,124),a=Math.abs(x-cx)<5?"middle":x>cx?"start":"end";return`<text x="${x}" y="${y-2}" text-anchor="${a}" font-size="11" font-weight="700" fill="var(--fg)">${esc(l)}</text><text x="${x}" y="${y+12}" text-anchor="${a}" font-size="11" font-weight="700" fill="${main[i]>=60?"var(--good)":"var(--bad)"}">${r0(main[i])}</text>`}).join("");
+  return`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="5つの要素のレーダーチャート" style="max-width:340px;margin:0 auto;display:block;overflow:visible">${g}</svg>`}
+function vAnalysis(){const sc=ensureBase(),A=S.answers,b=big5(A),g=isGood(sc);
+  const goodAx=FACTORS().filter(a=>sc[a.key]>=60).map(a=>a.name),badAx=FACTORS().filter(a=>sc[a.key]<60).map(a=>a.name);
+  app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(2)}
+   <div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><p class="eyebrow view-eyebrow">ANALYSIS</p><h2>あなたの推し活の分析</h2></div>${S.filled?'<span class="chip warn">見本の回答で表示中</span>':""}</div>
+   <section class="card"><div class="row" style="flex-wrap:wrap;gap:6px">${goodAx.length?`<span class="chip good wrap">良好：${goodAx.join("・")}</span>`:""}${badAx.length?`<span class="chip bad wrap">見直したい：${badAx.join("・")}</span>`:""}</div>
+    ${radar([{v:FV(sc),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
+    <p class="xs muted">点線は60点。60点以上を青（良好）、60点未満を赤（見直したい）。どの要素も高いほど良い向きです。</p>
+    ${outBars([["幸福度（WHO-5）",[sc.wb],true,52,"高いほど良い・線は13点"],["ストレス度（PSS-J）",[pss100(sc)],false,null,"高いほど負担"],["推し活のストレス（推し疲れ）",[sc.burnout],false,null,"高いほど負担"]],["今"])}</section>
+   ${g.ok?`<p class="callout good"><b>群A（今のままで順調）</b>：5つの要素の多くが60点以上で、WHO-5も13点以上です。プランの提案はありません。4週間後にもう一度だけ回答をお願いします。</p>`:""}
+   <section class="axes">${FACTORS().map(a=>{const v=r0(sc[a.key]),ok=v>=60;return`<div class="ax ${ok?"good":"bad"}"><div class="h"><span>${a.name}</span><span class="chip ${ok?"good":"bad"}">${ok?"良好":"見直したい"}</span></div><div class="v">${v}<small> / 100</small></div><div class="track"><i style="width:${v}%"></i></div></div>`}).join("")}</section>
+   <section class="axes"><div class="ax ${sc.burnout<50?"good":"bad"}"><div class="h"><span>推し疲れ</span></div><div class="v">${r0(sc.burnout)}<small> / 100</small></div><p class="xs muted">高いほど負担が大きい</p></div>
+    <div class="ax ${sc.who5raw>=13?"good":"bad"}"><div class="h"><span>WHO-5（気分）</span></div><div class="v">${sc.who5raw}<small> / 25</small></div><p class="xs muted">13点以上が目安</p></div>
+    <div class="ax"><div class="h"><span>主観的幸福感（SHS）</span></div><div class="v">${sc.shs!=null?sc.shs.toFixed(1):"–"}<small> / 7</small></div></div>
+    <div class="ax"><div class="h"><span>ストレス（PSS-J）</span></div><div class="v">${sc.pss??"–"}<small> / 56</small></div><p class="xs muted">高いほどストレスが高い</p></div></section>
+   <section class="card"><div class="sec"><h3>性格（TIPI-J）</h3><span class="xs muted">良い悪いはありません</span></div>
+    ${b?[["外向性","E"],["協調性","A"],["勤勉性","C"],["神経症傾向","N"],["開放性","O"]].map(([n,k])=>`<div class="trait"><span>${n}</span><div class="track"><i style="width:${b[k]}%"></i></div><span class="num" style="text-align:right">${b[k]}</span></div>`).join(""):""}
+    <details><summary>算出の根拠</summary><div class="formula">${SC.axes.map(a=>`<span><b>${a.name}</b>：${esc(a.formula)}</span>`).join("")}<span><b>推し疲れ</b>：${esc(SC.burnout.formula)}</span><span><b>SHS</b>：${esc(SC.shs.formula)}</span><span><b>PSS-J</b>：${esc(SC.pss.formula)}</span></div></details></section></main>
+   ${g.ok?dock("an-back","ホームへ","an-go"):dock("an-back","2つの未来を見る","an-go")}`;
+  $("#an-back").onclick=()=>go("avatar");$("#an-go").onclick=()=>{if(g.ok){if(STUDY&&S.group)return go("home");S.group="A";S.plan={id:null,ids:[],accepted:false};S.decidedAt=now();if(STUDY)OFStore.decide(S,null);go("home")}else go("future")};wire()}
+let PI=0;
+function pbar(name,a,b,hw,higher){const d=b-a,good=higher?d>=0:d<=0,col=good?"var(--good)":"var(--bad)";
+  const row=(lab,v,c,w)=>`<div class="pb"><span>${lab}</span><div class="pt">${w?`<span class="rg" style="left:${clamp(v-w,0,100)}%;width:${clamp(v+w,0,100)-clamp(v-w,0,100)}%;background:${c}"></span>`:""}<span class="pm" style="left:calc(${clamp(v,0,100)}% - 1.5px);background:${c}"></span></div></div>`;
+  return`<div><div class="h"><span>${name}</span><span class="vals"><span class="muted">${r0(a)}</span> → <b style="color:${col}">${r0(b)}</b></span></div>${row("プランA",a,"var(--faint)",hw)}${row("プランB",b,col,hw)}</div>`}
+let PSEL=new Set();
+function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">群A（今のままで順調）のため、提案はありません。</p><a class="btn" href="#home">ホームへ</a></main>`;wire();return}
+  PI=clamp(PI,0,S.plans.length-1);const sel=S.plans[PI],p=planById(sel.id);
+  const chosen=S.plans.map(x=>x.id).filter(id=>PSEL.has(id)),ids=chosen.length?chosen:[p.id],pr=predictMulti(sc,ids),lab=chosen.length?`選んだ${chosen.length}つ`:`提案${PI+1}だけ`;
+  const extra=(p.id==="donate"?DONATE_HTML:"")+(p.id==="event"?ticketHTML(A):"")+(p.id==="declutter"?'<p class="note">出品する前に、公式の転売禁止の規約を確認し、定価を大きく超える値段で出さないようにしましょう。</p>':"");
+  app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(3)}<div><p class="eyebrow view-eyebrow">TWO FUTURES</p><h2>4週間後の2つの未来</h2><p class="small muted">今のまま続けた場合（プランA）と、提案を取り入れた場合（プランB）を比べます。<b>試したい提案はいくつ選んでもかまいません。</b></p></div>
+   <div class="segs" role="group" aria-label="提案">${S.plans.map((x,i)=>`<button class="seg" data-pi="${i}" aria-pressed="${i===PI}">${PSEL.has(x.id)?"✓ ":""}提案${i+1}</button>`).join("")}</div>
+   <section class="card plan"><h3 style="font-size:17px">${esc(planTitle(p))}</h3><p class="small">${esc(planHow(p))}</p>${extra}<p class="why">選んだ理由：${esc(sel.why)}</p>${evidenceHTML(p.id)}
+    <label class="pickrow"><input type="checkbox" id="pickThis" ${PSEL.has(p.id)?"checked":""}> この提案を試す</label></section>
+   <div class="row" style="justify-content:space-between;flex-wrap:wrap"><span class="small">選んだ提案：<b>${chosen.length}</b>／${S.plans.length}</span><button class="btn sm" id="pickAll">${chosen.length===S.plans.length?"選択をすべて外す":"すべての提案を選ぶ"}</button></div>
+   <section class="futures"><div class="fut"><span class="lab">プランA　今のまま</span>${avatar(S.avatar,moodOf(sc),116)}</div><div class="fut b"><span class="lab">プランB　${lab}</span>${avatar(S.avatar,moodOf(pr.B)==="tired"?"neutral":"bright",116)}</div></section>
+   <section class="card"><div class="sec"><h3>5つの要素の見込み</h3><span class="xs muted">灰色の点線＝A、青＝B</span></div>
+    ${radar([{v:FV(pr.A),fill:"var(--faint)",stroke:"var(--faint)",dash:true,op:.05},{v:FV(pr.B),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
+    ${outBars([["幸福度（WHO-5）",[sc.wb,pr.B.wb],true,52,`±${pr.hwWb}の幅`],["ストレス度（PSS-J）",[pss100(sc),pss100(pr.B)],false,null,"仮の見込み"],["推し活のストレス（推し疲れ）",[sc.burnout,pr.B.burnout],false,null,`±${pr.hw}の幅`]],["A 今のまま","B 提案あり"])}
+    <p class="xs muted">選んだ提案の想定の効果を足し合わせた仮の見込みです。複数の提案の効果がそのまま足し合わさるかは分かっていないため、選んだ数が多いほど幅を広くしています。</p></section></main>
+   <div class="dock"><div class="in" style="flex-direction:column"><button class="btn primary block" id="pickB" ${chosen.length?"":"disabled"}>${chosen.length?`選んだ${chosen.length}つの提案で始める（プランB）`:"提案を選ぶとプランBで始められます"}</button><button class="btn block" id="pickA">今のままで続ける（プランA）</button></div><p class="note">どちらを選んでも、約4週間、4〜5日ごとに6回の振り返りをお願いします</p></div>`;
+  app.querySelectorAll("[data-pi]").forEach(b=>b.onclick=()=>{PI=+b.dataset.pi;keep(vFuture)});
+  $("#pickThis").onchange=e=>{e.target.checked?PSEL.add(p.id):PSEL.delete(p.id);keep(vFuture)};
+  $("#pickAll").onclick=()=>{if(chosen.length===S.plans.length)PSEL.clear();else S.plans.forEach(x=>PSEL.add(x.id));keep(vFuture)};
+  const pick=g=>{if(g==="B"&&!chosen.length)return;if(STUDY&&S.group)return go("home"); // 選んだ群は変えられない
+   S.group=g;S.plan={id:g==="B"?chosen[0]:p.id,ids:g==="B"?chosen:[],accepted:g==="B"};S.decidedAt=now();S.weekly=[];S.final=null;S.fin={};SV.final=null;if(STUDY){const pr2=predictMulti(sc,g==="B"?chosen:[p.id]);S.pred={A:pr2.A,B:pr2.B,hw:pr2.hw,hwWb:pr2.hwWb};OFStore.decide(S,S.pred)}toast(g==="B"?`プランB（${chosen.length}つの提案）で始めます`:"今のままで続けます");go("home")};
+  $("#pickB").onclick=()=>pick("B");$("#pickA").onclick=()=>pick("C");wire()}
+const N_CHECK=6,GAP=4,FINAL_DAY=28;
+function dayNo(){return S.decidedAt?Math.floor((now()-S.decidedAt)/DAY):0}
+function nextNo(){return S.weekly.length+1}
+function lastAt(){return S.weekly.length?Math.max(...S.weekly.map(x=>x.at)):S.decidedAt}
+function daysToNext(){return Math.max(0,GAP-Math.floor((now()-lastAt())/DAY))}
+function grp(){return S.group}
+function finalOpen(){return !!S.decidedAt&&dayNo()>=FINAL_DAY&&(grp()==="A"||S.weekly.length>=N_CHECK||dayNo()>=FINAL_DAY+7)}
+function canCheck(){return !!S.decidedAt&&grp()!=="A"&&nextNo()<=N_CHECK&&daysToNext()===0&&!finalOpen()}
+function vHome(){if(!S.group)ensureGroup();const sc=S.sc,g=grp(),ps=planIds().map(planById);
+  const W=S.weekly,pts=k=>W.map((w,i)=>`${20+i*48},${110-w[k]*0.9}`).join(" ");
+  app.innerHTML=header(g==="A"?"群A":`群${g}・${W.length}／${N_CHECK}回`)+`<main class="stack" style="padding-top:14px">
+   <section class="hero"><div class="stack" style="gap:8px"><span class="chip">開始から${dayNo()}日目</span>
+    ${g==="A"?`<h2>今の推し活は順調です</h2><p class="xs">今のままの推し活を続けてください。28日目にもう一度だけ回答をお願いします。</p>`:`<p class="xs">${g==="B"?`取り組み中の提案（プランB・${ps.length}つ）`:"提示された提案（プランAを選択）"}</p>${ps.map(p=>`<h2 style="font-size:15px">・${esc(planTitle(p))}</h2>`).join("")}`}</div>
+    <div class="isle">${miniSVG("base")}<div class="av">${avatar(S.avatar,moodOf(sc),74)}</div></div></section>
+   ${g!=="A"?`<section class="card"><div class="sec"><h3>振り返り　全${N_CHECK}回</h3><span class="xs muted">4〜5日ごと</span></div>
+    <div class="rounds">${[1,2,3,4,5,6].map(i=>`<div><span class="xs muted">${i}回</span><div class="c ${i<=W.length?"done":i===nextNo()?"next":""}">${i<=W.length?"✓":i}</div></div>`).join("")}</div>
+    ${canCheck()?`<a class="btn primary block" href="#checkin">${nextNo()}回目の振り返りをする（約2分）</a>`:nextNo()<=N_CHECK&&!finalOpen()?`<p class="small muted">次の振り返りは${daysToNext()}日後からできます。</p>`:""}
+    ${finalOpen()?`<a class="btn primary block" href="#final">最後の調査に答える</a>`:nextNo()>N_CHECK?`<p class="small muted">6回の振り返りが終わりました。最後の調査は${Math.max(0,FINAL_DAY-dayNo())}日後に開きます。</p>`:""}</section>`
+    :`<section class="card">${finalOpen()?`<a class="btn primary block" href="#final">最後の調査に答える</a>`:`<p class="small muted">最後の調査まで、あと${Math.max(0,FINAL_DAY-dayNo())}日です。</p>`}</section>`}
+   ${W.length?`<section class="card"><div class="sec"><h3>振り返りごとの変化</h3><span class="xs"><b style="color:var(--bad)">━</b> 推し疲れ　<b style="color:var(--good)">━</b> 推し活中の幸せ</span></div>
+    <svg viewBox="0 0 280 120" width="100%" role="img" aria-label="振り返りごとの推し疲れと幸せ"><line x1="20" y1="110" x2="260" y2="110" stroke="var(--line)"/><polyline points="${pts("burn")}" fill="none" stroke="var(--bad)" stroke-width="2.4"/><polyline points="${pts("joyN")}" fill="none" stroke="var(--good)" stroke-width="2.4"/>${W.map((w,i)=>`<text x="${20+i*48}" y="120" font-size="9" text-anchor="middle" fill="var(--muted)">${i+1}回</text>`).join("")}</svg></section>`:""}
+   <section class="card"><div class="sec"><h3>回答の予定をカレンダーに入れる</h3></div><p class="small muted">振り返りの目安日と最後の調査の日を、カレンダーに追加できます。ファイルは端末の中で作られ、どこにも送信されません。</p><button class="btn" id="ics">カレンダーに追加（.ics）</button></section>
+   <p class="xs muted">つらい状態が続くときは、振り返りを休んでかまいません。<a href="#mypage" style="color:var(--primary)">相談先を見る</a></p></main>${tabbar("home")}`;
+  $("#ics").onclick=()=>toast("試作ではファイルを作りません（研究版で作成します）");wire()}
+function vCheckin(){if(!S.group)ensureGroup();const g=grp();
+  if(g==="A"||!canCheck()&&!EDIT){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout">${g==="A"?"群Aの方は振り返りは不要です。":`次の振り返りは${daysToNext()}日後からできます（前回から4日以上あけます）。`}</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
+  if(nextNo()>N_CHECK){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">6回の振り返りはすべて終わりました。</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
+  const items=checkItems();
+  vSurvey("checkin",items,S.wk,`${nextNo()}回目の振り返り`,`${nextNo()}／${N_CHECK}回・開始から${dayNo()}日目`,()=>{const w=S.wk,B=["Q44","Q45","Q47","Q48"];
+    const burn=(mean(B.map(k=>w[k]))-1)/6*100,joyN=(w.joy-1)/6*100;
+    const rec={week:nextNo(),day:dayNo(),...w,burn,joyN};S.weekly.push({...rec,at:now()});if(STUDY)OFStore.checkin(S,rec);S.wk={};SV.checkin=null;toast("記録しました");go("home")})}
+function vFinal(){if(!S.group)ensureGroup();
+  vSurvey("final",finalItems(),S.fin,"最後の調査",`開始から${dayNo()}日目`,()=>{const A={...S.answers,...S.fin};S.final={sc:scores(A)};if(STUDY)OFStore.final(S,S.fin,dayNo());toast("回答ありがとうございました");go("result")})}
+function vResult(){if(STUDY&&!S.final)return go("home");if(!S.final){ensureGroup();const A={...S.answers};["W1","W2","W3"].forEach(k=>A[k]=Math.min(5,(A[k]??2)+1));["Q44","Q48"].forEach(k=>A[k]=Math.max(1,(A[k]??4)-2));QN.sections.find(s=>s.id==="pss").items.slice(0,3).forEach(i=>A[i.id]=Math.max(0,(A[i.id]??2)-1));S.final={sc:scores(A),sample:true}}
+  const a=S.sc,b=S.final.sc,dw=b.wb-a.wb,db=b.burnout-a.burnout,dp=(b.pss??0)-(a.pss??0);
+  const tile=(n,d,unit,higher)=>{const good=higher?d>=0:d<=0;return`<div class="ax ${good?"good":"bad"}"><div class="h"><span>${n}</span></div><div class="v">${d>0?"+":""}${r0(d)}<small>${unit}</small></div></div>`};
+  app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><p class="eyebrow view-eyebrow">RESULT</p><h2>4週間の結果</h2></div>${S.final.sample?'<span class="chip warn">見本の値で表示中</span>':""}</div>
+   <section class="card">${radar([{v:FV(a),fill:"var(--faint)",stroke:"var(--faint)",dash:true,op:.05},{v:FV(b),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
+    <p class="xs muted">灰色の点線＝開始時、青＝最後の調査</p>
+    ${outBars([["幸福度（WHO-5）",[a.wb,b.wb],true,52,"高いほど良い"],["ストレス度（PSS-J）",[pss100(a),pss100(b)],false,null,"高いほど負担"],["推し活のストレス（推し疲れ）",[a.burnout,b.burnout],false,null,"高いほど負担"]],["開始時","最後"])}</section>
+   <section class="delta">${tile("WHO-5（100点換算）",dw,"点",true)}${tile("推し疲れ",db,"点",false)}${tile("ストレス（PSS-J）",dp,"点",false)}</section>
+   ${b.who5raw<=7?`<p class="callout bad">最近、つらい気持ちが続いていませんか。一人で抱えずに、大学の学生相談室や厚生労働省「まもろうよ こころ」の相談窓口を利用してください。</p>`:""}<p class="callout ${dw>=10?"good":""}">${dw>=10?"幸福度は、意味のある変化とされる大きさ（10点以上）で上がりました。":dw<=-10?"幸福度は10点以上下がりました。つらい状態が続くときは、相談先を利用してください。":"幸福度の変化は10点未満でした。"}</p>
+   <section class="card"><h3>ご協力ありがとうございました</h3><p class="small muted">${grp()==="B"?"プランBに取り組んだ約4週間の変化です。":grp()==="A"?"順調な推し活を続けられたかを、開始時と比べて示しています。":"今のままで続けた約4週間の変化です。"}研究の結果は全員分を集計し、OshiFitの提案の改善に使います。</p></section></main>${tabbar("home")}`;wire()}
+function vMypage(){if(!S.group)ensureGroup();const g=grp(),ps=planIds().map(planById),p=ps[0]||null;
+  app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">MY PAGE</p><h2>マイページ</h2></div>
+   <section class="card"><div class="sec"><h3>アカウント</h3>${STUDY?'<button class="btn sm" id="logout">ログアウト</button>':""}</div>
+    ${STUDY&&OFStore.email?`<p class="small">ログイン中：<b>${esc(OFStore.email)}</b></p>`:""}
+    <div class="idbox"><span class="small muted">研究用の番号</span><span class="mono" id="pid">${S.id}</span><button class="btn sm" id="copy">コピー</button></div>
+    <p class="xs muted">プレ実験に参加した方は、この番号を研究者に知らせてください。</p></section>
+   <section class="card"><div class="sec"><h3>参加の状況</h3></div><div>
+    <div class="kv"><span>群</span><b>${g==="A"?"群A（今のままで順調）":g==="B"?"群B（プランBを実行）":"群C（プランAを選択）"}</b></div>
+    ${p?`<div class="kv"><span>提案</span><b>${esc(planTitle(p))}</b></div>`:""}
+    <div class="kv"><span>振り返り</span><b>${S.weekly.length} / ${N_CHECK}回</b></div><div class="kv"><span>開始から</span><b>${dayNo()}日目</b></div>
+    <div class="kv"><span>最後の調査</span><b>${S.final?"回答済み":"28日目以降"}</b></div></div></section>
+   <section class="card"><div class="sec"><h3>データの扱い</h3></div><ul class="facts">
+    <li>アバターに写真は使いません</li><li>メールアドレスはログインのためだけに使い、回答は研究用の番号で、研究用のサーバーに保存します</li><li>参加をやめても、それまでの回答は同意いただいたとおり研究に使います</li><li>研究の目的以外には使いません</li></ul></section>
+   <section class="card"><div class="sec"><h3>つらいとき</h3></div><p class="small muted">振り返りは休んでかまいません。一人で抱えずに、大学の学生相談室や、厚生労働省「まもろうよ こころ」の相談窓口を利用してください。</p></section>
+   <section class="card" style="border-color:color-mix(in srgb,var(--bad) 40%,transparent)"><div class="sec"><h3 style="color:var(--bad)">参加をやめる</h3></div>
+    <p class="small muted">参加をやめても不利益はありません。それまでの回答は、同意いただいたとおり研究に使います。</p>
+    <a class="btn danger-o block" href="#withdraw">参加をやめる</a></section>
+   <section class="card"><div class="sec"><h3>問い合わせ先</h3></div><div class="idbox"><span class="small" id="mail" style="font-weight:600;word-break:break-all">m1m02530106@oit.ac.jp</span><button class="btn sm" id="copymail">コピー</button></div><p class="xs muted">メールで参加をやめるときは、研究用の番号も書いてください。</p></section></main>${tabbar("mypage")}`;
+  if($("#logout"))$("#logout").onclick=async()=>{await OFStore.logout();S=blank();SV={};go("start")};
+  $("#copymail").onclick=()=>{(navigator.clipboard?navigator.clipboard.writeText($("#mail").textContent):Promise.reject()).then(()=>toast("メールアドレスをコピーしました")).catch(()=>{const r=document.createRange();r.selectNodeContents($("#mail"));const s=getSelection();s.removeAllRanges();s.addRange(r);toast("選択しました。コピーしてください")})};
+  $("#copy").onclick=()=>{const t=S.id;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast("参加IDをコピーしました")).catch(()=>{const r=document.createRange();r.selectNodeContents($("#pid"));const s=getSelection();s.removeAllRanges();s.addRange(r);toast("IDを選択しました。コピーしてください")})};wire()}
+function vWithdraw(){vMypage();const sc=document.createElement("div");sc.className="scrim";
+  sc.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="wt"><div class="grab"></div><h2 id="wt">参加をやめますか？</h2>
+   <p class="small">参加をやめても、成績や評価などの不利益は一切ありません。</p>
+   <div class="callout"><b>参加をやめると</b><br>これからの振り返りと最後の調査はなくなります。それまでの回答は、同意いただいたとおり研究に使います（削除はしません）。参加をやめたあとは、もう一度この研究に参加することはできません。</div>
+   <label class="check" for="wk"><input type="checkbox" id="wk">参加をやめると、もう一度は参加できないことを理解しました</label>
+   <button class="btn primary block" id="w-keep">参加を続ける</button><button class="btn danger block" id="w-go" disabled>参加をやめる</button></div>`;
+  document.body.appendChild(sc);const close=()=>{sc.remove();go("mypage")};
+  sc.onclick=e=>{if(e.target===sc)close()};$("#w-keep").onclick=close;$("#wk").onchange=e=>{$("#w-go").disabled=!e.target.checked};
+  $("#w-go").onclick=async()=>{if(STUDY){const b=$("#w-go");b.disabled=true;b.textContent="手続きしています…";try{await OFStore.withdraw()}catch(e){console.error(e);b.disabled=false;b.textContent="参加をやめる";toast("手続きできませんでした。通信を確認して、もう一度お試しください");return}}
+    sc.remove();S={...blank(),id:S.id};S.withdrawn=true;go("withdrawn")};$("#w-keep").focus()}
+function vWithdrawn(){app.innerHTML=header()+`<main class="stack" style="padding-top:22px">
+   <section class="card" style="align-items:center;text-align:center"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7 12l3.5 3.5L17 9"/></svg>
+    <h2>参加をやめる手続きが終わりました</h2><p class="small muted">これまでの回答は、同意いただいたとおり研究に使います。ご協力ありがとうございました。</p></section>
+   <section class="card"><div class="kv"><span>これからの振り返り・最後の調査</span><b>ありません</b></div><div class="kv"><span>今後の連絡</span><b>ありません</b></div></section>
+   <p class="small muted">これからも、ご自身の生活と推し活のバランスを大切にお過ごしください。</p>
+   <a class="btn block" href="#start">最初の画面に戻る</a></main>`;wire()}
+function vAdmin(){app.className="app wide";
+  const rows=[["7F3K-92QD","10/28","B","sns23",3,12,15,null],["Q8M2-7XLA","10/22","B","choose3",2,16,11,null],["E4W9-1TPK","10/24","C","donate",3,14,6,null],["K9LN-55RC","10/08","A","",0,29,15,16],["B3V7-H1QE","10/27","B","budget",2,10,18,null],["2M8P-4ZDW","10/18","C","mute",6,30,13,14]];
+  const al=[["bad","Q8M2-7XLA：振り返りが10日以上ない（開始から16日目・2回済み）"],["bad","E4W9-1TPK：3回目のWHO-5が6点（7点以下）"],["w","2M8P-4ZDW：推し疲れが高い状態が2回続いた（5回目）"]];
+  app.innerHTML=header("見本データ")+`<main class="stack" style="padding-top:16px">
+   <div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><h1 style="font-size:24px">開発者ページ</h1><p class="small muted">大学のGoogleアカウントでログイン中（登録した2名のみ）</p></div><span class="chip ok">閲覧のみ（書き換え・削除はできません）</span></div>
+   <section class="kpis">${[["同意して開始",40],["質問紙を完了",38],["群A（順調）",9],["群B（プランB）",17],["群C（プランA）",12],["最後の調査まで完了",6],["注意確認の誤答",1]].map(([l,v])=>`<div class="kpi"><span>${l}</span><b>${v}</b></div>`).join("")}</section>
+   <section class="grid2"><div class="card"><div class="sec"><h3>振り返りの進み具合</h3><span class="xs muted">回答した人 / 目安日を過ぎた人</span></div>
+     <div class="rgrid">${[[27,29],[24,27],[19,22],[14,17],[9,12],[6,8]].map(([d,u],i)=>`<div class="sunk" style="padding:10px"><span class="xs muted">${i+1}回目${i===2?"（WHO-5）":""}</span><div class="num" style="font-size:20px">${d}<span class="xs muted"> / ${u}人</span></div><div class="track" style="color:var(--primary);margin-top:6px"><i style="width:${r0(d/u*100)}%"></i></div></div>`).join("")}</div></div>
+    <div class="card"><div class="sec"><h3>確認が必要</h3><span class="chip bad">${al.length}件</span></div><div>${al.map(([c,t])=>`<div class="alert ${c==="w"?"w":""}"><i aria-hidden="true"></i><span>${t}</span><span></span></div>`).join("")}</div>
+     <p class="xs muted">連絡先は集めていないため、相談先の表示はアプリが自動で行います。</p></div></section>
+   <section class="stack" style="gap:8px"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><h3>参加者</h3><div class="row" style="flex-wrap:wrap;gap:6px"><button class="btn sm" data-csv="baseline">開始時（baseline.csv）</button><button class="btn sm" data-csv="weekly">振り返りごと（weekly.csv）</button><button class="btn sm" data-csv="trial">最後の調査まで（trial.csv）</button></div></div>
+    <div class="tablewrap"><table><thead><tr><th>参加ID</th><th>開始日</th><th>群</th><th>提案</th><th>振り返り</th><th>開始からの日数</th><th>WHO-5 開始→最後</th></tr></thead><tbody>
+    ${rows.map(([id,d,g,p,n,day,w0,w1])=>`<tr><td class="mono">${id}</td><td class="mono">${d}</td><td><span class="chip">群${g}</span></td><td>${p?esc(planById(p).title):"–"}</td><td class="n">${g==="A"?"–":n+" / 6"}</td><td class="n">${day}日目</td><td class="n" style="color:${w0<=7?"var(--bad)":"inherit"}">${w0} → ${w1??"–"}</td></tr>`).join("")}</tbody></table></div></section></main>`;
+  app.querySelectorAll("[data-csv]").forEach(b=>b.onclick=()=>toast("試作では書き出しません（研究版の開発者ページで書き出します）"));wire()}
+
+/* ---------- 画面の切り替え ---------- */
+const VIEWS={start:vStart,signup:vSignup,login:vLogin,q:vQ,avatar:vAvatar,analysis:vAnalysis,future:vFuture,home:vHome,checkin:vCheckin,final:vFinal,result:vResult,mypage:vMypage,withdraw:vWithdraw,withdrawn:vWithdrawn,admin:vAdmin};
+function keep(fn){const y=scrollY;fn();scrollTo(0,y)}
+function go(v){if(location.hash==="#"+v)render();else location.hash=v}
+let taps=0,tapT=0;
+function wire(){const lg=$("#logo");if(lg&&!STUDY)lg.onclick=()=>{const t=Date.now();taps=t-tapT<600?taps+1:1;tapT=t;if(taps>=5){taps=0;EDIT=!EDIT;render();toast(EDIT?"編集者モードを開きました":"編集者モードを閉じました")}};
+  if(!EDIT)return;const i=SCREENS.findIndex(s=>s[0]===VIEW);
+  const p=$("#ed-prev"),n=$("#ed-next"),s=$("#ed-sel");if(!s)return;
+  p.onclick=()=>go(SCREENS[Math.max(0,i-1)][0]);n.onclick=()=>go(SCREENS[Math.min(SCREENS.length-1,i+1)][0]);s.onchange=e=>go(e.target.value);
+  $("#ed-fill").onclick=()=>{const k=fillBase();S.sc=scores(S.answers);S.plans=null;toast(k?`${k}問を真ん中の値で埋めました`:"すべて回答済みです")};
+  $("#ed-day").onclick=()=>{S.offset+=4;toast(`開始から${dayNo()}日目になりました`);render()};
+  $("#ed-reset").onclick=()=>{S=blank();SV={};PI=0;toast("最初からにしました");go("start")};
+  $("#ed-off").onclick=()=>{EDIT=false;render();toast("ロゴを5回続けて押すと、また開きます")}}
+/* 研究版：まだ進めない画面には入れない（回答の自動補完をしないため） */
+function allowed(v){if(!STUDY)return v;
+  if(S.withdrawn)return v==="start"?v:"withdrawn";
+  if(v==="withdrawn")return S.consented?allowed("home"):"start";
+  if(v==="admin"){location.href="admin.html";return"start"}
+  if(!S.consented)return["start","signup","login"].includes(v)?v:"start";
+  if(v==="login"||v==="signup")return allowed("home");   // ログイン済みなら、いま進むべき画面へ
+  if(!S.baselineDone)return v==="start"?v:"q";
+  if(!S.group){if(["avatar","analysis"].includes(v))return v;if(v==="future")return S.avatarDone?v:"avatar";return S.avatarDone?"analysis":"avatar"}
+  if(["start","q","avatar","future"].includes(v))return"home";
+  return v}
+function render(){document.querySelectorAll(".scrim").forEach(x=>x.remove());const h=location.hash.slice(1);VIEW=VIEWS[h]?h:"start";const ok=allowed(VIEW);if(ok!==VIEW){VIEW=ok;if(location.hash!=="#"+ok){history.replaceState(null,"","#"+ok)}}app.className="app";const y=scrollY,k=KEEP;KEEP=false;if(!k)scrollTo(0,0);VIEWS[VIEW]();if(k)scrollTo(0,y)}
+let draftT=null;
+function saveDraft(key){if(STUDY&&key==="q"&&!S.baselineDone)OFStore.draft(S)}
+window.OSHIFIT_ON_SAVE_ERROR=()=>toast("保存できませんでした。通信がつながると自動でもう一度送ります");
+async function boot(){
+  if(STUDY){app.innerHTML=`<main class="stack" style="padding-top:40px;text-align:center"><p class="muted">読み込んでいます…</p></main>`;
+    try{const saved=await OFStore.init();if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers)}}
+    catch(e){console.error(e);app.innerHTML=`<main class="stack" style="padding-top:40px"><p class="callout bad">サーバーにつながりませんでした。通信を確認して、ページを読み込み直してください。</p></main>`;return}}
+  addEventListener("hashchange",render);render()}
+boot();
+})();
+</script>
+
+</body></html>

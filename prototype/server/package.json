@@ -1,0 +1,18 @@
+{
+  "name": "oshifit-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OshiFit research prototype: LLM mapping proxy (free text -> fixed questionnaire answers). Stores nothing.",
+  "main": "proxy.js",
+  "scripts": {
+    "start": "node proxy.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.132.1"
+  }
+}
