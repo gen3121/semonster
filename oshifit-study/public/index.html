@@ -1,4 +1,8 @@
 <!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+/* 提案の組み合わせ */
+.combo{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.combo.best{border:2px solid var(--primary);background:var(--good-bg)}.combo.bad{border-color:color-mix(in srgb,var(--bad) 50%,transparent)}
+.combo .chip{margin-left:4px}
 /* アバター作成（Mii を参考にした選び方） */
 .avstage{align-items:center;position:sticky;top:64px;z-index:5}
 .avprev{background:var(--low);border-radius:16px;width:100%;display:flex;justify-content:center;padding:6px 0}
@@ -1296,11 +1300,31 @@ function whyText(p,sc,b,A){const v=r0(sc[p.axis]);const t=[v>=60?`「${AXNAME[p.
 const planById=id=>PLANS.find(p=>p.id===id);
 /* 予測：プランA＝今のまま（現在の得点）、プランB＝プランの軸が eff 点改善し、幸福度は改善の1/4だけ上がる（仮定 v1.0）
    80%の幅：各軸 ±15、幸福度 ±12（開始時。研究では実測から推定し直す） */
-function predictMulti(sc,ids){let B={...sc};const ps=ids.map(planById);
-  ps.forEach(p=>{B[p.axis]=clamp(B[p.axis]+p.eff,0,100); if(p.axis!=="wb") B.wb=clamp(B.wb+p.eff/4,0,100);
-    if(p.axis!=="joy"&&p.axis!=="wb") B.burnout=clamp(B.burnout-p.eff/4,0,100); else B.joy=clamp(B.joy+p.eff,0,100);});
+/* 提案の組み合わせ（仮定 v1.2。データではまだ確かめていない。研究後に分析の手順6・7で確かめ直す）
+   ・続けにくさ：効果の大きい順に、2つめは0.8倍、3つめは0.6倍にする
+   ・相性が悪い組み合わせ（向きが逆の提案）：両方の効果を半分にし、ぶつかる要素を下げる。画面で「おすすめしない」と理由を出す
+   ・相性が良い組み合わせ：理由だけ示し、効果の上乗せはしない（根拠がないため） */
+const CLASH=[["event","budget","money",6,"イベントに行くとお金を使うので、「予算を先に決める」とぶつかりやすい"],
+  ["event","skipok","duty",6,"予定を「足す」提案と「行かない回を決める」提案は、向きが逆"],
+  ["event","choose3","duty",6,"予定を「足す」提案と「追う予定を絞る」提案は、向きが逆"]];
+const SYNERGY=[["sns23","calm","どちらも寝る前の時間の使い方で、一緒に続けやすい"],["sns23","archive","夜の視聴とSNSをまとめて減らせる"],
+  ["declutter","donate","手放す作業を一度で済ませられる"],["create","good3","どちらも「書く」ことで、良い気持ちを残せる"]];
+const pairIn=(ids,a,b)=>ids.includes(a)&&ids.includes(b);
+function predictMulti(sc,ids){let B={...sc};const ps=ids.map(planById).sort((x,y)=>y.eff-x.eff);
+  const f=Object.fromEntries(ps.map((p,i)=>[p.id,[1,.8,.6][i]??.5]));
+  const clashes=CLASH.filter(([a,b])=>pairIn(ids,a,b)),synergies=SYNERGY.filter(([a,b])=>pairIn(ids,a,b));
+  clashes.forEach(([a,b])=>{f[a]*=.5;f[b]*=.5});
+  ps.forEach(p=>{const e=p.eff*f[p.id];B[p.axis]=clamp(B[p.axis]+e,0,100); if(p.axis!=="wb") B.wb=clamp(B.wb+e/4,0,100);
+    if(p.axis!=="joy"&&p.axis!=="wb") B.burnout=clamp(B.burnout-e/4,0,100); else B.joy=clamp(B.joy+e,0,100);});
+  clashes.forEach(([,,ax,pen])=>{B[ax]=clamp(B[ax]-pen,0,100);B.burnout=clamp(B.burnout+pen/4,0,100)});
   if(sc.pss!=null&&sc.burnout!=null) B.pss=clamp(sc.pss*(1+(B.burnout-sc.burnout)/Math.max(sc.burnout,1)*.25),0,56); // 仮定：推し疲れの変化の1/4の割合でPSS-Jも動く
-  return{A:sc,B,hw:15+5*(ids.length-1),hwWb:12+4*(ids.length-1),plans:ps};}
+  return{A:sc,B,hw:15+5*(ids.length-1),hwWb:12+4*(ids.length-1),plans:ps,clashes,synergies};}
+/* 示した提案のすべての組み合わせを見積もり、幸福度の上がり方と推し疲れの下がり方の合計が最も大きいものを「おすすめ」にする */
+function combos(sc,ids){const out=[];for(let m=1;m<1<<ids.length;m++){const c=ids.filter((_,i)=>m>>i&1),pr=predictMulti(sc,c);
+    out.push({ids:c,pr,dWb:pr.B.wb-sc.wb,dBurn:pr.B.burnout-sc.burnout,score:(pr.B.wb-sc.wb)-(pr.B.burnout-sc.burnout)})}
+  const best=Math.max(...out.map(o=>o.score));
+  out.forEach(o=>{o.best=o.score===best;o.near=!o.best&&best-o.score<2;o.bad=o.pr.clashes.length>0});
+  return out.sort((a,b)=>b.score-a.score)}
 const planIds=()=>!S.plan?[]:(S.plan.ids&&S.plan.ids.length?S.plan.ids:[S.plan.id]);
 function predict(sc,planId){const p=planById(planId);const B={...sc};
   B[p.axis]=clamp(sc[p.axis]+p.eff,0,100); if(p.axis!=="wb") B.wb=clamp(sc.wb+p.eff/4,0,100);
@@ -1528,7 +1552,7 @@ function vStart(){app.className="app land";
    <section class="band axes-band" id="sec-axes">${wave("var(--l-band)")}<div class="in"><div class="sechead"><p class="eyebrow">5 FACTORS → WELL-BEING</p><h2 class="jp-xl">5つの要素が、幸福度とストレスを決める</h2><p class="body">街の5つの場所が、推し活の5つの要素です。この5つの状態から、結果として公園の「幸福度」と「ストレス度」が決まると考えます。どの要素も点数が高いほど良い向きで、60点以上を<b class="tb">青</b>、60点未満を<b class="tr">赤</b>で表示します。</p></div>
      <div class="axcards">${axes.map(a=>`<article class="axcard" id="ax-${a.key}"><div class="arch">${miniSVG(a.key)}</div><span class="no">0${a.no}</span><p class="en small-en">${a.d[0]}</p><h3>${a.name}</h3><p class="small muted">${a.d[1]}</p></article>`).join("")}<article class="axcard result" id="ax-wb"><div class="arch">${miniSVG("wb")}</div><span class="no">→</span><p class="en small-en">RESULT ／ 公園</p><h3>幸福度とストレス度</h3><p class="small muted">5つの要素の結果。幸福度はWHO-5（最近2週間の気分）、ストレス度はPSS-J（最近1か月）で測ります。</p></article></div></div></section>
    <section class="band flow-band" id="sec-flow">${wave("var(--l-ink)")}<div class="in"><div class="sechead inv"><p class="eyebrow">HOW IT WORKS</p><h2 class="jp-xl">最初の15分と、4週間の振り返り</h2></div>
-     <ol class="flowcards">${[["質問に答える","今の推し活と気分について、約${BASE_ITEMS.length}問。選ぶと自動で次の質問へ進みます。"],["アバターを作る","顔の形・髪型・色を選んで、自分に似せた分身を作ります。写真は使いません。"],["6つの軸を見る","良いところは青、見直したいところは赤。算出の根拠も見られます。"],["2つの未来を比べる","今のまま（A）と、提案を試す（B）。4週間後の見込みを並べます。"]].map(([t,d],i)=>`<li><span class="big">0${i+1}</span><h3>${t}</h3><p>${d}</p></li>`).join("")}</ol>
+     <ol class="flowcards">${[["質問に答える","今の推し活と気分について、約"+BASE_ITEMS.length+"問。選ぶと自動で次の質問へ進みます。"],["アバターを作る","顔の形・髪型・色を選んで、自分に似せた分身を作ります。写真は使いません。"],["6つの軸を見る","良いところは青、見直したいところは赤。算出の根拠も見られます。"],["2つの未来を比べる","今のまま（A）と、提案を試す（B）。4週間後の見込みを並べます。"]].map(([t,d],i)=>`<li><span class="big">0${i+1}</span><h3>${t}</h3><p>${d}</p></li>`).join("")}</ol>
      <div class="road"><p class="eyebrow">4 WEEKS</p><div class="track4">${[0,4,8,12,16,20,24,28].map((d,i)=>`<div class="mile ${i===0?"s":i===7?"f":""}"><span class="dot"></span><b>${i===0?"開始":i===7?"最後の調査":`${i}回目`}</b><span>${i===0?"0日目":i===7?"28日目〜":`${d}日目ごろ`}</span></div>`).join("")}</div>
      <p class="xs" style="color:var(--ink-muted)">振り返りは前回から4日以上あけて、4〜5日ごとに6回（各約2分）。3回目だけ、最近2週間の気分（WHO-5）も答えます。</p></div></div></section>
    <section class="band about-band" id="sec-about">${wave("var(--bg)")}<div class="in"><div class="sechead"><p class="eyebrow">ABOUT THE STUDY</p><h2 class="jp-xl">安心して参加してもらうために</h2></div>
@@ -1658,6 +1682,15 @@ function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.inner
     <label class="pickrow"><input type="checkbox" id="pickThis" ${PSEL.has(p.id)?"checked":""}> この提案を試す</label></section>
    <div class="row" style="justify-content:space-between;flex-wrap:wrap"><span class="small">選んだ提案：<b>${chosen.length}</b>／${S.plans.length}</span><button class="btn sm" id="pickAll">${chosen.length===S.plans.length?"選択をすべて外す":"すべての提案を選ぶ"}</button></div>
    <section class="futures"><div class="fut"><span class="lab">プランA　今のまま</span>${avatar(S.avatar,moodOf(sc),116)}</div><div class="fut b"><span class="lab">プランB　${lab}</span>${avatar(S.avatar,moodOf(pr.B)==="tired"?"neutral":"bright",116)}</div></section>
+   ${S.plans.length>1?(()=>{const cs=combos(sc,S.plans.map(x=>x.id)),nm=id=>"提案"+(S.plans.findIndex(x=>x.id===id)+1);
+     return`<section class="card" id="combos"><div class="sec"><h3>提案の組み合わせ</h3><span class="xs muted">仮の見込み</span></div>
+     ${cs.map(o=>`<div class="combo ${o.best?"best":""} ${o.bad?"bad":""}"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><b>${o.ids.map(nm).join(" × ")}</b>
+       <span>${o.best?'<span class="chip good">おすすめ</span>':o.near?'<span class="chip">おすすめとほぼ同じ</span>':""}${o.bad?'<span class="chip bad">おすすめしない</span>':""}</span></div>
+       <p class="xs">幸福度 ${o.dWb>=0?"+":""}${r0(o.dWb)}　推し疲れ ${o.dBurn>0?"+":""}${r0(o.dBurn)}</p>
+       ${o.pr.clashes.map(c=>`<p class="xs" style="color:var(--bad)">${nm(c[0])}と${nm(c[1])}：${esc(c[4])}</p>`).join("")}${o.pr.synergies.map(c=>`<p class="xs muted">${nm(c[0])}と${nm(c[1])}：${esc(c[2])}</p>`).join("")}
+       <button class="btn sm" data-combo="${o.ids.join(",")}">この組み合わせを選ぶ</button></div>`).join("")}
+     <p class="xs muted">提案が多いほど続けにくいと考え、2つめ以降の効果は小さく見積もっています。向きが逆の提案を一緒に選ぶと、効果が打ち消し合うと考えています。どちらも仮の考え方で、研究の結果で確かめ直します。</p></section>`})():""}
+   ${pr.clashes.length&&chosen.length?`<p class="callout bad">いま選んでいる提案には、相性が悪い組み合わせがあります：${pr.clashes.map(c=>esc(c[4])).join("／")}</p>`:""}
    <section class="card"><div class="sec"><h3>5つの要素の見込み</h3><span class="xs muted">灰色の点線＝A、青＝B</span></div>
     ${radar([{v:FV(pr.A),fill:"var(--faint)",stroke:"var(--faint)",dash:true,op:.05},{v:FV(pr.B),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
     ${outBars([["幸福度（WHO-5）",[sc.wb,pr.B.wb],true,52,`±${pr.hwWb}の幅`],["ストレス度（PSS-J）",[pss100(sc),pss100(pr.B)],false,null,"仮の見込み"],["推し活のストレス（推し疲れ）",[sc.burnout,pr.B.burnout],false,null,`±${pr.hw}の幅`]],["A 今のまま","B 提案あり"])}
@@ -1665,6 +1698,7 @@ function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.inner
    <div class="dock"><div class="in" style="flex-direction:column"><button class="btn primary block" id="pickB" ${chosen.length?"":"disabled"}>${chosen.length?`選んだ${chosen.length}つの提案で始める（プランB）`:"提案を選ぶとプランBで始められます"}</button><button class="btn block" id="pickA">今のままで続ける（プランA）</button></div><p class="note">どちらを選んでも、約4週間、4〜5日ごとに6回の振り返りをお願いします</p></div>`;
   app.querySelectorAll("[data-pi]").forEach(b=>b.onclick=()=>{PI=+b.dataset.pi;keep(vFuture)});
   $("#pickThis").onchange=e=>{e.target.checked?PSEL.add(p.id):PSEL.delete(p.id);keep(vFuture)};
+  app.querySelectorAll("[data-combo]").forEach(b=>b.onclick=()=>{PSEL.clear();b.dataset.combo.split(",").forEach(id=>PSEL.add(id));keep(vFuture)});
   $("#pickAll").onclick=()=>{if(chosen.length===S.plans.length)PSEL.clear();else S.plans.forEach(x=>PSEL.add(x.id));keep(vFuture)};
   const pick=g=>{if(g==="B"&&!chosen.length)return;if(STUDY&&S.group)return go("home"); // 選んだ群は変えられない
    S.group=g;S.plan={id:g==="B"?chosen[0]:p.id,ids:g==="B"?chosen:[],accepted:g==="B"};S.decidedAt=now();S.weekly=[];S.final=null;S.fin={};SV.final=null;if(STUDY){const pr2=predictMulti(sc,g==="B"?chosen:[p.id]);S.pred={A:pr2.A,B:pr2.B,hw:pr2.hw,hwWb:pr2.hwWb};OFStore.decide(S,S.pred)}toast(g==="B"?`プランB（${chosen.length}つの提案）で始めます`:"今のままで続けます");go("home")};

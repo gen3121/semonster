@@ -102,23 +102,27 @@
     return `<path d="${L}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round"/><path d="${R}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round"/>`;
   }
   function eyes(e, col, mood, skin) {
-    const y = 66, one = (x, flip) => {
-      const f = flip ? -1 : 1;
+    const y = 66;
+    // o = 目じりの向き（左目は -1、右目は +1）。たれ目は目じりが下がり、つり目は上がる
+    const one = (x, o) => {
+      const rot = (deg) => `transform="rotate(${deg * o} ${x} ${y})"`;
+      const lid = (dy) => `<path d="M${x - 6.5} ${y - 5 + (o < 0 ? dy : -dy)}Q${x} ${y - 8.5} ${x + 6.5} ${y - 5 + (o < 0 ? -dy : dy)}" stroke="${col}" stroke-width="1.6" fill="none" stroke-linecap="round"/>`;
       const base = [
-        `<ellipse cx="${x}" cy="${y}" rx="4.6" ry="5.4" fill="${col}"/>`,
-        `<ellipse cx="${x}" cy="${y}" rx="4" ry="6" fill="${col}"/>`,
-        `<path d="M${x - 6} ${y}Q${x} ${y - 6} ${x + 6} ${y}Q${x} ${y + 5} ${x - 6} ${y}Z" fill="${col}"/>`,
-        `<path d="M${x - 6} ${y - 1}Q${x} ${y - 5} ${x + 6} ${y + 2 * f}Q${x} ${y + 6} ${x - 6} ${y - 1}Z" fill="${col}"/>`,
-        `<path d="M${x - 6} ${y + 2 * f}Q${x} ${y - 6} ${x + 6} ${y - 2 * f}Q${x} ${y + 5} ${x - 6} ${y + 2 * f}Z" fill="${col}"/>`,
-        `<path d="M${x - 5} ${y}Q${x} ${y - 3} ${x + 5} ${y}" stroke="${col}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`,
-        `<ellipse cx="${x}" cy="${y}" rx="5.6" ry="6.6" fill="${col}"/>`,
-        `<ellipse cx="${x}" cy="${y}" rx="4.8" ry="5.6" fill="${col}"/><path d="M${x - 6} ${y - 4}L${x - 8} ${y - 6}M${x + 6} ${y - 4}L${x + 8} ${y - 6}" stroke="${col}" stroke-width="1.4"/>`,
+        `<circle cx="${x}" cy="${y}" r="5" fill="${col}"/>`,                                                            // まる
+        `<ellipse cx="${x}" cy="${y}" rx="4" ry="6" fill="${col}"/>`,                                                   // たまご
+        `<ellipse cx="${x}" cy="${y}" rx="6.2" ry="4.3" fill="${col}"/>`,                                               // アーモンド
+        `<ellipse cx="${x}" cy="${y}" rx="5.6" ry="4.8" fill="${col}" ${rot(-14)}/>${lid(2.5)}`,                        // たれ目（目じりが下がる）
+        `<ellipse cx="${x}" cy="${y}" rx="5.6" ry="4.8" fill="${col}" ${rot(14)}/>${lid(-2.5)}`,                        // つり目（目じりが上がる）
+        `<path d="M${x - 5} ${y}Q${x} ${y - 3.5} ${x + 5} ${y}" stroke="${col}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`, // 細め
+        `<ellipse cx="${x}" cy="${y}" rx="5.8" ry="6.8" fill="${col}"/>`,                                               // ぱっちり
+        `<ellipse cx="${x}" cy="${y}" rx="4.8" ry="5.6" fill="${col}"/><path d="M${x - 5.5} ${y - 4}Q${x} ${y - 8} ${x + 5.5} ${y - 4}" stroke="${col}" stroke-width="2" fill="none" stroke-linecap="round"/>` +
+          `<path d="M${x + 5 * o} ${y - 4.5}l${2.6 * o} -2.2M${x + 3 * o} ${y - 6}l${1.8 * o} -2.6" stroke="${col}" stroke-width="1.3" stroke-linecap="round"/>`, // まつげ（目じりの上に2本）
       ][e] || "";
-      const shine = e === 5 ? "" : `<circle cx="${x + 1.6}" cy="${y - 2}" r="${e === 6 ? 2 : 1.5}" fill="#fff"/>${mood === "bright" && e !== 5 ? `<circle cx="${x - 1.8}" cy="${y + 2}" r="0.9" fill="#fff"/>` : ""}`;
-      const lid = mood === "tired" && e !== 5 ? `<path d="M${x - 7} ${y - 7}L${x + 7} ${y - 7}L${x + 7} ${y - 0.5}Q${x} ${y - 2} ${x - 7} ${y - 0.5}Z" fill="${skin}"/>` : "";
-      return base + shine + lid;
+      const shine = e === 5 ? "" : `<circle cx="${x + 1.6}" cy="${y - 1.8}" r="${e === 6 ? 2.1 : 1.5}" fill="#fff"/>${mood === "bright" || e === 6 ? `<circle cx="${x - 1.8}" cy="${y + 2}" r="0.9" fill="#fff"/>` : ""}`;
+      const tired = mood === "tired" && e !== 5 ? `<path d="M${x - 7} ${y - 7.5}L${x + 7} ${y - 7.5}L${x + 7} ${y - 0.5}Q${x} ${y - 2} ${x - 7} ${y - 0.5}Z" fill="${skin}"/>` : "";
+      return base + shine + tired;
     };
-    return one(54, false) + one(76, true);
+    return one(54, -1) + one(76, 1);
   }
   function nose(n, skin) {
     const d = shade(skin, 0.78);

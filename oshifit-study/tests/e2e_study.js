@@ -135,6 +135,10 @@ async function answerAll(page, stop) {
   await page.locator("#an-go").click();
   let group;
   if (await page.locator("#pickB").count().then((n) => n > 0).catch(() => false) || (await page.waitForSelector("#pickB", { timeout: 4000 }).catch(() => null))) {
+    if (await page.locator("#combos").count()) {
+      assert.equal(await page.locator("#combos .chip.good").count(), 1, "おすすめの組み合わせは1つ");
+      await page.screenshot({ path: path.join(OUT, "03_combos.png"), fullPage: true });
+    }
     await page.locator("#pickThis").check();
     await page.locator("#pickB").click();
     group = "B";
