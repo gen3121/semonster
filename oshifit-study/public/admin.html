@@ -37,16 +37,18 @@ const items = (ids) => QN.sections.filter((s) => ids.includes(s.id)).flatMap((s)
 const BASE_ITEMS = QN.sections.flatMap((s) => s.items.map((i) => i.id)).filter((id) => id !== "Q62");
 const FINAL_ITEMS = [...items(["who5", "shs", "pss"]), "Q29", "Q30", "Q31", "Q32", "Q33", "Q34", "Q39", "Q44", "Q45", "Q46", "Q47", "Q48", "Q49", "Q50", "Q51", "J1", "J2", "K1", "K2", "K3", "K4", "K5"];
 
+const ERR = { "auth/operation-not-allowed": "このログイン方法が Firebase で有効になっていません（Authentication →「ログイン方法」で有効にしてください）", "auth/popup-blocked": "ポップアップが止められました。このサイトのポップアップを許可してください", "auth/popup-closed-by-user": "ログインの画面が閉じられました", "auth/unauthorized-domain": "このドメインが Firebase の「承認済みドメイン」にありません", "auth/account-exists-with-different-credential": "このメールアドレスは別のログイン方法で登録済みです", "auth/invalid-action-code": "ログイン用のリンクが古いか、使用済みです。もう一度送ってください" };
+const errMsg = (e) => (ERR[e && e.code] || "ログインできませんでした") + `（${e && e.code}）`;
 function login() {
   el.innerHTML = `<section class="card"><h1>開発者ページ</h1><p class="muted">登録した大学アカウントでログインしてください（閲覧のみ）。</p>
    <div class="row"><button class="btn primary" id="g">Google でログイン</button><button class="btn primary" id="ms">Microsoft（大学のアカウント）でログイン</button></div>
    <div class="row" style="margin-top:10px"><input id="mail" type="email" placeholder="大学のメールアドレス"><button class="btn" id="m">ログイン用のリンクを送る</button></div><p id="msg" class="muted"></p></section>`;
-  $("#g").onclick = () => A.signInWithPopup(auth, new A.GoogleAuthProvider()).catch((e) => ($("#msg").textContent = "ログインできませんでした：" + e.code));
-  $("#ms").onclick = () => { const p = new A.OAuthProvider("microsoft.com"); p.setCustomParameters({ prompt: "select_account" }); A.signInWithPopup(auth, p).catch((e) => ($("#msg").textContent = "ログインできませんでした：" + e.code)); };
+  $("#g").onclick = () => A.signInWithPopup(auth, new A.GoogleAuthProvider()).catch((e) => ($("#msg").textContent = errMsg(e)));
+  $("#ms").onclick = () => { const p = new A.OAuthProvider("microsoft.com"); p.setCustomParameters({ prompt: "select_account" }); A.signInWithPopup(auth, p).catch((e) => ($("#msg").textContent = errMsg(e))); };
   $("#m").onclick = async () => {
     const mail = $("#mail").value.trim(); if (!mail) return;
     try { await A.sendSignInLinkToEmail(auth, mail, { url: location.href, handleCodeInApp: true }); localStorage.setItem("oshifit.adminMail", mail); $("#msg").textContent = "メールを送りました。届いたリンクをこの端末で開いてください。"; }
-    catch (e) { $("#msg").textContent = "送れませんでした：" + e.code; }
+    catch (e) { $("#msg").textContent = errMsg(e); }
   };
 }
 if (A.isSignInWithEmailLink(auth, location.href)) {
@@ -58,7 +60,7 @@ if (A.isSignInWithEmailLink(auth, location.href)) {
 A.onAuthStateChanged(auth, async (u) => {
   if (!u || u.isAnonymous) return login();
   try { const me = await F.getDoc(F.doc(db, "admins", u.email)); if (!me.exists()) throw new Error("not admin"); }
-  catch (e) { el.innerHTML = `<section class="card"><h1>開発者ページ</h1><p>このアカウント（${esc(u.email)}）には閲覧の権限がありません。</p><button class="btn" id="out">ログアウト</button></section>`; $("#out").onclick = () => A.signOut(auth); return; }
+  catch (e) { el.innerHTML = `<section class="card"><h1>開発者ページ</h1><p>このアカウント（${esc(u.email || "メールアドレスなし")}）には閲覧の権限がありません。</p><p class="muted" style="font-size:12px">Firestore の admins に、このメールアドレスと同じ名前のドキュメントがあるか確認してください（大文字・小文字も同じにします）。</p><button class="btn" id="out">ログアウト</button></section>`; $("#out").onclick = () => A.signOut(auth); return; }
   el.innerHTML = `<p class="muted">データを読み込んでいます…</p>`;
   const [ps, cks, pil] = await Promise.all([F.getDocs(F.collection(db, "participants")), F.getDocs(F.collectionGroup(db, "checkins")), F.getDocs(F.collection(db, "pilots"))]);
   const pilots = new Set(pil.docs.map((d) => d.id));

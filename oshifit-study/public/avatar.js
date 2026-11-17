@@ -91,9 +91,9 @@
       perm: `<path d="M33 56Q30 28 65 25Q100 28 97 56Q92 46 82 48Q74 40 65 46Q56 40 48 48Q38 46 33 56Z" fill="${c}"/>${[40, 52, 65, 78, 90].map((x) => `<circle cx="${x}" cy="${x === 65 ? 30 : 36}" r="7" fill="${c}"/>`).join("")}`,
       wolf: `<path d="${cap(56)}Q84 44 72 42Q62 52 50 46Q40 50 35 56Z" fill="${c}"/>`,
       mlong: `<path d="${cap(54)}Q86 42 66 41Q46 42 35 54Z" fill="${c}"/>`,
-      buzz: `<path d="${cap(46)}Q85 37 65 37Q45 37 35 46Z" fill="${shade(c, 1)}" opacity=".85"/>`,
+      buzz: `<path d="M38 52Q37 30 65 29Q93 30 92 52Q90 44 84 41Q75 37 65 37Q55 37 46 41Q40 44 38 52Z" fill="${c}" opacity=".85"/>`,   // 頭の形に沿わせる（両端が浮かない）
     }[k] || "";
-    return top + (k === "buzz" ? "" : `<path d="M50 30Q60 27 70 29" stroke="${hl}" stroke-width="2" fill="none" opacity=".55" stroke-linecap="round"/>`);
+    return top + (k === "buzz" || k === "spiky" ? "" : `<path d="M50 30Q60 27 70 29" stroke="${hl}" stroke-width="2" fill="none" opacity=".55" stroke-linecap="round"/>`);
   }
   function brows(b, c, mood) {
     const t = mood === "tired" ? 2 : mood === "bright" ? -1 : 0;
