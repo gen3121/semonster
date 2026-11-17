@@ -108,7 +108,7 @@ async function answerAll(page, stop) {
   step(`ログアウト → ログイン（パスワード違いは断る）で、続き（${resumeAt}）から再開できる`);
 
   await answerAll(page, async () => (await page.locator("#av-go").count()) > 0);
-  d = await read((db) => getDoc(doc(db, "participants", uid)));
+  for (let i = 0; i < 25; i++) { d = await read((db) => getDoc(doc(db, "participants", uid))); if (d.data().baselineDone) break; await page.waitForTimeout(200); }
   assert.equal(d.data().baselineDone, true);
   const keys = Object.keys(d.data().answers).filter((k) => k !== "Q62");
   assert.equal(keys.length, 68, "短縮版：67項目＋性別が保存される");
@@ -160,6 +160,22 @@ async function answerAll(page, stop) {
   step("群が決まったあとは、2つの未来の画面に戻れない（群を変えられない）");
 
   if (group === "B") {
+    // 毎日のアンケート（お金・時間を入れる）
+    await page.goto(BASE + "#daily");
+    await page.locator(".qid").waitFor();
+    for (let i = 0; i < 40; i++) {
+      if ((await page.evaluate(() => location.hash)) === "#home") break;
+      const id = (await page.locator(".qid").innerText().catch(() => "")).trim();
+      if (await page.locator("#f-num").count()) { await page.locator("#f-num").fill(id === "yen" ? "1500" : "90"); await page.locator("#sv-next").click(); continue; }
+      if (await page.locator("[data-j]").count()) { await page.locator("[data-j]").nth(id === "mood" ? 4 : id.startsWith("did_") ? 0 : 3).click(); await page.waitForTimeout(350); continue; }
+      await page.waitForTimeout(200);
+    }
+    let dd; for (let i = 0; i < 25; i++) { dd = await read((db) => getDocs(collection(db, "participants", uid, "daily"))); if (dd.size) break; await page.waitForTimeout(200); }
+    assert.equal(dd.size, 1); const d1 = dd.docs[0].data();
+    assert.equal(d1.yen, 1500); assert.equal(d1.minutes, 90); assert.equal(d1.mood, 5); assert.match(d1.date, /^\d{4}-\d{2}-\d{2}$/);
+    await page.locator("#daily-card").getByText("今日は回答済み").waitFor();
+    assert.match(await page.locator("#stats").innerText(), /1,500円/);
+    step("毎日のアンケート（気分・お金・時間など）→ daily/{日付} に保存。ホームに合計が出る");
     // 振り返り：4日たつまで押せない
     await page.goto(BASE + "#checkin");
     await page.getByText("日後からできます").waitFor();
@@ -172,7 +188,8 @@ async function answerAll(page, stop) {
     assert.equal(ck.size, 1); const c1 = ck.docs[0].data();
     assert.equal(c1.week, 1); assert.equal(c1.day, 4); assert.ok(Object.keys(c1).some((k) => k.startsWith("did_")));
     assert.equal(c1.W1, undefined, "WHO-5 は3回目だけ");
-    step("4日後に1回目の振り返り → checkins/1（week=1, day=4）が保存される");
+    assert.equal(c1.sumYen, 1500, "振り返りに、前回からのお金の合計が入る"); assert.equal(c1.sumMin, 90);
+    step("4日後に1回目の振り返り → checkins/1（week=1, day=4、前回からの合計つき）が保存される");
     await page.reload();
     await page.locator(".rounds").waitFor();
     assert.match(await page.locator(".rounds").innerText(), /✓/);
@@ -180,20 +197,21 @@ async function answerAll(page, stop) {
   }
 
   // ---------- 開発者ページの CSV（ページの書き出し関数を、実際の記録で動かす）
-  const raw = await read(async (db) => { const s = await getDoc(doc(db, "participants", uid)); const c = await getDocs(collection(db, "participants", uid, "checkins"));
+  const raw = await read(async (db) => { const s = await getDoc(doc(db, "participants", uid)); const c = await getDocs(collection(db, "participants", uid, "checkins")); const dl = await getDocs(collection(db, "participants", uid, "daily"));
     const conv = (o) => JSON.parse(JSON.stringify(o, (k, v) => (v && typeof v.toMillis === "function" ? { __ts: v.toMillis() } : v)));
-    return { p: conv(s.data()), cks: c.docs.map((x) => conv(x.data())) }; });
+    return { p: conv(s.data()), cks: c.docs.map((x) => conv(x.data())), daily: dl.docs.map((x) => conv(x.data())) }; });
   const ap = await ctx.newPage();
   await ap.goto(BASE + "admin.html");
   await ap.waitForFunction(() => typeof window.__oshifitTables === "function");
   const csv = await ap.evaluate(({ raw, uid }) => {
     const rev = (o) => JSON.parse(JSON.stringify(o), (k, v) => (v && v.__ts ? { toMillis: () => v.__ts } : v));
-    const p = rev(raw.p); return window.__oshifitTables([{ uid, ...p, cks: raw.cks.map(rev), pilot: 0 }]);
+    const p = rev(raw.p); return window.__oshifitTables([{ uid, ...p, cks: raw.cks.map(rev), daily: raw.daily.map(rev), pilot: 0 }]);
   }, { raw, uid });
   const head = csv.baseline.replace(/^﻿/, "").split("\r\n")[0].split(",");
   ["pid", "group", "Q1", "Q61", "W5", "H4", "P14", "pss", "who5raw"].forEach((c) => assert.ok(head.includes(c), "baseline.csv に " + c));
   assert.equal(csv.baseline.split("\r\n").length, 2);
   if (group === "B") assert.equal(csv.weekly.split("\r\n").length, 2);
+  if (csv.daily) { const dh = csv.daily.replace(/^\uFEFF/, "").split("\r\n"); assert.ok(dh[0].split(",").includes("yen")); if (group === "B") assert.equal(dh.length, 2); }
   await ap.close();
   step("開発者ページの CSV（baseline / weekly）が DATA_SCHEMA の列で書き出せる");
 

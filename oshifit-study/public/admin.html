@@ -62,11 +62,12 @@ A.onAuthStateChanged(auth, async (u) => {
   try { const me = await F.getDoc(F.doc(db, "admins", u.email)); if (!me.exists()) throw new Error("not admin"); }
   catch (e) { el.innerHTML = `<section class="card"><h1>開発者ページ</h1><p>このアカウント（${esc(u.email || "メールアドレスなし")}）には閲覧の権限がありません。</p><p class="muted" style="font-size:12px">Firestore の admins に、このメールアドレスと同じ名前のドキュメントがあるか確認してください（大文字・小文字も同じにします）。</p><button class="btn" id="out">ログアウト</button></section>`; $("#out").onclick = () => A.signOut(auth); return; }
   el.innerHTML = `<p class="muted">データを読み込んでいます…</p>`;
-  const [ps, cks, pil] = await Promise.all([F.getDocs(F.collection(db, "participants")), F.getDocs(F.collectionGroup(db, "checkins")), F.getDocs(F.collection(db, "pilots"))]);
+  const [ps, cks, pil, dly] = await Promise.all([F.getDocs(F.collection(db, "participants")), F.getDocs(F.collectionGroup(db, "checkins")), F.getDocs(F.collection(db, "pilots")), F.getDocs(F.collectionGroup(db, "daily"))]);
+  const dByUid = {}; dly.docs.forEach((c) => { const uid = c.ref.parent.parent.id; (dByUid[uid] = dByUid[uid] || []).push(c.data()); });
   const pilots = new Set(pil.docs.map((d) => d.id));
   const P = ps.docs.map((d) => ({ uid: d.id, ...d.data() }));
   const byUid = {}; cks.docs.forEach((c) => { const uid = c.ref.parent.parent.id; (byUid[uid] = byUid[uid] || []).push(c.data()); });
-  P.forEach((p) => { p.cks = (byUid[p.uid] || []).sort((a, b) => a.week - b.week); p.pilot = pilots.has(p.pid) ? 1 : 0; });
+  P.forEach((p) => { p.cks = (byUid[p.uid] || []).sort((a, b) => a.week - b.week); p.daily = (dByUid[p.uid] || []).sort((a, b) => a.day - b.day); p.pilot = pilots.has(p.pid) ? 1 : 0; });
   render(u, P);
 });
 
@@ -79,6 +80,7 @@ function alerts(P) {
       const gap = Math.floor((now - last) / DAY);
       if (gap >= 10) out.push(["bad", `${p.pid}：振り返りが10日以上ない（${gap}日。開始から${Math.floor((now - dec) / DAY)}日目・${p.cks.length}回済み）`]);
     }
+    if (dec && !p.withdrawn && !p.final) { const lastD = p.daily.length ? Math.max(...p.daily.map((x) => ms(x.at) || 0)) : dec; const gapD = Math.floor((now - lastD) / DAY); if (gapD >= 3) out.push(["w", `${p.pid}：毎日のアンケートが${gapD}日ない（記録 ${p.daily.length}日）`]); }
     const w0 = p.scores && p.scores.who5raw; if (w0 != null && w0 <= 7) out.push(["bad", `${p.pid}：開始時のWHO-5が${w0}点（7点以下）`]);
     const c3 = p.cks.find((c) => c.week === 3); if (c3 && c3.W1 != null) { const r = ["W1", "W2", "W3", "W4", "W5"].reduce((a, k) => a + (c3[k] ?? 0), 0); if (r <= 7) out.push(["bad", `${p.pid}：3回目のWHO-5が${r}点（7点以下）`]); }
     const wf = p.final && p.final.scores && p.final.scores.who5raw; if (wf != null && wf <= 7) out.push(["bad", `${p.pid}：最後の調査のWHO-5が${wf}点（7点以下）`]);
@@ -95,7 +97,7 @@ function render(u, P) {
    <section class="card"><h2>確認が必要（${al.length}件）</h2>${al.length ? al.map(([c, t]) => `<div class="alert ${c}">${esc(t)}</div>`).join("") : '<p class="muted">ありません</p>'}
     <p class="muted" style="font-size:12px">連絡先は集めていないため、相談先の表示はアプリが自動で行います。</p></section>
    <section class="card"><div class="row" style="justify-content:space-between"><h2>参加者（${P.length}人）</h2><div class="row">
-     <button class="btn" data-csv="baseline">開始時（baseline.csv）</button><button class="btn" data-csv="weekly">振り返りごと（weekly.csv）</button><button class="btn" data-csv="trial">最後の調査まで（trial.csv）</button><button class="btn" data-csv="free">自由記述（free.csv）</button></div></div>
+     <button class="btn" data-csv="baseline">開始時（baseline.csv）</button><button class="btn" data-csv="weekly">振り返りごと（weekly.csv）</button><button class="btn" data-csv="trial">最後の調査まで（trial.csv）</button><button class="btn" data-csv="daily">毎日（daily.csv）</button><button class="btn" data-csv="free">自由記述（free.csv）</button></div></div>
     <div class="tablewrap"><table><thead><tr><th>参加ID</th><th>開始日</th><th>群</th><th>提案</th><th>振り返り</th><th>開始からの日数</th><th>WHO-5 開始→最後</th><th>プレ実験</th></tr></thead><tbody>
     ${P.map((p) => { const dec = ms(p.decidedAt); return `<tr><td class="mono">${esc(p.pid)}</td><td>${d(p.createdAt)}</td><td>${p.group ? "群" + p.group : "未決定"}${p.withdrawn ? "（やめた）" : ""}</td><td>${esc((p.planIds || []).join("・") || "–")}</td><td>${p.group === "A" ? "–" : p.cks.length + " / 6"}</td><td>${dec ? Math.floor((Date.now() - dec) / DAY) + "日目" : "–"}</td><td>${p.scores?.who5raw ?? "–"} → ${p.final?.scores?.who5raw ?? "–"}</td><td>${p.pilot ? "はい" : ""}</td></tr>`; }).join("")}
     </tbody></table></div></section>`;
@@ -118,17 +120,19 @@ export function tables(P) {
     if (p.pred) { Object.keys(p.pred.B || {}).forEach((k) => (r["pred_B_" + k] = p.pred.B[k])); r.pred_hw = p.pred.hw; r.pred_hwWb = p.pred.hwWb; }
     return r;
   });
-  const wkCols = ["pid", "group", "week", "day", "at", ...PLANS.map((x) => "did_" + x), "Q44", "Q45", "Q47", "Q48", "joy", "stress", "happy", "W1", "W2", "W3", "W4", "W5", "burn", "joyN"];
+  const wkCols = ["pid", "group", "week", "day", "at", "sumYen", "sumMin", "nDaily", ...PLANS.map((x) => "did_" + x), "Q44", "Q45", "Q47", "Q48", "joy", "stress", "happy", "W1", "W2", "W3", "W4", "W5", "burn", "joyN"];
   const weekly = P.flatMap((p) => p.cks.map((c) => ({ ...c, pid: p.pid, group: p.group, at: iso(c.at) })));
-  const trCols = ["pid", "pilot", "withdrawn", "group", "final_day", "final_at", ...FINAL_ITEMS, ...SC.map((k) => k + "_post"), "n_checkins", "exec_rate"];
+  const trCols = ["pid", "pilot", "withdrawn", "group", "final_day", "final_at", ...FINAL_ITEMS, ...SC.map((k) => k + "_post"), "n_checkins", "exec_rate", "total_yen", "total_min", "n_daily"];
   const trial = P.filter((p) => p.final).map((p) => {
-    const r = { pid: p.pid, pilot: p.pilot, withdrawn: p.withdrawn ? 1 : 0, group: p.group, final_day: p.final.day, final_at: iso(p.final.at), n_checkins: p.cks.length };
+    const r = { pid: p.pid, pilot: p.pilot, withdrawn: p.withdrawn ? 1 : 0, group: p.group, final_day: p.final.day, final_at: iso(p.final.at), n_checkins: p.cks.length, total_yen: p.final.totals?.yen, total_min: p.final.totals?.min, n_daily: p.final.totals?.n };
     FINAL_ITEMS.forEach((id) => (r[id] = p.final.answers?.[id])); SC.forEach((k) => (r[k + "_post"] = p.final.scores?.[k]));
     if (p.group === "B") { const v = p.cks.flatMap((c) => Object.keys(c).filter((x) => x.startsWith("did_")).map((x) => [1, 0.5, 0][c[x]])).filter((x) => x != null); r.exec_rate = v.length ? v.reduce((a, b) => a + b, 0) / v.length : ""; }
     return r;
   });
+  const dCols = ["pid", "group", "date", "day", "at", "mood", "yen", "minutes", "joy", "Q44", "Q45", "Q47", "Q48", ...PLANS.map((x) => "did_" + x)];
+  const daily = P.flatMap((p) => (p.daily || []).map((c) => ({ ...c, pid: p.pid, group: p.group, at: iso(c.at) })));
   const free = P.flatMap((p) => [p.answers?.Q62 ? { pid: p.pid, where: "baseline_Q62", text: p.answers.Q62 } : null, p.final?.answers?.how ? { pid: p.pid, where: "final_how", text: p.final.answers.how } : null].filter(Boolean));
-  return { baseline: [baseline, baseCols], weekly: [weekly, wkCols], trial: [trial, trCols], free: [free, ["pid", "where", "text"]] };
+  return { daily: [daily, dCols], baseline: [baseline, baseCols], weekly: [weekly, wkCols], trial: [trial, trCols], free: [free, ["pid", "where", "text"]] };
 }
 function download(name, P) {
   const [rows, cols] = tables(P)[name];

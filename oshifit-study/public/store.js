@@ -36,12 +36,14 @@
     if (!snap.exists()) return null;
     const d = snap.data();
     const cks = await fs.getDocs(fs.query(fs.collection(ref, "checkins"), fs.orderBy("week")));
+    const dly = await fs.getDocs(fs.collection(ref, "daily"));
     return {
       id: d.pid, consented: true, answers: d.answers || {}, baselineDone: !!d.baselineDone, avatar: d.avatar || null, avatarDone: !!d.avatarDone,
       sc: d.scores || null, plans: d.plansOffered || null, group: d.group || null, decidedAt: ms(d.decidedAt),
       plan: d.group ? { id: (d.planIds && d.planIds[0]) || null, ids: d.group === "B" ? d.planIds || [] : [], accepted: d.group === "B" } : null,
+      daily: dly.docs.map((x) => { const w = x.data(); return { ...w, at: ms(w.at) }; }).sort((a, b) => a.day - b.day),
       pred: d.pred || null, weekly: cks.docs.map((x) => { const w = x.data(); return { ...w, at: ms(w.at) }; }),
-      final: d.final ? { sc: d.final.scores, day: d.final.day } : null, withdrawn: !!d.withdrawn,
+      final: d.final ? { sc: d.final.scores, day: d.final.day, tot: d.final.totals || null } : null, withdrawn: !!d.withdrawn,
     };
   }
   // 新規登録（メールアドレスとパスワード）。続けて begin() で記録を作る
@@ -90,7 +92,9 @@
     const { fs } = fb;
     return fs.setDoc(fs.doc(ref, "checkins", String(rec.week)), { ...rec, at: fs.serverTimestamp() }).catch(report);
   }
-  function final(S, answers, day) { return upd({ final: { answers: { ...answers }, scores: S.final.sc, day, at: fb.fs.serverTimestamp() } }); }
+  function final(S, answers, day, totals) { return upd({ final: { answers: { ...answers }, scores: S.final.sc, day, totals: totals || null, at: fb.fs.serverTimestamp() } }); }
+  // 毎日のアンケート（文書IDは端末の日付 YYYY-MM-DD。1日1回）
+  function daily(rec) { const { fs } = fb; return fs.setDoc(fs.doc(ref, "daily", rec.date), { ...rec, at: fs.serverTimestamp() }).catch(report); }
 
   // 参加をやめる：記録は消さず（倫理審査の同意どおり研究に使う）、「やめた」印と時刻を付けてログアウトする。失敗したら例外を投げる
   async function withdraw() {
@@ -101,5 +105,5 @@
     return true;
   }
 
-  window.OFStore = { init, signup, login, social, logout, resetPassword, begin, draft, baseline, avatar, decide, checkin, final, withdraw, get failed() { return failed; }, get uid() { return uid; }, get email() { return email; } };
+  window.OFStore = { init, signup, login, social, logout, resetPassword, begin, draft, baseline, avatar, decide, checkin, final, daily, withdraw, get failed() { return failed; }, get uid() { return uid; }, get email() { return email; } };
 })();

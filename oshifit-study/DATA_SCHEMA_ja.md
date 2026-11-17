@@ -18,7 +18,7 @@ participants/{uid}                 … 参加者1人（uid は Firebase Authenti
   decidedAt      サーバー時刻（群が決まった時）。「開始からの日数」の起点
   pred           {A:{…scores}, B:{…scores}, hw, hwWb}（2つの未来で示した見込み。群Aはなし）
   avatar         {v:2, gender, face, skin, hair, hairColor, brow, eye, eyeColor, nose, mouth, glasses, beard, shirt}（番号と記号だけ。写真は使わない。avatar.js）
-  final          {answers:{…}, scores:{…}, day, at}（最後の調査）
+  final          {answers:{…}, scores:{…}, day, at, totals:{yen, min, n}}（最後の調査。totals は毎日のアンケートの合計と回答日数）
 participants/{uid}/checkins/{week} … 振り返り（week = 何回目か 1〜6。文書IDも同じ）
   week, day（開始からの日数）, at（サーバー時刻）
   did_<planId>   0=行った 1=一部行った 2=行わなかった
@@ -27,6 +27,14 @@ participants/{uid}/checkins/{week} … 振り返り（week = 何回目か 1〜6�
   happy          0=上がった 1=変わらない 2=下がった
   W1〜W5         3回目だけ（0〜5）
   burn, joyN     0〜100（画面のグラフ用）
+  sumYen, sumMin, nDaily   前回の振り返り（1回目は群が決まった時）から今回までの、毎日のアンケートのお金・時間の合計と回答日数
+participants/{uid}/daily/{YYYY-MM-DD} … 毎日のアンケート（全群。1日1回、書き換え不可。文書IDは端末の日付）
+  date, day（開始からの日数）, at（サーバー時刻）
+  mood           1〜7（とても悪い〜とても良い）
+  yen            今日の推し活に使ったお金（円、0〜1,000,000）
+  minutes        今日の推し活の時間（分、0〜1,440）
+  joy, Q44, Q45, Q47, Q48   1〜7
+  did_<planId>   群B・C だけ。0=行った 1=一部 2=行わなかった
 admins/{email}                     … 開発者ページを見られる人（大学アカウント）
 pilots/{pid}                       … プレ実験の参加ID（研究者が入れる。参加者からは見えない）
 ```
@@ -44,10 +52,15 @@ pilots/{pid}                       … プレ実験の参加ID（研究者が入
 ### weekly.csv（1行1回の振り返り）
 `pid, group, week, day, at, did_<planId>…（その人の提案の分だけ。列は全提案分を作り、ないところは空）, Q44, Q45, Q47, Q48, joy, stress, happy, W1 … W5, burn, joyN`
 
+### daily.csv（1行1日の毎日のアンケート）
+`pid, group, date, day, at, mood, yen, minutes, joy, Q44, Q45, Q47, Q48, did_<planId>…`
+
+weekly.csv には `sumYen, sumMin, nDaily` も入る。
+
 ### trial.csv（1行1人。最後の調査まで）
 `pid, pilot, withdrawn, group, final_day, final_at,` 最後の調査の項目 `W1 … W5, H1 … H4, P1 … P14, Q29 … Q34, Q39, Q44 … Q51, J1, J2, K1 … K5`（群Aは J/K なし）、
 最後の得点 `wb_post, joy_post, sleep_post, money_post, duty_post, compare_post, burnout_post, who5raw_post, shs_post, pss_post`、
-`n_checkins`（振り返りの回数）、`exec_rate`（群Bで「行った=1、一部=0.5、行わなかった=0」の平均）
+`n_checkins`（振り返りの回数）、`total_yen, total_min, n_daily`（28日間の毎日のアンケートの合計と回答日数）、`exec_rate`（群Bで「行った=1、一部=0.5、行わなかった=0」の平均）
 
 ### free.csv（自由記述。個人が特定される内容がないか確認してから使う）
 `pid, where(baseline_Q62 / final_how), text`

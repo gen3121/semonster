@@ -61,6 +61,20 @@ test("振り返りは群B・Cだけ、1〜6回目を一度だけ。書き換え�
   await assertFails(setDoc(doc(r, "checkins", "2"), { week: 3, day: 9 }));
   await assertFails(setDoc(doc(doc(other(), "participants", "u1"), "checkins", "2"), { week: 2, day: 9 }));
 });
+test("毎日のアンケート：群が決まったあと、1日1回だけ。値の範囲を確かめる", async () => {
+  const r = doc(me(), "participants", "u1");
+  await setDoc(r, base);
+  const ok = { date: "2026-11-24", day: 1, mood: 5, yen: 1500, minutes: 90, joy: 6 };
+  await assertFails(setDoc(doc(r, "daily", "2026-11-24"), ok));                           // 群が決まる前は不可
+  await updateDoc(r, { group: "A", planIds: [], decidedAt: serverTimestamp() });
+  await assertSucceeds(setDoc(doc(r, "daily", "2026-11-24"), ok));                        // 群Aも答える
+  await assertFails(setDoc(doc(r, "daily", "2026-11-24"), { ...ok, mood: 4 }));           // 同じ日は書き換えない
+  await assertFails(setDoc(doc(r, "daily", "2026-11-25"), { ...ok, date: "2026-11-25", mood: 9 }));
+  await assertFails(setDoc(doc(r, "daily", "2026-11-25"), { ...ok, date: "2026-11-25", yen: -1 }));
+  await assertFails(setDoc(doc(r, "daily", "2026-11-25"), { ...ok, date: "2026-11-26" }));  // 文書IDと日付が違う
+  await assertFails(setDoc(doc(doc(other(), "participants", "u1"), "daily", "2026-11-25"), { ...ok, date: "2026-11-25" }));
+  await assertSucceeds(getDocs(collectionGroup(admin(), "daily")));
+});
 test("群Aは振り返りを書けない。最後の調査は一度だけ", async () => {
   const r = doc(me(), "participants", "u1");
   await setDoc(r, base);
