@@ -1298,12 +1298,14 @@ function whyText(p,sc,b,A){const v=r0(sc[p.axis]);const t=[v>=60?`「${AXNAME[p.
   if(p.trait&&b&&traitFit(p,b)>0.1)t.push({E:"外向性が高め",["E-"]:"ひとりで楽しむ傾向",O:"開放性が高め",C:"計画的な傾向",N:"気持ちが揺れやすい傾向",A:"人を大切にする傾向"}[p.trait]);
   return t.join("・");}
 const planById=id=>PLANS.find(p=>p.id===id);
-/* 予測：プランA＝今のまま（現在の得点）、プランB＝プランの軸が eff 点改善し、幸福度は改善の1/4だけ上がる（仮定 v1.0）
+/* 予測：プランA＝現在のままの推し活（現在の得点）、プランB＝最適化された推し活（プランの軸が eff 点改善し、幸福度は改善の1/4だけ上がる（仮定 v1.0）
    80%の幅：各軸 ±15、幸福度 ±12（開始時。研究では実測から推定し直す） */
 /* 提案の組み合わせ（仮定 v1.2。データではまだ確かめていない。研究後に分析の手順6・7で確かめ直す）
    ・続けにくさ：効果の大きい順に、2つめは0.8倍、3つめは0.6倍にする
    ・相性が悪い組み合わせ（向きが逆の提案）：両方の効果を半分にし、ぶつかる要素を下げる。画面で「おすすめしない」と理由を出す
-   ・相性が良い組み合わせ：理由だけ示し、効果の上乗せはしない（根拠がないため） */
+   ・相性が良い組み合わせ：理由だけ示し、効果の上乗せはしない（根拠がないため）
+   ・続けるための負担：2つめから、提案1つにつき推し疲れを +3 点とする（提案を増やすほど負担も増えると考える） */
+const BURDEN=3;
 const CLASH=[["event","budget","money",6,"イベントに行くとお金を使うので、「予算を先に決める」とぶつかりやすい"],
   ["event","skipok","duty",6,"予定を「足す」提案と「行かない回を決める」提案は、向きが逆"],
   ["event","choose3","duty",6,"予定を「足す」提案と「追う予定を絞る」提案は、向きが逆"]];
@@ -1317,6 +1319,7 @@ function predictMulti(sc,ids){let B={...sc};const ps=ids.map(planById).sort((x,y
   ps.forEach(p=>{const e=p.eff*f[p.id];B[p.axis]=clamp(B[p.axis]+e,0,100); if(p.axis!=="wb") B.wb=clamp(B.wb+e/4,0,100);
     if(p.axis!=="joy"&&p.axis!=="wb") B.burnout=clamp(B.burnout-e/4,0,100); else B.joy=clamp(B.joy+e,0,100);});
   clashes.forEach(([,,ax,pen])=>{B[ax]=clamp(B[ax]-pen,0,100);B.burnout=clamp(B.burnout+pen/4,0,100)});
+  if(ps.length>1)B.burnout=clamp(B.burnout+BURDEN*(ps.length-1),0,100);
   if(sc.pss!=null&&sc.burnout!=null) B.pss=clamp(sc.pss*(1+(B.burnout-sc.burnout)/Math.max(sc.burnout,1)*.25),0,56); // 仮定：推し疲れの変化の1/4の割合でPSS-Jも動く
   return{A:sc,B,hw:15+5*(ids.length-1),hwWb:12+4*(ids.length-1),plans:ps,clashes,synergies};}
 /* 示した提案のすべての組み合わせを見積もり、幸福度の上がり方と推し疲れの下がり方の合計が最も大きいものを「おすすめ」にする */
@@ -1353,7 +1356,7 @@ function toast(t){document.querySelectorAll(".toast").forEach(x=>x.remove());con
 const ICON={home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',future:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',note:'<path d="M5 3h10l4 4v14H5z"/><path d="M9 12h6M9 16h6"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>'};
 function tabbar(cur){const T=[["home","ホーム","home"],["analysis","分析","chart"],["future","未来","future"],["checkin","記録","note"],["mypage","マイページ","user"]];
   return`<nav class="tabbar" aria-label="メニュー"><div class="in">${T.map(([v,l,i])=>`<a class="tab" href="#${v}" ${v===cur?'aria-current="page"':""}><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[i]}</svg>${l}</a>`).join("")}</div></nav>`}
-const SCREENS=[["start","1 はじめに"],["q","2 質問（1問ずつ）"],["avatar","3 アバター制作"],["analysis","4 分析"],["future","5 2つの未来（提案）"],["home","ホーム"],["checkin","6 3回目の振り返り"],["final","7 最後の調査"],["result","7 4週間の結果"],["mypage","8 マイページ"],["withdraw","9 辞退の確認"],["withdrawn","9 辞退の完了"],["admin","10 開発者ページ"]];
+const SCREENS=[["start","1 はじめに"],["q","2 質問（1問ずつ）"],["avatar","3 アバター制作"],["analysis","4 分析"],["future","5 2つの未来（提案）"],["home","ホーム"],["checkin","6 3回目の振り返り"],["final","7 最後の調査"],["result","7 28日間の結果"],["mypage","8 マイページ"],["withdraw","9 辞退の確認"],["withdrawn","9 辞退の完了"],["admin","10 開発者ページ"]];
 function editbar(){if(!EDIT)return"";const i=SCREENS.findIndex(s=>s[0]===VIEW);
   return`<div class="editbar" role="toolbar" aria-label="編集者モード"><button id="ed-prev" ${i<=0?"disabled":""}>‹ 前へ</button><select id="ed-sel" aria-label="画面を選ぶ">${SCREENS.map(([k,n])=>`<option value="${k}" ${k===VIEW?"selected":""}>${n}</option>`).join("")}</select><button id="ed-next" ${i>=SCREENS.length-1?"disabled":""}>次へ ›</button>
    <div class="tools"><span>編集者モード（回答しなくても移動できます。何も保存しません）</span><button id="ed-fill">回答を埋める</button><button id="ed-day">＋4日</button><button id="ed-reset">最初から</button><button id="ed-off">閉じる</button></div></div>`}
@@ -1547,18 +1550,18 @@ function vStart(){app.className="app land";
    <section class="band message"><div class="in"><div class="msg-grid"><div class="stack" style="gap:18px">
      <h2 class="jp-xl">好きな気持ちを、<br>すり減らさないために。</h2>
      <p class="body">推し活は、毎日を明るくしてくれます。一方で、グッズや遠征のお金、夜ふかし、SNSでのほかの人との比較、「行かなきゃ」という義務感で、知らないうちに疲れてしまうこともあります。</p>
-     <p class="body">OshiFitは、あなたの推し活を、幸福度とストレスを左右する5つの要素で見える化し、「今のまま」と「小さな工夫を試す」の2つの未来を並べて見せる、大学の研究アプリです。推し活をやめるためではなく、長く楽しく続けるために使います。</p></div>
+     <p class="body">OshiFitは、あなたの推し活を、幸福度とストレスを左右する5つの要素で見える化し、「現在のままの推し活」と「最適化された推し活」の2つの未来を並べて見せる、大学の研究アプリです。推し活をやめるためではなく、長く楽しく続けるために使います。</p></div>
      <div class="tiles"><button class="tile" data-go="sec-axes"><span class="en">5 FACTORS</span><b>5つの要素</b>${ARROW}</button><button class="tile alt" data-go="sec-flow"><span class="en">HOW IT WORKS</span><b>進め方</b>${ARROW}</button></div></div></div></section>
    <section class="band axes-band" id="sec-axes">${wave("var(--l-band)")}<div class="in"><div class="sechead"><p class="eyebrow">5 FACTORS → WELL-BEING</p><h2 class="jp-xl">5つの要素が、幸福度とストレスを決める</h2><p class="body">街の5つの場所が、推し活の5つの要素です。この5つの状態から、結果として公園の「幸福度」と「ストレス度」が決まると考えます。どの要素も点数が高いほど良い向きで、60点以上を<b class="tb">青</b>、60点未満を<b class="tr">赤</b>で表示します。</p></div>
      <div class="axcards">${axes.map(a=>`<article class="axcard" id="ax-${a.key}"><div class="arch">${miniSVG(a.key)}</div><span class="no">0${a.no}</span><p class="en small-en">${a.d[0]}</p><h3>${a.name}</h3><p class="small muted">${a.d[1]}</p></article>`).join("")}<article class="axcard result" id="ax-wb"><div class="arch">${miniSVG("wb")}</div><span class="no">→</span><p class="en small-en">RESULT ／ 公園</p><h3>幸福度とストレス度</h3><p class="small muted">5つの要素の結果。幸福度はWHO-5（最近2週間の気分）、ストレス度はPSS-J（最近1か月）で測ります。</p></article></div></div></section>
-   <section class="band flow-band" id="sec-flow">${wave("var(--l-ink)")}<div class="in"><div class="sechead inv"><p class="eyebrow">HOW IT WORKS</p><h2 class="jp-xl">最初の15分と、4週間の振り返り</h2></div>
-     <ol class="flowcards">${[["質問に答える","今の推し活と気分について、約"+BASE_ITEMS.length+"問。選ぶと自動で次の質問へ進みます。"],["アバターを作る","顔の形・髪型・色を選んで、自分に似せた分身を作ります。写真は使いません。"],["6つの軸を見る","良いところは青、見直したいところは赤。算出の根拠も見られます。"],["2つの未来を比べる","今のまま（A）と、提案を試す（B）。4週間後の見込みを並べます。"]].map(([t,d],i)=>`<li><span class="big">0${i+1}</span><h3>${t}</h3><p>${d}</p></li>`).join("")}</ol>
-     <div class="road"><p class="eyebrow">4 WEEKS</p><div class="track4">${[0,4,8,12,16,20,24,28].map((d,i)=>`<div class="mile ${i===0?"s":i===7?"f":""}"><span class="dot"></span><b>${i===0?"開始":i===7?"最後の調査":`${i}回目`}</b><span>${i===0?"0日目":i===7?"28日目〜":`${d}日目ごろ`}</span></div>`).join("")}</div>
+   <section class="band flow-band" id="sec-flow">${wave("var(--l-ink)")}<div class="in"><div class="sechead inv"><p class="eyebrow">HOW IT WORKS</p><h2 class="jp-xl">最初の質問と、約28日間の振り返り</h2></div>
+     <ol class="flowcards">${[["質問に答える","今の推し活と気分について、約"+BASE_ITEMS.length+"問。選ぶと自動で次の質問へ進みます。"],["アバターを作る","顔の形・髪型・色を選んで、自分に似せた分身を作ります。写真は使いません。"],["6つの軸を見る","良いところは青、見直したいところは赤。算出の根拠も見られます。"],["2つの未来を比べる","プランA「現在のままの推し活」と、プランB「最適化された推し活」の、28日後の見込みを並べます。"]].map(([t,d],i)=>`<li><span class="big">0${i+1}</span><h3>${t}</h3><p>${d}</p></li>`).join("")}</ol>
+     <div class="road"><p class="eyebrow">28 DAYS</p><div class="track4">${[0,4,8,12,16,20,24,28].map((d,i)=>`<div class="mile ${i===0?"s":i===7?"f":""}"><span class="dot"></span><b>${i===0?"開始":i===7?"最後の調査":`${i}回目`}</b><span>${i===0?"0日目":i===7?"28日目〜":`${d}日目ごろ`}</span></div>`).join("")}</div>
      <p class="xs" style="color:var(--ink-muted)">振り返りは前回から4日以上あけて、4〜5日ごとに6回（各約2分）。3回目だけ、最近2週間の気分（WHO-5）も答えます。</p></div></div></section>
    <section class="band about-band" id="sec-about">${wave("var(--bg)")}<div class="in"><div class="sechead"><p class="eyebrow">ABOUT THE STUDY</p><h2 class="jp-xl">安心して参加してもらうために</h2></div>
      <div class="facts-grid">${[["写真は使わない","アバターは写真を使わず、顔の形や髪型を自分で選んで作ります。"],["メールはログインだけに使う","メールアドレスはログインのためだけに使い、回答とは別に管理します。名前は集めません。"],["いつでもやめられる","マイページから参加をやめられます。それまでの回答は、同意いただいたとおり研究に使います。不利益はありません。"],["プレ実験の方も歓迎","プレ実験に参加した方も参加できます。マイページの研究用の番号を研究者にお知らせください。"]].map(([t,d],i)=>`<div class="fact"><span class="fno">${["AVATAR","PRIVACY","OPT-OUT","PILOT"][i]}</span><h3>${t}</h3><p class="small muted">${d}</p></div>`).join("")}</div></div></section>
    <section class="band join-band" id="sec-join"><div class="in"><div class="joincard"><div class="stack" style="gap:12px"><p class="eyebrow">JOIN</p><h2 class="jp-xl">さっそく、はじめてみる</h2>
-       <ul class="facts"><li>約${BASE_ITEMS.length}の質問（約${Math.max(8,Math.round(BASE_ITEMS.length*10/60))}分）</li><li>約4週間、4〜5日ごとに6回の振り返り（各約2分）。28日目以降に最後の調査</li><li>メールアドレスで登録し、次からはログインして続きから答えられます</li></ul>
+       <ul class="facts"><li>約${BASE_ITEMS.length}の質問（約${Math.max(8,Math.round(BASE_ITEMS.length*10/60))}分）</li><li>約28日間、4〜5日ごとに6回の振り返り（各約2分）。28日目以降に最後の調査</li><li>メールアドレスで登録し、次からはログインして続きから答えられます</li></ul>
        <div class="row" style="flex-wrap:wrap;gap:10px"><a class="btn primary pill big" id="go" href="#signup">新規登録してはじめる${ARROW}</a><a class="btn pill big" id="to-login" href="#login">ログイン</a></div></div><div class="joinart">${miniSVG("home")}</div></div></div></section>
    <footer class="lfoot">${wave("var(--l-ink)")}<div class="in"><div class="fgrid"><div><p class="display sm">OshiFit</p><p class="small">OshiFitで推し活を持続可能に！</p></div>
      <div class="small"><b>大阪工業大学大学院 情報科学研究科</b><br>倫理審査 承認済みの研究です<br>問い合わせ先：<span class="mono">m1m02530106@oit.ac.jp</span></div></div><p class="xs" style="color:var(--ink-muted)">© 2026 OshiFit 研究プロジェクト</p></div></footer>
@@ -1624,7 +1627,7 @@ function vAvatar(){const A=window.OFAvatar,gender=S.answers.Q2;
   if(AVTAB==="hair")grid=`<div class="avgrid">${styles.map(([k,n])=>`<button class="avopt" data-k="hair" data-v="${k}" aria-pressed="${av.hair===k}">${A.render({...av,hair:k},"neutral",62)}<span>${esc(n)}</span></button>`).join("")}</div>`;
   else if(COLORS[AVTAB])grid=`<div class="swgrid">${COLORS[AVTAB].map((c,i)=>`<button class="sw" data-k="${AVTAB}" data-v="${i}" aria-pressed="${av[AVTAB]===i}" aria-label="${TABS.find(t=>t[0]===AVTAB)[1]} ${i+1}" style="background:${c}"></button>`).join("")}</div>`;
   else grid=`<div class="avgrid">${LISTS[AVTAB].map((n,i)=>`<button class="avopt" data-k="${AVTAB}" data-v="${i}" aria-pressed="${av[AVTAB]===i}">${A.render({...av,[AVTAB]:i},"neutral",62)}<span>${esc(n)}</span></button>`).join("")}</div>`;
-  app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(1)}<div><p class="eyebrow view-eyebrow">AVATAR</p><h2>アバターを作る</h2><p class="small muted">自分に似せて作ってください。4週間後の2つの未来を、この分身で見比べます。</p></div>
+  app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(1)}<div><p class="eyebrow view-eyebrow">AVATAR</p><h2>アバターを作る</h2><p class="small muted">自分に似せて作ってください。28日後の2つの未来を、この分身で見比べます。</p></div>
    <section class="card avstage"><div class="avprev">${A.render(av,"neutral",150)}</div><button class="btn sm" id="av-rand">おまかせ</button></section>
    <section class="card" style="gap:10px"><div class="avtabs" role="tablist">${TABS.map(([k,l])=>`<button class="avtab" role="tab" data-tab="${k}" aria-selected="${AVTAB===k}">${l}</button>`).join("")}</div>${grid}</section></main>
    ${dock("av-back","結果を見る","av-go")}`;
@@ -1656,7 +1659,7 @@ function vAnalysis(){const sc=ensureBase(),A=S.answers,b=big5(A),g=isGood(sc);
     ${radar([{v:FV(sc),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
     <p class="xs muted">点線は60点。60点以上を青（良好）、60点未満を赤（見直したい）。どの要素も高いほど良い向きです。</p>
     ${outBars([["幸福度（WHO-5）",[sc.wb],true,52,"高いほど良い・線は13点"],["ストレス度（PSS-J）",[pss100(sc)],false,null,"高いほど負担"],["推し活のストレス（推し疲れ）",[sc.burnout],false,null,"高いほど負担"]],["今"])}</section>
-   ${g.ok?`<p class="callout good"><b>群A（今のままで順調）</b>：5つの要素の多くが60点以上で、WHO-5も13点以上です。プランの提案はありません。4週間後にもう一度だけ回答をお願いします。</p>`:""}
+   ${g.ok?`<p class="callout good"><b>群A（今のままで順調）</b>：5つの要素の多くが60点以上で、WHO-5も13点以上です。プランの提案はありません。28日目にもう一度だけ回答をお願いします。</p>`:""}
    <section class="axes">${FACTORS().map(a=>{const v=r0(sc[a.key]),ok=v>=60;return`<div class="ax ${ok?"good":"bad"}"><div class="h"><span>${a.name}</span><span class="chip ${ok?"good":"bad"}">${ok?"良好":"見直したい"}</span></div><div class="v">${v}<small> / 100</small></div><div class="track"><i style="width:${v}%"></i></div></div>`}).join("")}</section>
    <section class="axes"><div class="ax ${sc.burnout<50?"good":"bad"}"><div class="h"><span>推し疲れ</span></div><div class="v">${r0(sc.burnout)}<small> / 100</small></div><p class="xs muted">高いほど負担が大きい</p></div>
     <div class="ax ${sc.who5raw>=13?"good":"bad"}"><div class="h"><span>WHO-5（気分）</span></div><div class="v">${sc.who5raw}<small> / 25</small></div><p class="xs muted">13点以上が目安</p></div>
@@ -1676,12 +1679,12 @@ function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.inner
   PI=clamp(PI,0,S.plans.length-1);const sel=S.plans[PI],p=planById(sel.id);
   const chosen=S.plans.map(x=>x.id).filter(id=>PSEL.has(id)),ids=chosen.length?chosen:[p.id],pr=predictMulti(sc,ids),lab=chosen.length?`選んだ${chosen.length}つ`:`提案${PI+1}だけ`;
   const extra=(p.id==="donate"?DONATE_HTML:"")+(p.id==="event"?ticketHTML(A):"")+(p.id==="declutter"?'<p class="note">出品する前に、公式の転売禁止の規約を確認し、定価を大きく超える値段で出さないようにしましょう。</p>':"");
-  app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(3)}<div><p class="eyebrow view-eyebrow">TWO FUTURES</p><h2>4週間後の2つの未来</h2><p class="small muted">今のまま続けた場合（プランA）と、提案を取り入れた場合（プランB）を比べます。<b>試したい提案はいくつ選んでもかまいません。</b></p></div>
+  app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(3)}<div><p class="eyebrow view-eyebrow">TWO FUTURES</p><h2>28日後の2つの未来</h2><p class="small muted">プランA「現在のままの推し活」と、提案を取り入れたプランB「最適化された推し活」を比べます。<b>試したい提案はいくつ選んでもかまいません。</b></p></div>
    <div class="segs" role="group" aria-label="提案">${S.plans.map((x,i)=>`<button class="seg" data-pi="${i}" aria-pressed="${i===PI}">${PSEL.has(x.id)?"✓ ":""}提案${i+1}</button>`).join("")}</div>
    <section class="card plan"><h3 style="font-size:17px">${esc(planTitle(p))}</h3><p class="small">${esc(planHow(p))}</p>${extra}<p class="why">選んだ理由：${esc(sel.why)}</p>${evidenceHTML(p.id)}
     <label class="pickrow"><input type="checkbox" id="pickThis" ${PSEL.has(p.id)?"checked":""}> この提案を試す</label></section>
    <div class="row" style="justify-content:space-between;flex-wrap:wrap"><span class="small">選んだ提案：<b>${chosen.length}</b>／${S.plans.length}</span><button class="btn sm" id="pickAll">${chosen.length===S.plans.length?"選択をすべて外す":"すべての提案を選ぶ"}</button></div>
-   <section class="futures"><div class="fut"><span class="lab">プランA　今のまま</span>${avatar(S.avatar,moodOf(sc),116)}</div><div class="fut b"><span class="lab">プランB　${lab}</span>${avatar(S.avatar,moodOf(pr.B)==="tired"?"neutral":"bright",116)}</div></section>
+   <section class="futures"><div class="fut"><span class="lab">プランA　現在のままの推し活</span>${avatar(S.avatar,moodOf(sc),116)}</div><div class="fut b"><span class="lab">プランB　最適化された推し活（${lab}）</span>${avatar(S.avatar,moodOf(pr.B)==="tired"?"neutral":"bright",116)}</div></section>
    ${S.plans.length>1?(()=>{const cs=combos(sc,S.plans.map(x=>x.id)),nm=id=>"提案"+(S.plans.findIndex(x=>x.id===id)+1);
      return`<section class="card" id="combos"><div class="sec"><h3>提案の組み合わせ</h3><span class="xs muted">仮の見込み</span></div>
      ${cs.map(o=>`<div class="combo ${o.best?"best":""} ${o.bad?"bad":""}"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><b>${o.ids.map(nm).join(" × ")}</b>
@@ -1689,19 +1692,19 @@ function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.inner
        <p class="xs">幸福度 ${o.dWb>=0?"+":""}${r0(o.dWb)}　推し疲れ ${o.dBurn>0?"+":""}${r0(o.dBurn)}</p>
        ${o.pr.clashes.map(c=>`<p class="xs" style="color:var(--bad)">${nm(c[0])}と${nm(c[1])}：${esc(c[4])}</p>`).join("")}${o.pr.synergies.map(c=>`<p class="xs muted">${nm(c[0])}と${nm(c[1])}：${esc(c[2])}</p>`).join("")}
        <button class="btn sm" data-combo="${o.ids.join(",")}">この組み合わせを選ぶ</button></div>`).join("")}
-     <p class="xs muted">提案が多いほど続けにくいと考え、2つめ以降の効果は小さく見積もっています。向きが逆の提案を一緒に選ぶと、効果が打ち消し合うと考えています。どちらも仮の考え方で、研究の結果で確かめ直します。</p></section>`})():""}
+     <p class="xs muted">提案が多いほど続けにくく負担も増えると考え、2つめ以降の効果は小さく見積もり、提案1つにつき推し疲れを3点ずつ足しています。向きが逆の提案を一緒に選ぶと、効果が打ち消し合うと考えています。どちらも仮の考え方で、研究の結果で確かめ直します。</p></section>`})():""}
    ${pr.clashes.length&&chosen.length?`<p class="callout bad">いま選んでいる提案には、相性が悪い組み合わせがあります：${pr.clashes.map(c=>esc(c[4])).join("／")}</p>`:""}
    <section class="card"><div class="sec"><h3>5つの要素の見込み</h3><span class="xs muted">灰色の点線＝A、青＝B</span></div>
     ${radar([{v:FV(pr.A),fill:"var(--faint)",stroke:"var(--faint)",dash:true,op:.05},{v:FV(pr.B),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
-    ${outBars([["幸福度（WHO-5）",[sc.wb,pr.B.wb],true,52,`±${pr.hwWb}の幅`],["ストレス度（PSS-J）",[pss100(sc),pss100(pr.B)],false,null,"仮の見込み"],["推し活のストレス（推し疲れ）",[sc.burnout,pr.B.burnout],false,null,`±${pr.hw}の幅`]],["A 今のまま","B 提案あり"])}
+    ${outBars([["幸福度（WHO-5）",[sc.wb,pr.B.wb],true,52,`±${pr.hwWb}の幅`],["ストレス度（PSS-J）",[pss100(sc),pss100(pr.B)],false,null,"仮の見込み"],["推し活のストレス（推し疲れ）",[sc.burnout,pr.B.burnout],false,null,`±${pr.hw}の幅`]],["プランA","プランB"])}
     <p class="xs muted">選んだ提案の想定の効果を足し合わせた仮の見込みです。複数の提案の効果がそのまま足し合わさるかは分かっていないため、選んだ数が多いほど幅を広くしています。</p></section></main>
-   <div class="dock"><div class="in" style="flex-direction:column"><button class="btn primary block" id="pickB" ${chosen.length?"":"disabled"}>${chosen.length?`選んだ${chosen.length}つの提案で始める（プランB）`:"提案を選ぶとプランBで始められます"}</button><button class="btn block" id="pickA">今のままで続ける（プランA）</button></div><p class="note">どちらを選んでも、約4週間、4〜5日ごとに6回の振り返りをお願いします</p></div>`;
+   <div class="dock"><div class="in" style="flex-direction:column"><button class="btn primary block" id="pickB" ${chosen.length?"":"disabled"}>${chosen.length?`選んだ${chosen.length}つの提案で、プランB「最適化された推し活」を始める`:"提案を選ぶとプランBで始められます"}</button><button class="btn block" id="pickA">プランA「現在のままの推し活」で続ける</button></div><p class="note">どちらを選んでも、約28日間、4〜5日ごとに6回の振り返りをお願いします</p></div>`;
   app.querySelectorAll("[data-pi]").forEach(b=>b.onclick=()=>{PI=+b.dataset.pi;keep(vFuture)});
   $("#pickThis").onchange=e=>{e.target.checked?PSEL.add(p.id):PSEL.delete(p.id);keep(vFuture)};
   app.querySelectorAll("[data-combo]").forEach(b=>b.onclick=()=>{PSEL.clear();b.dataset.combo.split(",").forEach(id=>PSEL.add(id));keep(vFuture)});
   $("#pickAll").onclick=()=>{if(chosen.length===S.plans.length)PSEL.clear();else S.plans.forEach(x=>PSEL.add(x.id));keep(vFuture)};
   const pick=g=>{if(g==="B"&&!chosen.length)return;if(STUDY&&S.group)return go("home"); // 選んだ群は変えられない
-   S.group=g;S.plan={id:g==="B"?chosen[0]:p.id,ids:g==="B"?chosen:[],accepted:g==="B"};S.decidedAt=now();S.weekly=[];S.final=null;S.fin={};SV.final=null;if(STUDY){const pr2=predictMulti(sc,g==="B"?chosen:[p.id]);S.pred={A:pr2.A,B:pr2.B,hw:pr2.hw,hwWb:pr2.hwWb};OFStore.decide(S,S.pred)}toast(g==="B"?`プランB（${chosen.length}つの提案）で始めます`:"今のままで続けます");go("home")};
+   S.group=g;S.plan={id:g==="B"?chosen[0]:p.id,ids:g==="B"?chosen:[],accepted:g==="B"};S.decidedAt=now();S.weekly=[];S.final=null;S.fin={};SV.final=null;if(STUDY){const pr2=predictMulti(sc,g==="B"?chosen:[p.id]);S.pred={A:pr2.A,B:pr2.B,hw:pr2.hw,hwWb:pr2.hwWb};OFStore.decide(S,S.pred)}toast(g==="B"?`プランB「最適化された推し活」（${chosen.length}つの提案）で始めます`:"プランA「現在のままの推し活」で続けます");go("home")};
   $("#pickB").onclick=()=>pick("B");$("#pickA").onclick=()=>pick("C");wire()}
 const N_CHECK=6,GAP=4,FINAL_DAY=28;
 function dayNo(){return S.decidedAt?Math.floor((now()-S.decidedAt)/DAY):0}
@@ -1726,7 +1729,11 @@ function vHome(){if(!S.group)ensureGroup();const sc=S.sc,g=grp(),ps=planIds().ma
     <svg viewBox="0 0 280 120" width="100%" role="img" aria-label="振り返りごとの推し疲れと幸せ"><line x1="20" y1="110" x2="260" y2="110" stroke="var(--line)"/><polyline points="${pts("burn")}" fill="none" stroke="var(--bad)" stroke-width="2.4"/><polyline points="${pts("joyN")}" fill="none" stroke="var(--good)" stroke-width="2.4"/>${W.map((w,i)=>`<text x="${20+i*48}" y="120" font-size="9" text-anchor="middle" fill="var(--muted)">${i+1}回</text>`).join("")}</svg></section>`:""}
    <section class="card"><div class="sec"><h3>回答の予定をカレンダーに入れる</h3></div><p class="small muted">振り返りの目安日と最後の調査の日を、カレンダーに追加できます。ファイルは端末の中で作られ、どこにも送信されません。</p><button class="btn" id="ics">カレンダーに追加（.ics）</button></section>
    <p class="xs muted">つらい状態が続くときは、振り返りを休んでかまいません。<a href="#mypage" style="color:var(--primary)">相談先を見る</a></p></main>${tabbar("home")}`;
-  $("#ics").onclick=()=>toast("試作ではファイルを作りません（研究版で作成します）");wire()}
+  $("#ics").onclick=()=>{const d0=S.decidedAt||now(),f=t=>new Date(t).toISOString().slice(0,10).replace(/-/g,""),ev=[];
+    if(g!=="A")for(let i=1;i<=N_CHECK;i++)ev.push([d0+GAP*i*DAY,`OshiFit ${i}回目の振り返り（約2分）`]);
+    ev.push([d0+FINAL_DAY*DAY,"OshiFit 最後の調査"]);
+    const ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//OshiFit//JA",...ev.flatMap(([t,n],i)=>["BEGIN:VEVENT",`UID:oshifit-${S.id}-${i}`,`DTSTAMP:${f(Date.now())}T000000Z`,`DTSTART;VALUE=DATE:${f(t)}`,`DTEND;VALUE=DATE:${f(t+DAY)}`,`SUMMARY:${n}`,"URL:"+location.origin+"/","END:VEVENT"]),"END:VCALENDAR"].join("\r\n");
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([ics],{type:"text/calendar"}));a.download="oshifit.ics";document.body.append(a);a.click();a.remove();toast("カレンダーのファイルを作りました")};wire()}
 function vCheckin(){if(!S.group)ensureGroup();const g=grp();
   if(g==="A"||!canCheck()&&!EDIT){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout">${g==="A"?"群Aの方は振り返りは不要です。":`次の振り返りは${daysToNext()}日後からできます（前回から4日以上あけます）。`}</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
   if(nextNo()>N_CHECK){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">6回の振り返りはすべて終わりました。</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
@@ -1739,13 +1746,13 @@ function vFinal(){if(!S.group)ensureGroup();
 function vResult(){if(STUDY&&!S.final)return go("home");if(!S.final){ensureGroup();const A={...S.answers};["W1","W2","W3"].forEach(k=>A[k]=Math.min(5,(A[k]??2)+1));["Q44","Q48"].forEach(k=>A[k]=Math.max(1,(A[k]??4)-2));QN.sections.find(s=>s.id==="pss").items.slice(0,3).forEach(i=>A[i.id]=Math.max(0,(A[i.id]??2)-1));S.final={sc:scores(A),sample:true}}
   const a=S.sc,b=S.final.sc,dw=b.wb-a.wb,db=b.burnout-a.burnout,dp=(b.pss??0)-(a.pss??0);
   const tile=(n,d,unit,higher)=>{const good=higher?d>=0:d<=0;return`<div class="ax ${good?"good":"bad"}"><div class="h"><span>${n}</span></div><div class="v">${d>0?"+":""}${r0(d)}<small>${unit}</small></div></div>`};
-  app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><p class="eyebrow view-eyebrow">RESULT</p><h2>4週間の結果</h2></div>${S.final.sample?'<span class="chip warn">見本の値で表示中</span>':""}</div>
+  app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><p class="eyebrow view-eyebrow">RESULT</p><h2>28日間の結果</h2></div>${S.final.sample?'<span class="chip warn">見本の値で表示中</span>':""}</div>
    <section class="card">${radar([{v:FV(a),fill:"var(--faint)",stroke:"var(--faint)",dash:true,op:.05},{v:FV(b),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
     <p class="xs muted">灰色の点線＝開始時、青＝最後の調査</p>
     ${outBars([["幸福度（WHO-5）",[a.wb,b.wb],true,52,"高いほど良い"],["ストレス度（PSS-J）",[pss100(a),pss100(b)],false,null,"高いほど負担"],["推し活のストレス（推し疲れ）",[a.burnout,b.burnout],false,null,"高いほど負担"]],["開始時","最後"])}</section>
    <section class="delta">${tile("WHO-5（100点換算）",dw,"点",true)}${tile("推し疲れ",db,"点",false)}${tile("ストレス（PSS-J）",dp,"点",false)}</section>
    ${b.who5raw<=7?`<p class="callout bad">最近、つらい気持ちが続いていませんか。一人で抱えずに、大学の学生相談室や厚生労働省「まもろうよ こころ」の相談窓口を利用してください。</p>`:""}<p class="callout ${dw>=10?"good":""}">${dw>=10?"幸福度は、意味のある変化とされる大きさ（10点以上）で上がりました。":dw<=-10?"幸福度は10点以上下がりました。つらい状態が続くときは、相談先を利用してください。":"幸福度の変化は10点未満でした。"}</p>
-   <section class="card"><h3>ご協力ありがとうございました</h3><p class="small muted">${grp()==="B"?"プランBに取り組んだ約4週間の変化です。":grp()==="A"?"順調な推し活を続けられたかを、開始時と比べて示しています。":"今のままで続けた約4週間の変化です。"}研究の結果は全員分を集計し、OshiFitの提案の改善に使います。</p></section></main>${tabbar("home")}`;wire()}
+   <section class="card"><h3>ご協力ありがとうございました</h3><p class="small muted">${grp()==="B"?"プランB「最適化された推し活」に取り組んだ、約28日間の変化です。":grp()==="A"?"順調な推し活を続けられたかを、開始時と比べて示しています。":"プランA「現在のままの推し活」で続けた、約28日間の変化です。"}研究の結果は全員分を集計し、OshiFitの提案の改善に使います。</p></section></main>${tabbar("home")}`;wire()}
 function vMypage(){if(!S.group)ensureGroup();const g=grp(),ps=planIds().map(planById),p=ps[0]||null;
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">MY PAGE</p><h2>マイページ</h2></div>
    <section class="card"><div class="sec"><h3>アカウント</h3>${STUDY?'<button class="btn sm" id="logout">ログアウト</button>':""}</div>
@@ -1831,6 +1838,7 @@ async function boot(){
     try{const saved=await OFStore.init();if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers)}}
     catch(e){console.error(e);app.innerHTML=`<main class="stack" style="padding-top:40px"><p class="callout bad">サーバーにつながりませんでした。通信を確認して、ページを読み込み直してください。</p></main>`;return}}
   addEventListener("hashchange",render);render()}
+if(!STUDY)window.__OSHIFIT_CHECK={plansFor,scores,big5,combos,predictMulti,PLANS}; // 確認用（展示・編集者用だけ）
 boot();
 })();
 </script>

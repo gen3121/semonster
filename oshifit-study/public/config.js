@@ -1,7 +1,8 @@
 // OshiFit の設定。研究版で公開するときは OSHIFIT_MODE を "study" にする。
 //   "study" … 研究版。回答を Firebase（Firestore、東京）に保存する。編集者モード・回答の自動補完は使えない
 //   "demo"  … 展示（学祭）・確認用。何も保存しない。編集者モードあり
-window.OSHIFIT_MODE = "study";   // 展示（学祭）で使うときは "demo" に戻す
+// 研究で使う URL（/）は研究版。編集者用の URL（/editor）は保存しない確認用（編集者モードつき）
+window.OSHIFIT_MODE = /^\/editor/.test(location.pathname) ? "demo" : "study";
 window.OSHIFIT_APP_VERSION = "2026-11-12";
 // 質問の数："short"＝短縮版（採点・提案に使わない17項目を省く）、"full"＝承認時の全項目
 window.OSHIFIT_QSET = "short";
