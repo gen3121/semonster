@@ -6,7 +6,7 @@
 participants/{uid}                 … 参加者1人（uid は Firebase Authentication の ID。ログインはメールアドレスとパスワード。メールアドレスは Authentication にだけあり、ここには入れない）
   pid            研究用の番号（例 "7F3K-92QD"。自動で作る。マイページに出す）
   qset           質問の版（"short"＝短縮版、"full"＝全項目）
-  withdrawn      参加をやめたら true（記録は消さない。倫理審査の同意どおり研究に使う）、withdrawnAt はその時刻
+  withdrawn      旧版の「参加をやめる」で付いた印（2026-11-17 にアプリから削除。今は付かない）
   mode           "study"
   appVersion     アプリの版（例 "2026-11-12"）
   createdAt      サーバー時刻（同意して始めた時）
@@ -27,6 +27,7 @@ participants/{uid}/checkins/{week} … 振り返り（week = 何回目か 1〜6�
   happy          0=上がった 1=変わらない 2=下がった
   W1〜W5         3回目だけ（0〜5）
   burn, joyN     0〜100（画面のグラフ用）
+  adjBurn, adjBurnHw, adjWb, adjWbHw, adjN, adjNWb   その時点で本人の記録で直した28日目の見込み（推し疲れ・WHO-5）と80%区間の半幅、使った記録の数（index.html の personalPred）
   sumYen, sumMin, nDaily   前回の振り返り（1回目は群が決まった時）から今回までの、毎日のアンケートのお金・時間の合計と回答日数
 participants/{uid}/daily/{YYYY-MM-DD} … 毎日のアンケート（全群。1日1回、書き換え不可。文書IDは端末の日付）
   date, day（開始からの日数）, at（サーバー時刻）
@@ -55,7 +56,7 @@ pilots/{pid}                       … プレ実験の参加ID（研究者が入
 ### daily.csv（1行1日の毎日のアンケート）
 `pid, group, date, day, at, mood, yen, minutes, joy, Q44, Q45, Q47, Q48, did_<planId>…`
 
-weekly.csv には `sumYen, sumMin, nDaily` も入る。
+weekly.csv には `sumYen, sumMin, nDaily, adjBurn, adjBurnHw, adjWb, adjWbHw, adjN, adjNWb` も入る。
 
 ### trial.csv（1行1人。最後の調査まで）
 `pid, pilot, withdrawn, group, final_day, final_at,` 最後の調査の項目 `W1 … W5, H1 … H4, P1 … P14, Q29 … Q34, Q39, Q44 … Q51, J1, J2, K1 … K5`（群Aは J/K なし）、

@@ -111,7 +111,7 @@ def make(out: Path, n: int = 120, seed: int = 1) -> Path:
     out.mkdir(parents=True, exist_ok=True)
     (out / SYNTH_MARKER).write_text("このフォルダの CSV は合成データ（動作確認用の作り物）。研究の結果として使わない。\n", encoding="utf-8")
     start = datetime(2026, 12, 1, 10, 0)
-    base_rows, week_rows, trial_rows, free_rows = [], [], [], []
+    base_rows, week_rows, trial_rows, free_rows, daily_rows = [], [], [], [], []
     did_cols = [f"did_{p}" for p in plans]
     for i in range(n):
         pid = "".join(rng.choice(list("ABCDEFGHJKLMNPQRSTUVWXYZ23456789"), 8))
@@ -215,6 +215,30 @@ def make(out: Path, n: int = 120, seed: int = 1) -> Path:
             w["joyN"] = round((w["joy"] - 1) / 6 * 100, 2)
             rows_w.append(w)
         week_rows += rows_w
+        # 毎日のアンケート（全群。8割5分の日に答える。提案を行った日は気分が少し高い）
+        resp = rng.uniform(0.6, 0.98)
+        for dd in range(1, 29):
+            if rng.random() > resp:
+                continue
+            frac = dd / 30
+            Lw = {k: (1 - frac) * L[k] + frac * Lpost[k] for k in L}
+            r = {"pid": pid, "group": g, "date": (decided + timedelta(days=dd)).date().isoformat(), "day": dd,
+                 "at": (decided + timedelta(days=dd, hours=11)).isoformat()}
+            r.update({c: "" for c in did_cols})
+            ex = 0.0
+            for p_ in ([] if g == "A" else (chosen if g == "B" else offered[:1])):
+                u = rng.random()
+                v = 0 if u < 0.7 * p_exec else (1 if u < 0.7 * p_exec + 0.15 else 2)
+                r[f"did_{p_}"] = v
+                ex = max(ex, {0: 1.0, 1: 0.5, 2: 0.0}[v])
+            it = items_from_latent(rng, S, Lw)
+            for k in ["Q44", "Q45", "Q47", "Q48"]:
+                r[k] = it[k]
+            r["mood"] = int(lik(rng, 4.4, 1.1, Lw["wb"] + 0.5 * ex, 1, 7))
+            r["joy"] = int(lik(rng, 5.0, 1.2, Lw["joy"], 1, 7))
+            r["yen"] = int(max(0, rng.lognormal(6.5, 1.2))) if rng.random() < 0.4 else 0
+            r["minutes"] = int(min(1440, max(0, rng.normal(80, 40))))
+            daily_rows.append(r)
         if rng.random() < 0.9:   # 1割は最後の調査に答えない
             fday = max(28, day + int(rng.integers(0, 4))) if g != "A" else int(rng.integers(28, 32))
             fday = min(fday, 40)
@@ -241,7 +265,9 @@ def make(out: Path, n: int = 120, seed: int = 1) -> Path:
         ["J1", "J2", "K1", "K2", "K3", "K4", "K5"] + [f"{k}_post" for k in SCORE_KEYS] + ["n_checkins", "exec_rate"]
     trial = pd.DataFrame(trial_rows, columns=trial_cols)
     free = pd.DataFrame(free_rows, columns=["pid", "where", "text"])
-    for name, d in [("baseline", base), ("weekly", week), ("trial", trial), ("free", free)]:
+    daily = pd.DataFrame(daily_rows, columns=["pid", "group", "date", "day", "at", "mood", "yen", "minutes", "joy",
+                                              "Q44", "Q45", "Q47", "Q48"] + did_cols)
+    for name, d in [("baseline", base), ("weekly", week), ("trial", trial), ("free", free), ("daily", daily)]:
         d.to_csv(out / f"{name}.csv", index=False, encoding="utf-8-sig")
     return out
 

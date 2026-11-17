@@ -1,6 +1,7 @@
 """分析パイプラインの確認。oshifit-study/ で `python -m pytest analysis/tests -q` を実行する。"""
 from __future__ import annotations
 
+from pathlib import Path
 import json
 import math
 
@@ -186,3 +187,16 @@ def test_mismatch_detected(tmp_path):
     run.main(["--data", str(d), "--out", str(tmp_path / "out"), "--steps", "0"])
     mm = pd.read_csv(tmp_path / "out" / "s0_score_mismatches.csv", encoding="utf-8-sig")
     assert len(mm) == 1 and mm.loc[0, "得点"] == "pss"
+
+
+def test_personal_shrink_matches_app():
+    """手順8の個人補正は、アプリ（index.html の shrink）と同じ式。記録がなければ最初の見込みと幅のまま。"""
+    from analysis.step8_daily import PC_APP, shrink
+    su, se = PC_APP["burnout"]["su"], PC_APP["burnout"]["se"]
+    est, hw, n = shrink([], su, se, 15.0, 40.0)
+    assert n == 0 and est == 40.0 and abs(hw - 15.0) < 1e-6
+    est, hw, n = shrink([10.0] * 20, su, se, 15.0, 40.0)
+    k = se * se / (su * su)
+    assert abs(est - (40 + 200 / (20 + k))) < 1e-9 and hw < 15.0
+    src = (Path(__file__).resolve().parents[2] / "public" / "index.html").read_text(encoding="utf-8")
+    assert "PC={burnout:{su:10,se:14},wb:{su:9,se:10}}" in src, "アプリと分析の仮の分散をそろえる"

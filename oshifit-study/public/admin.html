@@ -120,7 +120,7 @@ export function tables(P) {
     if (p.pred) { Object.keys(p.pred.B || {}).forEach((k) => (r["pred_B_" + k] = p.pred.B[k])); r.pred_hw = p.pred.hw; r.pred_hwWb = p.pred.hwWb; }
     return r;
   });
-  const wkCols = ["pid", "group", "week", "day", "at", "sumYen", "sumMin", "nDaily", ...PLANS.map((x) => "did_" + x), "Q44", "Q45", "Q47", "Q48", "joy", "stress", "happy", "W1", "W2", "W3", "W4", "W5", "burn", "joyN"];
+  const wkCols = ["pid", "group", "week", "day", "at", "sumYen", "sumMin", "nDaily", ...PLANS.map((x) => "did_" + x), "Q44", "Q45", "Q47", "Q48", "joy", "stress", "happy", "W1", "W2", "W3", "W4", "W5", "burn", "joyN", "adjBurn", "adjBurnHw", "adjWb", "adjWbHw", "adjN", "adjNWb"];
   const weekly = P.flatMap((p) => p.cks.map((c) => ({ ...c, pid: p.pid, group: p.group, at: iso(c.at) })));
   const trCols = ["pid", "pilot", "withdrawn", "group", "final_day", "final_at", ...FINAL_ITEMS, ...SC.map((k) => k + "_post"), "n_checkins", "exec_rate", "total_yen", "total_min", "n_daily"];
   const trial = P.filter((p) => p.final).map((p) => {

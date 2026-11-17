@@ -1,6 +1,6 @@
-# OshiFit 研究版の分析手順（手順0〜7）
+# OshiFit 研究版の分析手順（手順0〜8）
 
-研究者が、開発者ページから書き出した CSV（`baseline.csv`・`weekly.csv`・`trial.csv`・`free.csv`）を分析するための手順。
+研究者が、開発者ページから書き出した CSV（`baseline.csv`・`weekly.csv`・`trial.csv`・`free.csv`・`daily.csv`）を分析するための手順。
 CSV の形は `../DATA_SCHEMA_ja.md`、項目と採点規則は `../public/questionnaire.json`、提案の一覧（id・軸・改善の見込み eff）は `../public/index.html` の `PLANS` から読む。
 
 ## 大事な前提
@@ -49,8 +49,24 @@ python -m pytest analysis/tests -q
 | 5 幸福度の根拠 | WHO-5 が意味のある大きさで上がった人は B に多いか。変化はいつ起きたか。提案を多く実行した人ほど変化したか | WHO-5 が10点以上（0〜100）上がったかの IPW 重み付きロジスティック回帰。線形混合モデル（WHO-5 の3時点：開始時0日・3回目の振り返りの日・最後の調査の日、日数 × 群、人ごとのランダム切片、基準は群C）。用量反応（群B：変化 ~ 実行率 + 開始時、HC3）。媒介（群B：実行率 → 推し疲れの変化 → WHO-5 の変化、パーセンタイル法ブートストラップ） | `s5_improved_logit.json`、`s5_mixed_who5.json`、`s5_dose_response.csv`、`s5_mediation.json`、`s5_who5_trajectory.png` |
 | 6 今回追加（探索） | 性格によって結びつきが違うか。変化を予測する特徴はどれか | 交互作用（変化 ~ 群B × 性格、群B内で 実行率 × 性格、HC3、20本を Holm 補正）。LASSO の安定性選択（B∪C、50%の部分標本 × 200回、全体の LassoCV で選んだ α を固定、選択確率 ≥ 0.6 を「安定」） | `s6_interactions.csv`、`s6_stability_selection.csv` |
 | 7 研究終了後 | 提案ごとの改善の見込み（eff）と見込みの幅（±15・±12）を実測でどう直すか | 縮約（正規分布どうしの精度重み付き平均）：事前＝PLANS の eff（SD 8）、観測＝群Bでその提案を選んだ人のその軸の前後差（SE＝SD/√n、下限 1 点）。参考に提案間のばらつき τ をモーメント法で推定した版も出す。見込みの誤差（観測 − 見込み）の絶対値の80パーセンタイルを新しい半幅の候補にし、今の区間に入った割合も出す | `plan_effects_updated.json`、`s7_plan_effects.csv`、`prediction_interval_updated.json` |
+| 8 毎日の記録と個人補正（2026-11-17 追加） | 毎日の気分・推し疲れはどう動いたか。提案を行った日は気分が高いか。実行は続いたか。本人の記録で直した見込みは当たったか。一人ひとりに信頼できる変化があったか | 8a 線形混合モデル（気分・負担4項目 ~ 日数 × 群、人ごとのランダム切片と傾き。収束しなければ切片だけ）。8b 個人内・個人間に分けた混合モデル（その日の実行の、本人の平均からのずれと本人の平均）。8c 実行（一部も含む）のロジスティック混合モデル（変分ベイズ）と GEE（交換可能相関、頑健SE）。8d アプリと同じ式で個人補正を計算し直し、最後の調査と比べる（平均絶対誤差・80%区間の包含率）。補正の分散 σu・σe を混合モデルで推定。8e RCI（WHO-5・PSS-J、α は逆転をそろえて計算） | `s8a_daily_trend.json`、`s8b_within_between.json`、`s8c_exec_logit.json`、`s8d_prediction_accuracy.csv`、`s8_personal_prediction.csv`、`personal_correction_params.json`、`s8e_rci.csv` |
 
 最後に全体をまとめた `分析レポート.md` を出力フォルダに書く。
+
+## 統計手法の選び方（2026-11-17、研究計画書からの変更）
+
+研究計画書は「無作為割り付け＋2週間の記録だけの期間」を前提に、2週目の値を共変量にした共分散分析と、実行率のロジスティック混合モデルを予定していた。実際の設計は「本人の選択で群が決まる・記録だけの期間はない・28日間・毎日の記録あり」なので、次のように置き換える。
+
+| 問い | 研究計画書 | この研究で使う方法 | 理由 |
+|---|---|---|---|
+| 主要：B と C で28日目の WHO-5・PSS-J に差があるか | 2週目を共変量にした ANCOVA | **開始時の値を共変量にした ANCOVA**（手順4）。TIPI を足した版も出す。主要2本を Holm 補正 | 記録だけの期間がないので、開始時が最も近い共変量。前後差の t 検定より検出力が高く、開始時の差による偏りも小さい（Vickers & Altman, 2001） |
+| 自己選択の偏り | （無作為化で対処） | **傾向スコアの重み付け**（安定化 IPW、手順4）を感度分析。釣り合い（SMD）と有効標本サイズを必ず出す | 群は本人の選択なので、測った共変量の偏りを調整する。重みが極端なときは overlap weights（Li et al., 2018）も候補 |
+| 毎日・振り返りの推移 | 混合効果モデル | **線形混合モデル**（日数 × 群、ランダム切片と傾き、手順5・8a） | 欠けた日があっても全員を使える（欠測はランダムに近いと仮定）。人ごとの出発点と変わり方の違いを分けられる（Laird & Ware, 1982） |
+| 提案を行った日に気分は良いか | なし | **個人内・個人間に分けた混合モデル**（手順8b） | 「よく行う人ほど元々気分が良い」（個人間）と「同じ人が行った日に気分が良い」（個人内）を混ぜないため（Curran & Bauer, 2011）。個人内の係数が提案の効果に最も近い（ただし因果ではない） |
+| 実行は続いたか | ロジスティック混合モデル | **ロジスティック混合モデル**（変分ベイズ）＋**GEE**（手順8c） | 計画書どおりの混合モデルに加え、収束が安定し頑健SEを出せる GEE（Liang & Zeger, 1986）を並べて確かめる |
+| 見込みは当たったか（検証項目1） | 予備調査のモデル＋本人の記録での補正（混合モデル） | 最初の見込みと **個人補正（経験ベイズ、ランダム切片）** の見込みを、最後の調査と比べる（MAE・80%区間の包含率、手順8d）。補正の分散も推定し直す | 計画書の「本人の記録で補正」をアプリで実装した（`index.html` の `personalPred`）。同じ式で分析し直すので、アプリの表示と論文の数字がそろう |
+| 一人ひとりの変化 | なし | **RCI**（手順8e） | 平均の差だけでなく、測定誤差を超えて良くなった・悪くなった人の数を示せる（Jacobson & Truax, 1991） |
+| 多重比較 | 未定 | Holm（下の節） | 主要・副次・探索を分けて補正する |
 
 ## 多重比較（Holm）
 
@@ -89,13 +105,20 @@ python -m pytest analysis/tests -q
 - Hu, L., & Bentler, P. M. (1999). Cutoff criteria for fit indexes in covariance structure analysis: Conventional criteria versus new alternatives. *Structural Equation Modeling, 6*(1), 1–55.
 - Meinshausen, N., & Bühlmann, P. (2010). Stability selection. *Journal of the Royal Statistical Society: Series B, 72*(4), 417–473.
 
+- Curran, P. J., & Bauer, D. J. (2011). The disaggregation of within-person and between-person effects in longitudinal models of change. *Annual Review of Psychology, 62*, 583–619.
+- Jacobson, N. S., & Truax, P. (1991). Clinical significance: A statistical approach to defining meaningful change in psychotherapy research. *Journal of Consulting and Clinical Psychology, 59*(1), 12–19.
+- Laird, N. M., & Ware, J. H. (1982). Random-effects models for longitudinal data. *Biometrics, 38*(4), 963–974.
+- Li, F., Morgan, K. L., & Zaslavsky, A. M. (2018). Balancing covariates via propensity score weighting. *Journal of the American Statistical Association, 113*(521), 390–400.
+- Liang, K.-Y., & Zeger, S. L. (1986). Longitudinal data analysis using generalized linear models. *Biometrika, 73*(1), 13–22.
+- Vickers, A. J., & Altman, D. G. (2001). Analysing controlled trials with baseline and follow up measurements. *BMJ, 323*, 1123–1124.
+
 ## ファイル
 
 ```
 analysis/
   run.py             手順0〜7をまとめて実行（CLI）
   common.py          採点・提案一覧の読み込み・保存・Holm・α・縮約・図の字体
-  step0_load.py … step7_update.py   各手順
+  step0_load.py … step8_daily.py   各手順
   make_synthetic.py  合成データ（動作確認用）
   tests/test_pipeline.py  採点・α・縮約・Holm・通しの実行のテスト
   requirements.txt

@@ -1356,7 +1356,7 @@ function toast(t){document.querySelectorAll(".toast").forEach(x=>x.remove());con
 const ICON={home:'<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',future:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',note:'<path d="M5 3h10l4 4v14H5z"/><path d="M9 12h6M9 16h6"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>'};
 function tabbar(cur){const T=[["home","ホーム","home"],["analysis","分析","chart"],["future","未来","future"],["checkin","記録","note"],["mypage","マイページ","user"]];
   return`<nav class="tabbar" aria-label="メニュー"><div class="in">${T.map(([v,l,i])=>`<a class="tab" href="#${v}" ${v===cur?'aria-current="page"':""}><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[i]}</svg>${l}</a>`).join("")}</div></nav>`}
-const SCREENS=[["start","1 はじめに"],["q","2 質問（1問ずつ）"],["avatar","3 アバター制作"],["analysis","4 分析"],["future","5 2つの未来（提案）"],["home","ホーム"],["checkin","6 3回目の振り返り"],["final","7 最後の調査"],["result","7 28日間の結果"],["mypage","8 マイページ"],["withdraw","9 辞退の確認"],["withdrawn","9 辞退の完了"],["admin","10 開発者ページ"]];
+const SCREENS=[["start","1 はじめに"],["q","2 質問（1問ずつ）"],["avatar","3 アバター制作"],["analysis","4 分析"],["future","5 2つの未来（提案）"],["home","ホーム"],["checkin","6 3回目の振り返り"],["final","7 最後の調査"],["result","7 28日間の結果"],["mypage","8 マイページ"],["admin","9 開発者ページ"]];
 function editbar(){if(!EDIT)return"";const i=SCREENS.findIndex(s=>s[0]===VIEW);
   return`<div class="editbar" role="toolbar" aria-label="編集者モード"><button id="ed-prev" ${i<=0?"disabled":""}>‹ 前へ</button><select id="ed-sel" aria-label="画面を選ぶ">${SCREENS.map(([k,n])=>`<option value="${k}" ${k===VIEW?"selected":""}>${n}</option>`).join("")}</select><button id="ed-next" ${i>=SCREENS.length-1?"disabled":""}>次へ ›</button>
    <div class="tools"><span>編集者モード（回答しなくても移動できます。何も保存しません）</span><button id="ed-fill">回答を埋める</button><button id="ed-day">＋4日</button><button id="ed-reset">最初から</button><button id="ed-off">閉じる</button></div></div>`}
@@ -1437,6 +1437,39 @@ function statsCard(){const tr=moodTrend(),ex=(S.group==="B"||S.group==="C")?exec
     <span>傾き：日にちと気分に直線を当てはめた傾き（最小二乗法）×7。95%の幅は 傾き ± t × 標準誤差（t は自由度＝日数−2 の t 分布の97.5%点）</span>
     <span>提案の比較：気分の平均の差。95%の幅はウェルチの方法（分散が違ってもよい t 検定の考え方）</span>
     <span>どれも、あなたの中での記録の傾向です。提案が気分を変えたという意味（因果）ではありません。</span></div></details></section>`}
+/* ---------- 本人の記録で見込みを直す（個人補正 v1） ----------
+   最初の見込み（予備調査と文献にもとづく仮定 v1.2 の predictMulti）を「事前」とし、本人の記録とのずれで直す。
+   モデル：記録 = 見込み(日) + 本人のずれ b + 誤差。b はランダム切片（線形混合モデルの考え方）で、経験ベイズの縮約で推定する。
+     見込み(日) = 開始時 + (28日目の見込み − 開始時) × min(日/28, 1)（直線で近づくと仮定）
+     b = Σずれ ÷ (n + k)、k = σe² ÷ σu²（記録が少ないうちは 0 に近く、たまるほど本人の値に近づく）
+     80%の幅 = 1.2816 × √(σe²÷(n+k) + τ²)、τ² = (最初の幅÷1.2816)² − σu²（本人のずれでは説明できない分）
+   σu・σe は仮の値。研究後に分析の手順8（混合モデル）で推定し直して、ここを書き換える。 */
+const PC={burnout:{su:10,se:14},wb:{su:9,se:10}},Z80=1.2816,PC_H=28;
+const burn4=r=>{const v=["Q44","Q45","Q47","Q48"].map(k=>r[k]);return v.some(x=>x==null)?null:(mean(v)-1)/(SMAX-1)*100};
+function shrink(res,{su,se},hw0,prior){const n=res.length,k=se*se/(su*su),b=n?res.reduce((a,x)=>a+x,0)/(n+k):0;
+  const tau2=Math.max((hw0/Z80)**2-su*su,1),hw=Z80*Math.sqrt(se*se/(n+k)+tau2),est=clamp(prior+b,0,100);
+  return{prior,est,b,n,hw,lo:clamp(est-hw,0,100),hi:clamp(est+hw,0,100),k}}
+function personalPred(){if(!S.group||!S.sc)return null;const base=S.sc;
+  const pr=S.group==="B"?(S.pred&&S.pred.B?S.pred:predictMulti(base,planIds())):{B:base,hw:15,hwWb:12};
+  const fr=d=>clamp(d/PC_H,0,1),b0=burn4(S.answers);if(b0==null||base.burnout==null)return null;
+  const dB=pr.B.burnout-base.burnout,dW=pr.B.wb-base.wb;
+  const ob=[...S.daily,...S.weekly].filter(r=>r.day!=null).map(r=>[r.day,burn4(r)]).filter(([,y])=>y!=null);
+  const ow=S.weekly.filter(r=>r.W1!=null&&r.day!=null).map(r=>[r.day,["W1","W2","W3","W4","W5"].reduce((a,k)=>a+(r[k]??0),0)*4]);
+  return{burnout:shrink(ob.map(([d,y])=>y-(b0+dB*fr(d))),PC.burnout,pr.hw,pr.B.burnout),
+         wb:shrink(ow.map(([d,y])=>y-(base.wb+dW*fr(d))),PC.wb,pr.hwWb,pr.B.wb)}}
+function predCard(){const pp=personalPred();if(!pp)return"";const lab=S.group==="B"?"プランB「最適化された推し活」":"プランA「現在のままの推し活」";
+  const row=(name,x,good)=>`<p class="small">${name}：最初の見込み <b>${r0(x.prior)}</b> → あなたの記録で直した見込み <b style="color:var(${good})">${r0(x.est)}</b>点（80%の幅 ${r0(x.lo)}〜${r0(x.hi)}、記録${x.n}回）</p>`;
+  return`<section class="card" id="predadj"><div class="sec"><h3>28日目の見込み（あなたの記録で直したもの）</h3><span class="xs muted">${lab}</span></div>
+   ${row("推し活のストレス（推し疲れ、低いほど良い）",pp.burnout,"--bad")}
+   ${row("幸福度（WHO-5、高いほど良い）",pp.wb,"--good")}
+   <p class="xs muted">${pp.wb.n?"":"幸福度は、3回目の振り返りで WHO-5 に答えると直ります。"}記録がたまるほど、見込みはあなたの実際の値に近づき、幅は狭くなります。</p>
+   <details><summary>算出の根拠</summary><div class="formula">
+    <span>最初の見込み：2つの未来で示した28日目の値（提案の効果の仮定 v1.2）</span>
+    <span>途中の日の見込み：開始時から28日目の見込みへ、日数に比例して近づくと仮定</span>
+    <span>ずれ：毎日のアンケートと振り返りの負担4項目（睡眠・お金・義務感・比較）から出した推し疲れ − その日の見込み。幸福度は3回目の振り返りの WHO-5 − その日の見込み</span>
+    <span>あなたのずれ b ＝ ずれの合計 ÷（記録の数 ＋ ${f1(pp.burnout.k)}）。記録が少ないうちは、最初の見込みをあまり動かしません（混合モデルのランダム切片の推定と同じ考え方）</span>
+    <span>直した見込み ＝ 最初の見込み ＋ b。80%の幅 ＝ 1.2816 × √（b の不確かさ ＋ あなたのずれでは説明できない分）</span>
+    <span>ばらつきの大きさは仮の値です。研究のあとに、参加者全体の記録から推定し直します。</span></div></details></section>`}
 function finalItems(){const ids=["W1","W2","W3","W4","W5","H1","H2","H3","H4",...QN.sections.find(s=>s.id==="pss").items.map(i=>i.id),"Q29","Q30","Q31","Q32","Q33","Q34","Q39","Q44","Q45","Q46","Q47","Q48","Q49","Q50","Q51"];
   const L=ids.map(itemOf);if(S.group!=="A")USE.forEach(([id,text])=>L.push({id,text,sec:"OshiFitを使ってみて",lead:"",kind:"list",labels:AGREE5U,vals:AGREE5U.map((_,j)=>j+1)}));
   if(S.group==="B")L.push({id:"how",text:"提案（プランB）を行ってみて、どのように変わりましたか（任意）",sec:"最後に",lead:"",kind:"text",optional:true});return L}
@@ -1603,7 +1636,7 @@ function vStart(){app.className="app land";
      <div class="road"><p class="eyebrow">28 DAYS</p><div class="track4">${[0,4,8,12,16,20,24,28].map((d,i)=>`<div class="mile ${i===0?"s":i===7?"f":""}"><span class="dot"></span><b>${i===0?"開始":i===7?"最後の調査":`${i}回目`}</b><span>${i===0?"0日目":i===7?"28日目〜":`${d}日目ごろ`}</span></div>`).join("")}</div>
      <p class="xs" style="color:var(--ink-muted)">振り返りは前回から4日以上あけて、4〜5日ごとに6回（各約2分）。3回目だけ、最近2週間の気分（WHO-5）も答えます。</p></div></div></section>
    <section class="band about-band" id="sec-about">${wave("var(--bg)")}<div class="in"><div class="sechead"><p class="eyebrow">ABOUT THE STUDY</p><h2 class="jp-xl">安心して参加してもらうために</h2></div>
-     <div class="facts-grid">${[["写真は使わない","アバターは写真を使わず、顔の形や髪型を自分で選んで作ります。"],["メールはログインだけに使う","メールアドレスはログインのためだけに使い、回答とは別に管理します。名前は集めません。"],["いつでもやめられる","マイページから参加をやめられます。それまでの回答は、同意いただいたとおり研究に使います。不利益はありません。"],["プレ実験の方も歓迎","プレ実験に参加した方も参加できます。マイページの研究用の番号を研究者にお知らせください。"]].map(([t,d],i)=>`<div class="fact"><span class="fno">${["AVATAR","PRIVACY","OPT-OUT","PILOT"][i]}</span><h3>${t}</h3><p class="small muted">${d}</p></div>`).join("")}</div></div></section>
+     <div class="facts-grid">${[["写真は使わない","アバターは写真を使わず、顔の形や髪型を自分で選んで作ります。"],["メールはログインだけに使う","メールアドレスはログインのためだけに使い、回答とは別に管理します。名前は集めません。"],["困ったときは連絡を","わからないことや困ったことがあれば、マイページの問い合わせ先にご連絡ください。"],["プレ実験の方も歓迎","プレ実験に参加した方も参加できます。マイページの研究用の番号を研究者にお知らせください。"]].map(([t,d],i)=>`<div class="fact"><span class="fno">${["AVATAR","PRIVACY","CONTACT","PILOT"][i]}</span><h3>${t}</h3><p class="small muted">${d}</p></div>`).join("")}</div></div></section>
    <section class="band join-band" id="sec-join"><div class="in"><div class="joincard"><div class="stack" style="gap:12px"><p class="eyebrow">JOIN</p><h2 class="jp-xl">さっそく、はじめてみる</h2>
        <ul class="facts"><li>約${BASE_ITEMS.length}の質問（約${Math.max(8,Math.round(BASE_ITEMS.length*10/60))}分）</li><li>約28日間、4〜5日ごとに6回の振り返り（各約2分）。28日目以降に最後の調査</li><li>メールアドレスで登録し、次からはログインして続きから答えられます</li></ul>
        <div class="row" style="flex-wrap:wrap;gap:10px"><a class="btn primary pill big" id="go" href="#signup">新規登録してはじめる${ARROW}</a><a class="btn pill big" id="to-login" href="#login">ログイン</a></div></div><div class="joinart">${miniSVG("home")}</div></div></div></section>
@@ -1775,6 +1808,7 @@ function vHome(){if(!S.group)ensureGroup();const sc=S.sc,g=grp(),ps=planIds().ma
    ${W.length?`<section class="card"><div class="sec"><h3>振り返りごとの変化</h3><span class="xs"><b style="color:var(--bad)">━</b> 推し疲れ　<b style="color:var(--good)">━</b> 推し活中の幸せ</span></div>
     <svg viewBox="0 0 280 120" width="100%" role="img" aria-label="振り返りごとの推し疲れと幸せ"><line x1="20" y1="110" x2="260" y2="110" stroke="var(--line)"/><polyline points="${pts("burn")}" fill="none" stroke="var(--bad)" stroke-width="2.4"/><polyline points="${pts("joyN")}" fill="none" stroke="var(--good)" stroke-width="2.4"/>${W.map((w,i)=>`<text x="${20+i*48}" y="120" font-size="9" text-anchor="middle" fill="var(--muted)">${i+1}回</text>`).join("")}</svg></section>`:""}
    ${statsCard()}
+   ${predCard()}
    <section class="card"><div class="sec"><h3>回答の予定をカレンダーに入れる</h3></div><p class="small muted">毎日のアンケートの時刻（通知つき）と、振り返り・最後の調査の日を、カレンダーに追加できます。ファイルは端末の中で作られ、どこにも送信されません。</p>
     <label class="row small">毎日の通知の時刻 <input class="field" id="ics-time" type="time" value="21:00" style="width:auto"></label><button class="btn" id="ics">カレンダーに追加（.ics）</button></section>
    <p class="xs muted">つらい状態が続くときは、振り返りを休んでかまいません。<a href="#mypage" style="color:var(--primary)">相談先を見る</a></p></main>${tabbar("home")}`;
@@ -1791,7 +1825,7 @@ function vCheckin(){if(!S.group)ensureGroup();const g=grp();
   const items=checkItems();
   vSurvey("checkin",items,S.wk,`${nextNo()}回目の振り返り`,`${nextNo()}／${N_CHECK}回・開始から${dayNo()}日目`,()=>{const w=S.wk,B=["Q44","Q45","Q47","Q48"];
     const burn=(mean(B.map(k=>w[k]))-1)/6*100,joyN=(w.joy-1)/6*100;
-    const sm=sumDaily(lastCheckAt(),now());const rec={week:nextNo(),day:dayNo(),...w,burn,joyN,sumYen:sm.yen,sumMin:sm.min,nDaily:sm.n};S.weekly.push({...rec,at:now()});if(STUDY)OFStore.checkin(S,rec);S.wk={};SV.checkin=null;toast("記録しました");go("home")})}
+    const sm=sumDaily(lastCheckAt(),now());const rec={week:nextNo(),day:dayNo(),...w,burn,joyN,sumYen:sm.yen,sumMin:sm.min,nDaily:sm.n};S.weekly.push({...rec,at:now()});const pp=personalPred();if(pp)Object.assign(rec,{adjBurn:r0(pp.burnout.est*10)/10,adjBurnHw:r0(pp.burnout.hw*10)/10,adjWb:r0(pp.wb.est*10)/10,adjWbHw:r0(pp.wb.hw*10)/10,adjN:pp.burnout.n,adjNWb:pp.wb.n});Object.assign(S.weekly[S.weekly.length-1],rec);if(STUDY)OFStore.checkin(S,rec);S.wk={};SV.checkin=null;toast("記録しました");go("home")})}
 function vDaily(){if(!S.group)return go("home");
   if(!dailyOpen()&&!EDIT){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">${S.final?"調査はすべて終わりました。":"今日のアンケートは回答済みです。また明日お願いします。"}</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
   vSurvey("daily",dailyItems(),S.dk,"今日のアンケート",`開始から${dayNo()}日目`,()=>{const rec={date:todayKey(),day:dayNo(),...S.dk};S.daily.push({...rec,at:now()});if(STUDY)OFStore.daily(rec);S.dk={};SV.daily=null;toast("記録しました。また明日お願いします");go("home")})}
@@ -1820,31 +1854,12 @@ function vMypage(){if(!S.group)ensureGroup();const g=grp(),ps=planIds().map(plan
     <div class="kv"><span>振り返り</span><b>${S.weekly.length} / ${N_CHECK}回</b></div><div class="kv"><span>開始から</span><b>${dayNo()}日目</b></div>
     <div class="kv"><span>最後の調査</span><b>${S.final?"回答済み":"28日目以降"}</b></div></div></section>
    <section class="card"><div class="sec"><h3>データの扱い</h3></div><ul class="facts">
-    <li>アバターに写真は使いません</li><li>メールアドレスはログインのためだけに使い、回答は研究用の番号で、研究用のサーバーに保存します</li><li>参加をやめても、それまでの回答は同意いただいたとおり研究に使います</li><li>研究の目的以外には使いません</li></ul></section>
+    <li>アバターに写真は使いません</li><li>メールアドレスはログインのためだけに使い、回答は研究用の番号で、研究用のサーバーに保存します</li><li>研究の目的以外には使いません</li></ul></section>
    <section class="card"><div class="sec"><h3>つらいとき</h3></div><p class="small muted">振り返りは休んでかまいません。一人で抱えずに、大学の学生相談室や、厚生労働省「まもろうよ こころ」の相談窓口を利用してください。</p></section>
-   <section class="card" style="border-color:color-mix(in srgb,var(--bad) 40%,transparent)"><div class="sec"><h3 style="color:var(--bad)">参加をやめる</h3></div>
-    <p class="small muted">参加をやめても不利益はありません。それまでの回答は、同意いただいたとおり研究に使います。</p>
-    <a class="btn danger-o block" href="#withdraw">参加をやめる</a></section>
-   <section class="card"><div class="sec"><h3>問い合わせ先</h3></div><div class="idbox"><span class="small" id="mail" style="font-weight:600;word-break:break-all">m1m02530106@oit.ac.jp</span><button class="btn sm" id="copymail">コピー</button></div><p class="xs muted">メールで参加をやめるときは、研究用の番号も書いてください。</p></section></main>${tabbar("mypage")}`;
+   <section class="card"><div class="sec"><h3>問い合わせ先</h3></div><div class="idbox"><span class="small" id="mail" style="font-weight:600;word-break:break-all">m1m02530106@oit.ac.jp</span><button class="btn sm" id="copymail">コピー</button></div><p class="xs muted">問い合わせのときは、研究用の番号も書いてください。</p></section></main>${tabbar("mypage")}`;
   if($("#logout"))$("#logout").onclick=async()=>{await OFStore.logout();S=blank();SV={};go("start")};
   $("#copymail").onclick=()=>{(navigator.clipboard?navigator.clipboard.writeText($("#mail").textContent):Promise.reject()).then(()=>toast("メールアドレスをコピーしました")).catch(()=>{const r=document.createRange();r.selectNodeContents($("#mail"));const s=getSelection();s.removeAllRanges();s.addRange(r);toast("選択しました。コピーしてください")})};
   $("#copy").onclick=()=>{const t=S.id;(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast("参加IDをコピーしました")).catch(()=>{const r=document.createRange();r.selectNodeContents($("#pid"));const s=getSelection();s.removeAllRanges();s.addRange(r);toast("IDを選択しました。コピーしてください")})};wire()}
-function vWithdraw(){vMypage();const sc=document.createElement("div");sc.className="scrim";
-  sc.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="wt"><div class="grab"></div><h2 id="wt">参加をやめますか？</h2>
-   <p class="small">参加をやめても、成績や評価などの不利益は一切ありません。</p>
-   <div class="callout"><b>参加をやめると</b><br>これからの振り返りと最後の調査はなくなります。それまでの回答は、同意いただいたとおり研究に使います（削除はしません）。参加をやめたあとは、もう一度この研究に参加することはできません。</div>
-   <label class="check" for="wk"><input type="checkbox" id="wk">参加をやめると、もう一度は参加できないことを理解しました</label>
-   <button class="btn primary block" id="w-keep">参加を続ける</button><button class="btn danger block" id="w-go" disabled>参加をやめる</button></div>`;
-  document.body.appendChild(sc);const close=()=>{sc.remove();go("mypage")};
-  sc.onclick=e=>{if(e.target===sc)close()};$("#w-keep").onclick=close;$("#wk").onchange=e=>{$("#w-go").disabled=!e.target.checked};
-  $("#w-go").onclick=async()=>{if(STUDY){const b=$("#w-go");b.disabled=true;b.textContent="手続きしています…";try{await OFStore.withdraw()}catch(e){console.error(e);b.disabled=false;b.textContent="参加をやめる";toast("手続きできませんでした。通信を確認して、もう一度お試しください");return}}
-    sc.remove();S={...blank(),id:S.id};S.withdrawn=true;go("withdrawn")};$("#w-keep").focus()}
-function vWithdrawn(){app.innerHTML=header()+`<main class="stack" style="padding-top:22px">
-   <section class="card" style="align-items:center;text-align:center"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7 12l3.5 3.5L17 9"/></svg>
-    <h2>参加をやめる手続きが終わりました</h2><p class="small muted">これまでの回答は、同意いただいたとおり研究に使います。ご協力ありがとうございました。</p></section>
-   <section class="card"><div class="kv"><span>これからの振り返り・最後の調査</span><b>ありません</b></div><div class="kv"><span>今後の連絡</span><b>ありません</b></div></section>
-   <p class="small muted">これからも、ご自身の生活と推し活のバランスを大切にお過ごしください。</p>
-   <a class="btn block" href="#start">最初の画面に戻る</a></main>`;wire()}
 function vAdmin(){app.className="app wide";
   const rows=[["7F3K-92QD","10/28","B","sns23",3,12,15,null],["Q8M2-7XLA","10/22","B","choose3",2,16,11,null],["E4W9-1TPK","10/24","C","donate",3,14,6,null],["K9LN-55RC","10/08","A","",0,29,15,16],["B3V7-H1QE","10/27","B","budget",2,10,18,null],["2M8P-4ZDW","10/18","C","mute",6,30,13,14]];
   const al=[["bad","Q8M2-7XLA：振り返りが10日以上ない（開始から16日目・2回済み）"],["bad","E4W9-1TPK：3回目のWHO-5が6点（7点以下）"],["w","2M8P-4ZDW：推し疲れが高い状態が2回続いた（5回目）"]];
@@ -1861,7 +1876,7 @@ function vAdmin(){app.className="app wide";
   app.querySelectorAll("[data-csv]").forEach(b=>b.onclick=()=>toast("試作では書き出しません（研究版の開発者ページで書き出します）"));wire()}
 
 /* ---------- 画面の切り替え ---------- */
-const VIEWS={daily:vDaily,start:vStart,signup:vSignup,login:vLogin,q:vQ,avatar:vAvatar,analysis:vAnalysis,future:vFuture,home:vHome,checkin:vCheckin,final:vFinal,result:vResult,mypage:vMypage,withdraw:vWithdraw,withdrawn:vWithdrawn,admin:vAdmin};
+const VIEWS={daily:vDaily,start:vStart,signup:vSignup,login:vLogin,q:vQ,avatar:vAvatar,analysis:vAnalysis,future:vFuture,home:vHome,checkin:vCheckin,final:vFinal,result:vResult,mypage:vMypage,admin:vAdmin};
 function keep(fn){const y=scrollY;fn();scrollTo(0,y)}
 function go(v){if(location.hash==="#"+v)render();else location.hash=v}
 let taps=0,tapT=0;
@@ -1875,8 +1890,6 @@ function wire(){const lg=$("#logo");if(lg&&!STUDY)lg.onclick=()=>{const t=Date.n
   $("#ed-off").onclick=()=>{EDIT=false;render();toast("ロゴを5回続けて押すと、また開きます")}}
 /* 研究版：まだ進めない画面には入れない（回答の自動補完をしないため） */
 function allowed(v){if(!STUDY)return v;
-  if(S.withdrawn)return v==="start"?v:"withdrawn";
-  if(v==="withdrawn")return S.consented?allowed("home"):"start";
   if(v==="admin"){location.href="admin.html";return"start"}
   if(!S.consented)return["start","signup","login"].includes(v)?v:"start";
   if(v==="login"||v==="signup")return allowed("home");   // ログイン済みなら、いま進むべき画面へ
@@ -1893,7 +1906,7 @@ async function boot(){
     try{const saved=await OFStore.init();if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers)}}
     catch(e){console.error(e);app.innerHTML=`<main class="stack" style="padding-top:40px"><p class="callout bad">サーバーにつながりませんでした。通信を確認して、ページを読み込み直してください。</p></main>`;return}}
   addEventListener("hashchange",render);render()}
-if(!STUDY)window.__OSHIFIT_CHECK={plansFor,scores,big5,combos,predictMulti,PLANS}; // 確認用（展示・編集者用だけ）
+if(!STUDY)window.__OSHIFIT_CHECK={plansFor,scores,big5,combos,predictMulti,PLANS,shrink,personalPred}; // 確認用（展示・編集者用だけ）
 boot();
 })();
 </script>

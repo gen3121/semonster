@@ -18,16 +18,17 @@ if __package__ in (None, ""):          # python analysis/run.py で呼ばれた�
     __package__ = "analysis"
 
 from analysis import (step0_load, step1_scales, step2_baseline, step3_predict,  # noqa: E402
-                      step4_groups, step5_wellbeing, step6_extra, step7_update)
+                      step4_groups, step5_wellbeing, step6_extra, step7_update,
+                      step8_daily)
 from analysis.common import SYNTH_MARKER, Ctx, Scheme  # noqa: E402
 
 STEPS = [("0", step0_load), ("1", step1_scales), ("2", step2_baseline), ("3", step3_predict),
-         ("4", step4_groups), ("5", step5_wellbeing), ("6", step6_extra), ("7", step7_update)]
+         ("4", step4_groups), ("5", step5_wellbeing), ("6", step6_extra), ("7", step7_update), ("8", step8_daily)]
 REPORT = "分析レポート.md"
 
 
 def main(argv=None) -> Ctx:
-    ap = argparse.ArgumentParser(description="OshiFit 研究版の分析（手順0〜7）")
+    ap = argparse.ArgumentParser(description="OshiFit 研究版の分析（手順0〜8）")
     ap.add_argument("--data", required=True, help="baseline.csv などがあるフォルダ")
     ap.add_argument("--out", required=True, help="結果を書き出すフォルダ（実データを含むのでリポジトリの外に置く）")
     ap.add_argument("--seed", type=int, default=20261112)
@@ -35,7 +36,7 @@ def main(argv=None) -> Ctx:
     ap.add_argument("--boot-cluster", type=int, default=200, help="k-means 安定性のブートストラップ回数")
     ap.add_argument("--stab", type=int, default=200, help="LASSO 安定性選択の繰り返し回数")
     ap.add_argument("--prior-sd", type=float, default=8.0, help="提案の改善量の事前SD（点）")
-    ap.add_argument("--steps", default="0,1,2,3,4,5,6,7", help="実行する手順（手順0は常に実行）")
+    ap.add_argument("--steps", default="0,1,2,3,4,5,6,7,8", help="実行する手順（手順0は常に実行）")
     ap.add_argument("--synthetic", action="store_true", help="合成データとして扱う（目印ファイルがあれば自動）")
     a = ap.parse_args(argv)
 

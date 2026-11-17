@@ -96,7 +96,7 @@ async function answerAll(page, stop) {
   assert.ok(savedN >= 10, `途中経過が保存される（${savedN}問）`);
   // ログアウトして、ログインし直すと続きから
   await page.evaluate(async () => { await window.OFStore.logout(); });
-  await page.reload(); await page.waitForFunction(() => location.hash === "#start" || location.hash === "" || location.hash === "#withdrawn"); await page.evaluate(() => (location.hash = "login"));
+  await page.reload(); await page.waitForFunction(() => location.hash === "#start" || location.hash === "" ); await page.evaluate(() => (location.hash = "login"));
   await page.locator("#li-mail").waitFor({ timeout: 8000 }).catch(async (e) => { console.log("DEBUG", page.url(), (await page.locator("#app").innerText()).slice(0, 200), errors); throw e; });
   await page.locator("#li-mail").fill(MAIL); await page.locator("#li-pw").fill("wrong-pass");
   await page.locator("#li-go").click();
@@ -189,6 +189,8 @@ async function answerAll(page, stop) {
     assert.equal(c1.week, 1); assert.equal(c1.day, 4); assert.ok(Object.keys(c1).some((k) => k.startsWith("did_")));
     assert.equal(c1.W1, undefined, "WHO-5 は3回目だけ");
     assert.equal(c1.sumYen, 1500, "振り返りに、前回からのお金の合計が入る"); assert.equal(c1.sumMin, 90);
+    assert.equal(typeof c1.adjBurn, "number", "本人の記録で直した見込みが保存される"); assert.ok(c1.adjN >= 2 && c1.adjBurnHw > 0 && c1.adjBurnHw < 15);
+    await page.locator("#predadj").waitFor(); assert.match(await page.locator("#predadj").innerText(), /記録\d+回/);
     step("4日後に1回目の振り返り → checkins/1（week=1, day=4、前回からの合計つき）が保存される");
     await page.reload();
     await page.locator(".rounds").waitFor();
@@ -215,20 +217,13 @@ async function answerAll(page, stop) {
   await ap.close();
   step("開発者ページの CSV（baseline / weekly）が DATA_SCHEMA の列で書き出せる");
 
-  // ---------- 参加をやめる
-  await page.goto(BASE + "#withdraw");
-  await page.locator("#wk").check();
-  await page.locator("#w-go").click();
-  await page.waitForFunction(() => location.hash === "#withdrawn");
-  for (let i = 0; i < 25; i++) { d = await read((db) => getDoc(doc(db, "participants", uid))); if (d.data().withdrawn) break; await page.waitForTimeout(200); }
-  assert.equal(d.exists(), true, "記録は残る"); assert.equal(d.data().withdrawn, true); assert.ok(d.data().withdrawnAt);
-  assert.equal(d.data().baselineDone, true);
-  if (group === "B") { const ck2 = await read((db) => getDocs(collection(db, "participants", uid, "checkins"))); assert.equal(ck2.size, 1, "振り返りも残る"); }
-  // やめた人がもう一度ログインしても、記録は増やせない
-  await page.reload(); await page.waitForFunction(() => location.hash === "#start" || location.hash === "" || location.hash === "#withdrawn"); await page.evaluate(() => (location.hash = "login"));
-  await page.locator("#li-mail").fill(MAIL); await page.locator("#li-pw").fill(PW); await page.locator("#li-go").click();
-  await page.waitForFunction(() => location.hash === "#withdrawn");
-  step("参加をやめると「やめた」印が付き、記録は残る（同意どおり研究に使う）。再ログインしても参加は再開しない");
+  // ---------- 「参加をやめる」の欄はない（同意書で参加の同意を得るため、2026-11-17 に削除）
+  await page.goto(BASE + "#mypage");
+  await page.getByText("問い合わせ先").waitFor();
+  assert.equal(await page.getByText("参加をやめる").count(), 0);
+  await page.goto(BASE + "#withdraw"); await page.waitForTimeout(300);
+  assert.equal(await page.getByText("参加をやめますか").count(), 0);
+  step("マイページに「参加をやめる」の欄がない");
 
   assert.deepEqual(errors.filter((e) => !/auth\/|Firestore|offline|unavailable/i.test(e)), [], "ページのエラー: " + errors.join(" / "));
   await browser.close(); await env.cleanup();

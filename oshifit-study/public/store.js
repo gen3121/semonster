@@ -96,14 +96,6 @@
   // 毎日のアンケート（文書IDは端末の日付 YYYY-MM-DD。1日1回）
   function daily(rec) { const { fs } = fb; return fs.setDoc(fs.doc(ref, "daily", rec.date), { ...rec, at: fs.serverTimestamp() }).catch(report); }
 
-  // 参加をやめる：記録は消さず（倫理審査の同意どおり研究に使う）、「やめた」印と時刻を付けてログアウトする。失敗したら例外を投げる
-  async function withdraw() {
-    if (!ref) await init();
-    if (!ref) return true;
-    await fb.fs.updateDoc(ref, { withdrawn: true, withdrawnAt: fb.fs.serverTimestamp() });
-    await logout();
-    return true;
-  }
 
-  window.OFStore = { init, signup, login, social, logout, resetPassword, begin, draft, baseline, avatar, decide, checkin, final, daily, withdraw, get failed() { return failed; }, get uid() { return uid; }, get email() { return email; } };
+  window.OFStore = { init, signup, login, social, logout, resetPassword, begin, draft, baseline, avatar, decide, checkin, final, daily, get failed() { return failed; }, get uid() { return uid; }, get email() { return email; } };
 })();
