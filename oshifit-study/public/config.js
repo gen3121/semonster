@@ -16,5 +16,8 @@ window.OSHIFIT_FIREBASE = {
   appId: "1:48328396908:web:e2164c0c82f5858607c849",
   // measurementId（Google アナリティクス）は使わない：参加者の操作を外部の分析に送らないため
 };
+// Microsoft でのログインに使う Azure のテナント（大阪工業大学）。Azure のアプリが「この組織ディレクトリのみ」のときに必要。
+// 学外の人の Microsoft アカウントも使えるようにするなら、Azure のアプリを「任意の組織ディレクトリと個人の Microsoft アカウント」にして、ここを null にする
+window.OSHIFIT_MS_TENANT = "636389c0-b95c-4828-b98f-f9fcb8d9383a";
 // テスト用：エミュレーターにつなぐ（本番では null のまま）
 window.OSHIFIT_EMULATOR = null; // 例 { auth: "http://127.0.0.1:9099", firestore: ["127.0.0.1", 8080] }

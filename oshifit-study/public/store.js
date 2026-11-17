@@ -60,7 +60,7 @@
   async function social(kind) {
     const { auth, au } = await load();
     const p = kind === "microsoft" ? new auth.OAuthProvider("microsoft.com") : new auth.GoogleAuthProvider();
-    if (kind === "microsoft") p.setCustomParameters({ prompt: "select_account" });
+    if (kind === "microsoft") p.setCustomParameters({ prompt: "select_account", ...(window.OSHIFIT_MS_TENANT ? { tenant: window.OSHIFIT_MS_TENANT } : {}) });
     const cred = await auth.signInWithPopup(au, p);
     return loadMine(cred.user);
   }

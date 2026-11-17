@@ -44,7 +44,7 @@ function login() {
    <div class="row"><button class="btn primary" id="g">Google でログイン</button><button class="btn primary" id="ms">Microsoft（大学のアカウント）でログイン</button></div>
    <div class="row" style="margin-top:10px"><input id="mail" type="email" placeholder="大学のメールアドレス"><button class="btn" id="m">ログイン用のリンクを送る</button></div><p id="msg" class="muted"></p></section>`;
   $("#g").onclick = () => A.signInWithPopup(auth, new A.GoogleAuthProvider()).catch((e) => ($("#msg").textContent = errMsg(e)));
-  $("#ms").onclick = () => { const p = new A.OAuthProvider("microsoft.com"); p.setCustomParameters({ prompt: "select_account" }); A.signInWithPopup(auth, p).catch((e) => ($("#msg").textContent = errMsg(e))); };
+  $("#ms").onclick = () => { const p = new A.OAuthProvider("microsoft.com"); p.setCustomParameters({ prompt: "select_account", ...(window.OSHIFIT_MS_TENANT ? { tenant: window.OSHIFIT_MS_TENANT } : {}) }); A.signInWithPopup(auth, p).catch((e) => ($("#msg").textContent = errMsg(e))); };
   $("#m").onclick = async () => {
     const mail = $("#mail").value.trim(); if (!mail) return;
     try { await A.sendSignInLinkToEmail(auth, mail, { url: location.href, handleCodeInApp: true }); localStorage.setItem("oshifit.adminMail", mail); $("#msg").textContent = "メールを送りました。届いたリンクをこの端末で開いてください。"; }
