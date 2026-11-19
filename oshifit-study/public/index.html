@@ -1383,14 +1383,21 @@ const OMIT=new Set(["Q2",...((window.OSHIFIT_QSET||"short")==="short"?(QN.short_
 const BASE_ITEMS=QN.sections.flatMap(s=>s.items.filter(it=>!OMIT.has(it.id)).map(it=>mkItem(it,s)));
 const AGREE7=["全く当てはまらない","ほとんど当てはまらない","あまり当てはまらない","どちらともいえない","やや当てはまる","かなり当てはまる","非常に当てはまる"];
 function itemOf(id){return BASE_ITEMS.find(i=>i.id===id)}
-function checkItems(){const ps=(planIds().length?planIds():["sns23"]).map(planById), sec="振り返り", lead="前回の振り返りから今日までについて答えてください。", A=v=>({kind:"circle",labels:AGREE7,vals:AGREE7.map((_,j)=>j+1)});
-  const L=ps.map(p=>({id:"did_"+p.id,sec,lead,text:`${S.group==="B"?"提案（プランB）":"提示された提案"}「${planTitle(p)}」を、前回の振り返りから今日までに行いましたか`,kind:"list",labels:["行った","一部行った","行わなかった"],vals:[0,1,2]}));
-  ["Q44","Q45","Q47","Q48"].forEach(k=>L.push({id:k,sec,lead,text:itemOf(k).text,...A()}));
-  L.push({id:"joy",sec,lead,text:"推し活をしているときに幸せを感じた",...A()});
-  L.push({id:"stress",sec,lead:"",text:"前回の振り返りと比べて、推し活のストレスは",kind:"list",labels:["減った","変わらない","増えた"],vals:[0,1,2]});
-  L.push({id:"happy",sec,lead:"",text:"前回の振り返りと比べて、推し活中の幸福感は",kind:"list",labels:["上がった","変わらない","下がった"],vals:[0,1,2]});
+/* 振り返り（2026-11-19 から）：毎日のアンケートと重なる質問（負担4項目・幸せ・提案を行ったか）は聞かない。
+   それらは前回から今日までの毎日の記録から自動でまとめて保存する（periodStats）。振り返りでは「前回と比べた変化」と、3回目だけ WHO-5 を聞く */
+function checkItems(){const sec="振り返り";
+  const L=[{id:"stress",sec,lead:"さきほどのまとめを思い出しながら、前回の振り返りから今日までについて答えてください。",text:"前回の振り返りと比べて、推し活のストレスは",kind:"list",labels:["減った","変わらない","増えた"],vals:[0,1,2]},
+    {id:"happy",sec,lead:"",text:"前回の振り返りと比べて、推し活中の幸福感は",kind:"list",labels:["上がった","変わらない","下がった"],vals:[0,1,2]}];
   if(nextNo()===3)QN.sections.find(s=>s.id==="who5").items.forEach(it=>L.push({...mkItem(it,QN.sections.find(s=>s.id==="who5")),sec:"3回目のみ：最近2週間の気分（WHO-5）"}));
   return L}
+/* 前回の振り返りから今日までの毎日の記録のまとめ（振り返りに保存する。記録がなければ空） */
+function periodStats(from,to){const D=S.daily.filter(d=>(d.at??0)>from&&(d.at??0)<=to),o={};
+  const m=a=>a.length?r0(mean(a)*100)/100:null;
+  const bs=D.map(burn4).filter(x=>x!=null),jy=D.map(d=>d.joy).filter(x=>x!=null),md=D.map(d=>d.mood).filter(x=>x!=null);
+  o.dBurn=m(bs);o.dJoy=m(jy);o.dMood=m(md);
+  o.burn=o.dBurn;o.joyN=o.dJoy==null?null:r0((o.dJoy-1)/6*10000)/100;
+  const ex=[];planIds().forEach(id=>{const v=D.map(d=>d["did_"+id]).filter(x=>x!=null).map(x=>[1,.5,0][x]);o["exec_"+id]=m(v);ex.push(...v)});
+  o.dExec=m(ex);o.dExecDays=D.filter(d=>Object.keys(d).some(k=>k.startsWith("did_")&&d[k]<=1)).length;return o}
 const AGREE5U=["まったくそう思わない","あまりそう思わない","どちらともいえない","ややそう思う","とてもそう思う"];
 const USE=[["J1","自分の推し活のどの仕方がストレスにつながっているかに気づいた"],["J2","推し活の仕方を見直そうと思った"],["K1","OshiFitは自分の推し活を見直すのに役立った"],["K2","OshiFitは使いやすかった"],["K3","示された提案は自分に合っていた"],["K4","未来の見込みを見て不安になった"],["K5","これからもOshiFitを使いたい"]];
 /* ---------- 毎日のアンケート（約1分）。お金・時間は振り返りと最後の調査で自動で合計する ---------- */
@@ -1807,7 +1814,7 @@ function grp(){return S.group}
 function finalOpen(){return !!S.decidedAt&&dayNo()>=FINAL_DAY&&(grp()==="A"||S.weekly.length>=N_CHECK||dayNo()>=FINAL_DAY+7)}
 function canCheck(){return !!S.decidedAt&&grp()!=="A"&&nextNo()<=N_CHECK&&daysToNext()===0&&!finalOpen()}
 function vHome(){if(!S.group)ensureGroup();const sc=S.sc,g=grp(),ps=planIds().map(planById);
-  const W=S.weekly,pts=k=>W.map((w,i)=>`${20+i*48},${110-w[k]*0.9}`).join(" ");
+  const W=S.weekly,pts=k=>W.map((w,i)=>w[k]==null?null:`${20+i*48},${110-w[k]*0.9}`).filter(Boolean).join(" ");
   app.innerHTML=header(g==="A"?"群A":`群${g}・${W.length}／${N_CHECK}回`)+`<main class="stack" style="padding-top:14px">
    <section class="hero"><div class="stack" style="gap:8px"><span class="chip">開始から${dayNo()}日目</span>
     ${g==="A"?`<h2>今の推し活は順調です</h2><p class="xs">今のままの推し活を続けてください。28日目にもう一度だけ回答をお願いします。</p>`:`<p class="xs">${g==="B"?`取り組み中の提案（プランB・${ps.length}つ）`:"提示された提案（プランAを選択）"}</p>${ps.map(p=>`<h2 style="font-size:15px">・${esc(planTitle(p))}</h2>`).join("")}`}</div>
@@ -1817,7 +1824,7 @@ function vHome(){if(!S.group)ensureGroup();const sc=S.sc,g=grp(),ps=planIds().ma
    ${g!=="A"?`<section class="card"><div class="sec"><h3>振り返り　全${N_CHECK}回</h3><span class="xs muted">4〜5日ごと</span></div>
     ${(()=>{const sm=sumDaily(lastCheckAt(),now());return`<p class="xs muted">前回の振り返りから今日まで：お金 ${sm.yen.toLocaleString("ja-JP")}円・時間 ${f1(sm.min/60)}時間（記録 ${sm.n}日）</p>`})()}
     <div class="rounds">${[1,2,3,4,5,6].map(i=>`<div><span class="xs muted">${i}回</span><div class="c ${i<=W.length?"done":i===nextNo()?"next":""}">${i<=W.length?"✓":i}</div></div>`).join("")}</div>
-    ${canCheck()?`<a class="btn primary block" href="#checkin">${nextNo()}回目の振り返りをする（約2分）</a>`:nextNo()<=N_CHECK&&!finalOpen()?`<p class="small muted">次の振り返りは${daysToNext()}日後からできます。</p>`:""}
+    ${canCheck()?`<a class="btn primary block" href="#checkin">${nextNo()}回目の振り返りをする（約1分）</a>`:nextNo()<=N_CHECK&&!finalOpen()?`<p class="small muted">次の振り返りは${daysToNext()}日後からできます。</p>`:""}
     ${finalOpen()?`<a class="btn primary block" href="#final">最後の調査に答える</a>`:nextNo()>N_CHECK?`<p class="small muted">6回の振り返りが終わりました。最後の調査は${Math.max(0,FINAL_DAY-dayNo())}日後に開きます。</p>`:""}</section>`
     :`<section class="card">${finalOpen()?`<a class="btn primary block" href="#final">最後の調査に答える</a>`:`<p class="small muted">最後の調査まで、あと${Math.max(0,FINAL_DAY-dayNo())}日です。</p>`}</section>`}
    ${W.length?`<section class="card"><div class="sec"><h3>振り返りごとの変化</h3><span class="xs"><b style="color:var(--bad)">━</b> 推し疲れ　<b style="color:var(--good)">━</b> 推し活中の幸せ</span></div>
@@ -1843,9 +1850,8 @@ function vCheckin(){if(!S.group)ensureGroup();const g=grp();
      <button class="btn primary block" id="ck-start">振り返りを始める</button></main>${tabbar("checkin")}`;
     $("#ck-start").onclick=()=>{SV.ckIntro=true;vCheckin()};wire();return}
   const items=checkItems();
-  vSurvey("checkin",items,S.wk,`${nextNo()}回目の振り返り`,`${nextNo()}／${N_CHECK}回・開始から${dayNo()}日目`,()=>{const w=S.wk,B=["Q44","Q45","Q47","Q48"];
-    const burn=(mean(B.map(k=>w[k]))-1)/6*100,joyN=(w.joy-1)/6*100;
-    const sm=sumDaily(lastCheckAt(),now());const rec={week:nextNo(),day:dayNo(),...w,burn,joyN,sumYen:sm.yen,sumMin:sm.min,nDaily:sm.n};S.weekly.push({...rec,at:now()});const pp=personalPred();if(pp)Object.assign(rec,{adjBurn:r0(pp.burnout.est*10)/10,adjBurnHw:r0(pp.burnout.hw*10)/10,adjWb:r0(pp.wb.est*10)/10,adjWbHw:r0(pp.wb.hw*10)/10,adjN:pp.burnout.n,adjNWb:pp.wb.n});Object.assign(S.weekly[S.weekly.length-1],rec);if(STUDY)OFStore.checkin(S,rec);S.wk={};SV.checkin=null;SV.ckIntro=null;toast("記録しました");go("home")})}
+  vSurvey("checkin",items,S.wk,`${nextNo()}回目の振り返り`,`${nextNo()}／${N_CHECK}回・開始から${dayNo()}日目`,()=>{const w=S.wk;
+    const sm=sumDaily(lastCheckAt(),now());const rec={week:nextNo(),day:dayNo(),...w,...periodStats(lastCheckAt(),now()),sumYen:sm.yen,sumMin:sm.min,nDaily:sm.n};S.weekly.push({...rec,at:now()});const pp=personalPred();if(pp)Object.assign(rec,{adjBurn:r0(pp.burnout.est*10)/10,adjBurnHw:r0(pp.burnout.hw*10)/10,adjWb:r0(pp.wb.est*10)/10,adjWbHw:r0(pp.wb.hw*10)/10,adjN:pp.burnout.n,adjNWb:pp.wb.n});Object.assign(S.weekly[S.weekly.length-1],rec);if(STUDY)OFStore.checkin(S,rec);S.wk={};SV.checkin=null;SV.ckIntro=null;toast("記録しました");go("home")})}
 function vDaily(){if(!S.group)return go("home");
   if(!dailyOpen()&&!EDIT){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">${S.final?"調査はすべて終わりました。":"今日のアンケートは回答済みです。また明日お願いします。"}</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
   vSurvey("daily",dailyItems(),S.dk,"今日のアンケート",`開始から${dayNo()}日目`,()=>{const rec={date:todayKey(),day:dayNo(),...S.dk};S.daily.push({...rec,at:now()});if(STUDY)OFStore.daily(rec);S.dk={};SV.daily=null;toast("記録しました。また明日お願いします");go("home")})}

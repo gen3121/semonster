@@ -192,10 +192,11 @@ async function answerAll(page, stop) {
     await answerAll(page, async () => (await page.evaluate(() => location.hash)) === "#home");
     let ck; for (let i = 0; i < 25; i++) { ck = await read((db) => getDocs(collection(db, "participants", uid, "checkins"))); if (ck.size) break; await page.waitForTimeout(200); }
     assert.equal(ck.size, 1); const c1 = ck.docs[0].data();
-    assert.equal(c1.week, 1); assert.equal(c1.day, 4); assert.ok(Object.keys(c1).some((k) => k.startsWith("did_")));
+    assert.equal(c1.week, 1); assert.equal(c1.day, 4); assert.ok(!Object.keys(c1).some((k) => k.startsWith("did_")) && c1.Q44 === undefined && c1.joy === undefined, "振り返りでは毎日と重なる質問を聞かない");
+    assert.ok(Object.keys(c1).some((k) => k.startsWith("exec_") && c1[k] === 1), "提案の実行は毎日の記録からまとめる"); assert.equal(c1.dMood, 5); assert.equal(c1.dExecDays, 1); assert.equal(typeof c1.dBurn, "number"); assert.ok([0, 1, 2].includes(c1.stress));
     assert.equal(c1.W1, undefined, "WHO-5 は3回目だけ");
     assert.equal(c1.sumYen, 1500, "振り返りに、前回からのお金の合計が入る"); assert.equal(c1.sumMin, 90);
-    assert.equal(typeof c1.adjBurn, "number", "本人の記録で直した見込みが保存される"); assert.ok(c1.adjN >= 2 && c1.adjBurnHw > 0 && c1.adjBurnHw < 15);
+    assert.equal(typeof c1.adjBurn, "number", "本人の記録で直した見込みが保存される"); assert.ok(c1.adjN === 1 && c1.adjBurnHw > 0 && c1.adjBurnHw < 15);
     await page.locator("#predadj").waitFor(); assert.match(await page.locator("#predadj").innerText(), /記録\d+回/);
     step("振り返りの前に、前回からのまとめ（お金・時間・気分・負担・提案を行った日）と、直した見込みが出る");
     step("4日後に1回目の振り返り → checkins/1（week=1, day=4、前回からの合計つき）が保存される");

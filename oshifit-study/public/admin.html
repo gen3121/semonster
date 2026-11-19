@@ -120,13 +120,13 @@ export function tables(P) {
     if (p.pred) { Object.keys(p.pred.B || {}).forEach((k) => (r["pred_B_" + k] = p.pred.B[k])); r.pred_hw = p.pred.hw; r.pred_hwWb = p.pred.hwWb; }
     return r;
   });
-  const wkCols = ["pid", "group", "week", "day", "at", "sumYen", "sumMin", "nDaily", ...PLANS.map((x) => "did_" + x), "Q44", "Q45", "Q47", "Q48", "joy", "stress", "happy", "W1", "W2", "W3", "W4", "W5", "burn", "joyN", "adjBurn", "adjBurnHw", "adjWb", "adjWbHw", "adjN", "adjNWb"];
+  const wkCols = ["pid", "group", "week", "day", "at", "sumYen", "sumMin", "nDaily", ...PLANS.map((x) => "did_" + x), "Q44", "Q45", "Q47", "Q48", "joy", "stress", "happy", "W1", "W2", "W3", "W4", "W5", "burn", "joyN", "dBurn", "dJoy", "dMood", "dExec", "dExecDays", ...PLANS.map((x) => "exec_" + x), "adjBurn", "adjBurnHw", "adjWb", "adjWbHw", "adjN", "adjNWb"];
   const weekly = P.flatMap((p) => p.cks.map((c) => ({ ...c, pid: p.pid, group: p.group, at: iso(c.at) })));
   const trCols = ["pid", "pilot", "withdrawn", "group", "final_day", "final_at", ...FINAL_ITEMS, ...SC.map((k) => k + "_post"), "n_checkins", "exec_rate", "total_yen", "total_min", "n_daily"];
   const trial = P.filter((p) => p.final).map((p) => {
     const r = { pid: p.pid, pilot: p.pilot, withdrawn: p.withdrawn ? 1 : 0, group: p.group, final_day: p.final.day, final_at: iso(p.final.at), n_checkins: p.cks.length, total_yen: p.final.totals?.yen, total_min: p.final.totals?.min, n_daily: p.final.totals?.n };
     FINAL_ITEMS.forEach((id) => (r[id] = p.final.answers?.[id])); SC.forEach((k) => (r[k + "_post"] = p.final.scores?.[k]));
-    if (p.group === "B") { const v = p.cks.flatMap((c) => Object.keys(c).filter((x) => x.startsWith("did_")).map((x) => [1, 0.5, 0][c[x]])).filter((x) => x != null); r.exec_rate = v.length ? v.reduce((a, b) => a + b, 0) / v.length : ""; }
+    if (p.group === "B") { const src = (p.daily || []).length ? p.daily : p.cks; const v = src.flatMap((c) => Object.keys(c).filter((x) => x.startsWith("did_")).map((x) => [1, 0.5, 0][c[x]])).filter((x) => x != null); /* 実行率は毎日のアンケートから（旧版の振り返りしかなければ振り返りから） */ r.exec_rate = v.length ? v.reduce((a, b) => a + b, 0) / v.length : ""; }
     return r;
   });
   const dCols = ["pid", "group", "date", "day", "at", "mood", "yen", "minutes", "joy", "Q44", "Q45", "Q47", "Q48", ...PLANS.map((x) => "did_" + x)];

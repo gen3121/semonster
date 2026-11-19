@@ -21,12 +21,13 @@ participants/{uid}                 … 参加者1人（uid は Firebase Authenti
   final          {answers:{…}, scores:{…}, day, at, totals:{yen, min, n}}（最後の調査。totals は毎日のアンケートの合計と回答日数）
 participants/{uid}/checkins/{week} … 振り返り（week = 何回目か 1〜6。文書IDも同じ）
   week, day（開始からの日数）, at（サーバー時刻）
-  did_<planId>   0=行った 1=一部行った 2=行わなかった
-  Q44, Q45, Q47, Q48, joy   1〜7
+  did_<planId>, Q44, Q45, Q47, Q48, joy   旧版のみ（2026-11-19 から振り返りでは聞かない。毎日のアンケートで聞く）
+  dBurn          前回から今日までの毎日の負担4項目の平均（0〜100）。burn にも同じ値（画面のグラフ用）
+  dJoy, dMood    同じ期間の「幸せを感じた」・気分の平均（1〜7）。joyN は dJoy を0〜100にしたもの
+  exec_<planId>  同じ期間の、その提案の実行（行った1・一部0.5・行わなかった0）の平均。dExec は全提案の平均、dExecDays は行った日（一部も含む）の数
   stress         0=減った 1=変わらない 2=増えた
   happy          0=上がった 1=変わらない 2=下がった
   W1〜W5         3回目だけ（0〜5）
-  burn, joyN     0〜100（画面のグラフ用）
   adjBurn, adjBurnHw, adjWb, adjWbHw, adjN, adjNWb   その時点で本人の記録で直した28日目の見込み（推し疲れ・WHO-5）と80%区間の半幅、使った記録の数（index.html の personalPred）
   sumYen, sumMin, nDaily   前回の振り返り（1回目は群が決まった時）から今回までの、毎日のアンケートのお金・時間の合計と回答日数
 participants/{uid}/daily/{YYYY-MM-DD} … 毎日のアンケート（全群。1日1回、書き換え不可。文書IDは端末の日付）
@@ -61,7 +62,7 @@ weekly.csv には `sumYen, sumMin, nDaily, adjBurn, adjBurnHw, adjWb, adjWbHw, a
 ### trial.csv（1行1人。最後の調査まで）
 `pid, pilot, withdrawn, group, final_day, final_at,` 最後の調査の項目 `W1 … W5, H1 … H4, P1 … P14, Q29 … Q34, Q39, Q44 … Q51, J1, J2, K1 … K5`（群Aは J/K なし）、
 最後の得点 `wb_post, joy_post, sleep_post, money_post, duty_post, compare_post, burnout_post, who5raw_post, shs_post, pss_post`、
-`n_checkins`（振り返りの回数）、`total_yen, total_min, n_daily`（28日間の毎日のアンケートの合計と回答日数）、`exec_rate`（群Bで「行った=1、一部=0.5、行わなかった=0」の平均）
+`n_checkins`（振り返りの回数）、`exec_rate` は毎日のアンケートの「今日、提案を行ったか」から計算（旧版は振り返りから）、`total_yen, total_min, n_daily`（28日間の毎日のアンケートの合計と回答日数）、`exec_rate`（群Bで「行った=1、一部=0.5、行わなかった=0」の平均）
 
 ### free.csv（自由記述。個人が特定される内容がないか確認してから使う）
 `pid, where(baseline_Q62 / final_how), text`

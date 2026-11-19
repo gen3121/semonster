@@ -213,10 +213,13 @@ def make(out: Path, n: int = 120, seed: int = 1) -> Path:
                 w[k] = it[k] if wk == 3 else ""
             w["burn"] = round((np.mean([w[k] for k in ["Q44", "Q45", "Q47", "Q48"]]) - 1) / 6 * 100, 2)
             w["joyN"] = round((w["joy"] - 1) / 6 * 100, 2)
+            for c in did_cols + ["Q44", "Q45", "Q47", "Q48", "joy"]:
+                w[c] = ""   # 2026-11-19 から振り返りでは聞かない（毎日の記録から自動でまとめる）
             rows_w.append(w)
         week_rows += rows_w
         # 毎日のアンケート（全群。8割5分の日に答える。提案を行った日は気分が少し高い）
         resp = rng.uniform(0.6, 0.98)
+        ddids = []
         for dd in range(1, 29):
             if rng.random() > resp:
                 continue
@@ -230,6 +233,7 @@ def make(out: Path, n: int = 120, seed: int = 1) -> Path:
                 u = rng.random()
                 v = 0 if u < 0.7 * p_exec else (1 if u < 0.7 * p_exec + 0.15 else 2)
                 r[f"did_{p_}"] = v
+                ddids.append({0: 1.0, 1: 0.5, 2: 0.0}[v])
                 ex = max(ex, {0: 1.0, 1: 0.5, 2: 0.0}[v])
             it = items_from_latent(rng, S, Lw)
             for k in ["Q44", "Q45", "Q47", "Q48"]:
@@ -252,7 +256,7 @@ def make(out: Path, n: int = 120, seed: int = 1) -> Path:
                 t[k] = int(rng.integers(1, 6)) if g != "A" else ""
             t.update({f"{k}_post": round(scp[k], 2) for k in SCORE_KEYS})
             t["n_checkins"] = n_check
-            t["exec_rate"] = round(float(np.mean(dids)), 4) if (g == "B" and dids) else ""
+            t["exec_rate"] = round(float(np.mean(ddids)), 4) if (g == "B" and ddids) else ""   # 実行率は毎日の記録から
             trial_rows.append(t)
             if rng.random() < 0.1:
                 free_rows.append({"pid": pid, "where": "final_how", "text": "（合成）最後の調査の自由記述の例"})

@@ -115,7 +115,10 @@ def run(ctx: Ctx):
             w3 = w3.assign(wb_r3=w3[S.who5_items].sum(axis=1, min_count=5) * 4)
             wide = wide.drop(columns=["wb_r3", "day_r3"]).merge(
                 w3[["pid", "wb_r3", "day"]].rename(columns={"day": "day_r3"}), on="pid", how="left")
-        er = exec_rate_from_weekly(weekly[weekly["group"] == "B"] if "group" in weekly.columns else weekly)
+        # 実行率：毎日のアンケート（daily.csv）の「今日、提案を行ったか」から出す（2026-11-19 から振り返りでは聞かない）。
+        # daily.csv がなければ、旧版の振り返りの did_ から出す
+        src = read_csv(d / "daily.csv") if (d / "daily.csv").exists() else weekly
+        er = exec_rate_from_weekly(src[src["group"] == "B"] if "group" in src.columns else src)
         wide = wide.merge(er, left_on="pid", right_index=True, how="left")
         for pid, a, b in zip(wide["pid"], wide["exec_rate"], wide["exec_rate_rc"]):
             if np.isfinite(a) and np.isfinite(b) and abs(a - b) > 0.01:
