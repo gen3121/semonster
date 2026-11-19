@@ -136,7 +136,9 @@ const CFG_LABEL = {
 const flat = (o, pre = "") => Object.entries(o).flatMap(([k, v]) => (v && typeof v === "object" && !Array.isArray(v) ? flat(v, pre + k + ".") : [[pre + k, v]]));
 const setPath = (o, path, v) => { const ks = path.split("."); let c = o; ks.slice(0, -1).forEach((k) => (c = c[k] = c[k] || {})); c[ks[ks.length - 1]] = v; };
 const protoNow = () => { const p = ST.protocolOf(CFG); delete p.version; return p; };
-const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// 値が同じか（Firestore は項目を名前の順に並べ替えて返すので、並び順を無視して比べる）
+const canon = (v) => (Array.isArray(v) ? v.map(canon) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
 function protoWarn() {
   if (!MG.proto) return "";
   const last = MG.history[MG.history.length - 1];

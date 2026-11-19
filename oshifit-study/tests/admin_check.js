@@ -58,6 +58,7 @@ window.OSHIFIT_EMULATOR={auth:"http://127.0.0.1:9099",firestore:["127.0.0.1",808
   let hs = await read((db) => getDocs(collection(db, "study", "protocol", "history")));
   assert.equal(hs.size, 1);
   assert.match(await page.locator("#manage").innerText(), /版 1・変更できます/);
+  assert.doesNotMatch(await page.locator("#manage").innerText(), /直接変えた可能性/, "開発者ページから作った直後は警告を出さない");
   step("「初期値で実験の条件を作る」→ study/protocol（版1）と history/1 ができる");
 
   // ---------- 提案を plans に書き込む
@@ -79,6 +80,7 @@ window.OSHIFIT_EMULATOR={auth:"http://127.0.0.1:9099",firestore:["127.0.0.1",808
   const h2 = await read((db) => getDoc(doc(db, "study", "protocol", "history", "2")));
   assert.equal(h2.data().reason, "試験：間隔を5日に"); assert.deepEqual(h2.data().changed.map((c) => [c.k, c.before, c.after]), [["gapDays", 4, 5]]);
   assert.equal(h2.data().by, MAIL);
+  assert.doesNotMatch(await page.locator("#manage").innerText(), /直接変えた可能性/, "開発者ページから変えた直後は警告を出さない");
   step("値を変えて理由を書くと版2になり、history/2 に前の値・新しい値・理由・だれが が残る（理由がないと保存しない）");
 
   // ---------- 範囲外の値は保存しない
