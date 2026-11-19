@@ -1897,7 +1897,8 @@ function vAdmin(){app.className="app wide";
   const rows=[["7F3K-92QD","10/28","B","sns23",3,12,15,null],["Q8M2-7XLA","10/22","B","choose3",2,16,11,null],["E4W9-1TPK","10/24","C","donate",3,14,6,null],["K9LN-55RC","10/08","A","",0,29,15,16],["B3V7-H1QE","10/27","B","budget",2,10,18,null],["2M8P-4ZDW","10/18","C","mute",6,30,13,14]];
   const al=[["bad","Q8M2-7XLA：振り返りが10日以上ない（開始から16日目・2回済み）"],["bad","E4W9-1TPK：3回目のWHO-5が6点（7点以下）"],["w","2M8P-4ZDW：推し疲れが高い状態が2回続いた（5回目）"]];
   app.innerHTML=header("見本データ")+`<main class="stack" style="padding-top:16px">
-   <div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><h1 style="font-size:24px">開発者ページ</h1><p class="small muted">大学のGoogleアカウントでログイン中（登録した2名のみ）</p></div><span class="chip ok">閲覧のみ（書き換え・削除はできません）</span></div>
+   <div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><h1 style="font-size:24px">開発者ページ</h1><p class="small muted">大学のGoogleアカウントでログイン中（登録した2名のみ）</p></div>
+   <p class="callout" style="flex-basis:100%"><b>これは見本の画面です。</b>人数・研究用の番号・確認が必要な人は、画面の説明のための架空の値で、実際の参加者ではありません。実際のデータは研究版の開発者ページ（/admin.html）で見ます。</p><span class="chip ok">閲覧のみ（書き換え・削除はできません）</span></div>
    <section class="kpis">${[["同意して開始",40],["質問紙を完了",38],["群A（順調）",9],["群B（プランB）",17],["群C（プランA）",12],["最後の調査まで完了",6],["注意確認の誤答",1]].map(([l,v])=>`<div class="kpi"><span>${l}</span><b>${v}</b></div>`).join("")}</section>
    <section class="grid2"><div class="card"><div class="sec"><h3>振り返りの進み具合</h3><span class="xs muted">回答した人 / 目安日を過ぎた人</span></div>
      <div class="rgrid">${[[27,29],[24,27],[19,22],[14,17],[9,12],[6,8]].map(([d,u],i)=>`<div class="sunk" style="padding:10px"><span class="xs muted">${i+1}回目${i===2?"（WHO-5）":""}</span><div class="num" style="font-size:20px">${d}<span class="xs muted"> / ${u}人</span></div><div class="track" style="color:var(--primary);margin-top:6px"><i style="width:${r0(d/u*100)}%"></i></div></div>`).join("")}</div></div>

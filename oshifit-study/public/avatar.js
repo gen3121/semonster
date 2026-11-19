@@ -66,17 +66,27 @@
       halfup: `<path d="M31 62Q31 27 65 26Q99 27 99 62L101 112Q65 120 29 112Z" fill="${d}"/><circle cx="65" cy="24" r="7" fill="${d}"/>`,
       braid: `<path d="M32 62Q32 28 65 27Q98 28 98 62L96 90L34 90Z" fill="${d}"/>${[0, 1, 2, 3].map((i) => `<ellipse cx="96" cy="${92 + i * 9}" rx="6" ry="5.5" fill="${d}"/>`).join("")}`,
       mlong: `<path d="M34 60Q34 29 65 28Q96 29 96 60L94 80L36 80Z" fill="${d}"/><ellipse cx="65" cy="96" rx="6" ry="10" fill="${d}"/>`,
-      wolf: `<path d="M33 62Q32 28 65 27Q98 28 97 62L98 92Q90 86 86 96L44 96Q40 86 32 92Z" fill="${d}"/>`,
+      wolf: `<path d="M33 62Q32 26 65 25Q98 26 97 62L96 80L34 80Z" fill="${d}"/>`,
       perm: `<path d="M32 60Q31 28 65 27Q99 28 98 60Q102 72 94 80L36 80Q28 72 32 60Z" fill="${d}"/>`,
       flip: `<path d="M31 62Q30 27 65 26Q100 27 99 62Q100 80 96 86Q102 88 106 82Q105 92 95 93L35 93Q25 92 24 82Q28 88 34 86Q30 80 31 62Z" fill="${d}"/>`,
       mwave: `<path d="M31 60Q30 26 65 25Q100 26 99 60Q104 74 98 86Q104 98 98 110Q65 117 32 110Q26 98 32 86Q26 74 31 60Z" fill="${d}"/>`,
       center: `<path d="M33 62Q32 27 65 26Q98 27 97 62L95 76Q65 82 35 76Z" fill="${d}"/>`,
-      spiral: `<path d="M29 62Q26 20 65 19Q104 20 101 62Q103 74 97 80L33 80Q27 74 29 62Z" fill="${d}"/>${curls([[31, 72], [99, 72], [34, 79], [96, 79]], 5.5, d, shade(c, 1.3))}`,
+      spiral: `<path d="M29 62Q26 20 65 19Q104 20 101 62Q103 74 97 80L33 80Q27 74 29 62Z" fill="${d}"/>${blobs([[31, 70, 6], [99, 70, 6], [34, 78, 5.5], [96, 78, 5.5]], d)}`,
     }[k] || "";
   }
   // 巻き毛（スパイラルパーマ）：小さな円を並べ、中に巻きの線を入れる
   function curls(pts, r, fill, line) {
-    return pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}"/><path d="M${x - r * 0.5} ${y + r * 0.1}Q${x} ${y - r * 0.7} ${x + r * 0.5} ${y + r * 0.1}" stroke="${line}" stroke-width="1.1" fill="none" opacity=".7"/>`).join("");
+    const edge = shade(fill, 0.62);
+    return pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}" stroke="${edge}" stroke-width=".7"/><path d="M${x - r * 0.55} ${y + r * 0.15}Q${x - r * 0.1} ${y - r * 0.75} ${x + r * 0.55} ${y - r * 0.05}Q${x + r * 0.2} ${y + r * 0.5} ${x - r * 0.1} ${y + r * 0.2}" stroke="${line}" stroke-width="1.1" fill="none" opacity=".75" stroke-linecap="round"/>`).join("");
+  }
+  // 縁のでこぼこ（輪郭線なし）
+  const blobs = (pts, c) => pts.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/>`).join("");
+  // 巻きの線：決まった位置に、向きと大きさを少しずつ変えて置く（毎回同じ絵になる）
+  function squiggles(c) {
+    const P = [[40, 32], [50, 26], [60, 23], [71, 23], [81, 27], [90, 33], [36, 42], [46, 37], [57, 33], [68, 32], [79, 35], [93, 42], [42, 46], [53, 44], [64, 42], [75, 44], [86, 45], [34, 54], [96, 54], [50, 52], [70, 52], [60, 50], [81, 51]];
+    const lt = shade(c, 1.55), dk = shade(c, 0.6);
+    return P.map(([x, y], i) => { const w = 2.6 + (i % 3) * 0.6, f = i % 2 ? 1 : -1, col = i % 3 === 0 ? dk : lt;
+      return `<path d="M${x - w} ${y}q${w / 2} ${-2.4 * f} ${w} 0t${w} 0" stroke="${col}" stroke-width="1" fill="none" opacity=".8" stroke-linecap="round"/>`; }).join("");
   }
   const arc = (cx, cy, rx, ry, a0, a1, n) => Array.from({ length: n }, (_, i) => { const a = (a0 + ((a1 - a0) * i) / (n - 1)) * Math.PI / 180; return [Math.round((cx + rx * Math.cos(a)) * 10) / 10, Math.round((cy + ry * Math.sin(a)) * 10) / 10]; });
   // 細部（毛流れ）：前髪の毛先の位置。つむじ（65,26）から毛先へ細い線を引き、layer は毛先をとがらせる（男性の短い髪型など）
@@ -85,7 +95,7 @@
     vshort: { t: [[46, 42], [56, 39], [66, 38], [76, 39], [85, 42]], layer: 1 },
     side: { t: [[42, 47], [50, 46], [58, 42], [68, 39], [80, 39], [89, 43]], layer: 1 },
     mash: { t: [[40, 54], [47, 51], [55, 50], [63, 50], [71, 50], [79, 50], [87, 51], [92, 54]], layer: 1 },
-    wolf: { t: [[42, 51], [50, 47], [58, 47], [66, 46], [73, 42], [82, 44], [90, 49]], layer: 1 },
+    wolf: { t: [[43, 55], [52, 53], [62, 52], [72, 52], [81, 53], [90, 56]] },
     center: { t: [[39, 56], [44, 51], [86, 51], [91, 56]], layer: 1 },   // 分け目の近くは毛先を作らない
     twoblock: { t: [[44, 46], [52, 46], [60, 48], [68, 48], [76, 45], [85, 44]], layer: 1 },
     upbang: { t: [[42, 46], [50, 38], [58, 35], [72, 35], [82, 39], [89, 46]] },
@@ -114,7 +124,7 @@
     return tufts + lines + shine;
   }
   // 後ろ髪の毛流れと毛先（長い髪）：[毛先の高さ, 毛先をとがらせるか]
-  const BACKTIPS = { long: [128, 1], hime: [126, 1], semi: [108, 1], halfup: [112, 1], wave: [124, 0], mwave: [108, 0], bob: [92, 0], sbob: [84, 0], flip: [92, 0], wolf: [94, 0], center: [76, 0], mlong: [80, 0] };
+  const BACKTIPS = { long: [128, 1], hime: [126, 1], semi: [108, 1], halfup: [112, 1], wave: [124, 0], mwave: [108, 0], bob: [92, 0], sbob: [84, 0], flip: [92, 0], center: [76, 0], mlong: [80, 0] };
   function backDetail(k, c) {
     const B = BACKTIPS[k];
     if (!B) return "";
@@ -123,6 +133,14 @@
     const lines = xs.map(([x0, x1]) => `<path d="M${x0} 66Q${x0 + (x0 < 65 ? -1 : 1)} ${(66 + by) / 2} ${x1} ${by - 5}" stroke="${dk}" stroke-width=".9" fill="none" opacity=".5"/>`).join("");
     const tips = sharp ? [31, 36, 41, 89, 94, 99].map((x) => `<path d="M${x - 2.5} ${by - 3}L${x} ${by + 3}L${x + 2.5} ${by - 3}Z" fill="${shade(c, 0.82)}"/>`).join("") : "";
     return lines + tips;
+  }
+  // えり足（服の上に描く）：ウルフの細く長い毛先を肩に流す
+  function nape(k, c) {
+    if (k !== "wolf") return "";
+    const d = shade(c, 0.82), dk = shade(c, 0.6);
+    const L = `<path d="M36 74Q33 92 38 104L34 118L42 106L42 120L47 104Q46 90 46 78Z" fill="${d}"/><path d="M38 84Q37 98 40 108" stroke="${dk}" stroke-width=".9" fill="none" opacity=".6"/>`;
+    const R = `<path d="M94 74Q97 92 92 104L96 118L88 106L88 120L83 104Q84 90 84 78Z" fill="${d}"/><path d="M92 84Q93 98 90 108" stroke="${dk}" stroke-width=".9" fill="none" opacity=".6"/>`;
+    return L + R;
   }
   // 前髪・頭頂部（顔の上に描く）
   function hairFront(k, c) {
@@ -146,10 +164,12 @@
       // センターパート：真ん中で分け、前髪を左右に流して耳の上までかぶせる（カーテンバング）
       center: `<path d="M34 60Q31 24 65 23Q99 24 96 60Q95 57 92 55Q84 52 78 45Q70 38 66 27L64 27Q60 38 52 45Q46 52 38 55Q35 57 34 60Z" fill="${c}"/><path d="M38 50Q37 56 39 60L36 62Q34 56 34 50Z" fill="${c}"/><path d="M92 50Q93 56 91 60L94 62Q96 56 96 50Z" fill="${c}"/><path d="M65 24L65 29" stroke="${shade(c, 0.65)}" stroke-width="1.3"/><path d="M61 32Q53 40 44 51" stroke="${hl}" stroke-width="1.3" fill="none" opacity=".6"/><path d="M69 32Q77 40 86 51" stroke="${hl}" stroke-width="1.3" fill="none" opacity=".6"/>`,
       // スパイラルパーマ：丸いシルエットに細かい巻きを重ね、前髪も巻いて眉の上まで
-      spiral: `<path d="M31 60Q28 19 65 18Q102 19 99 60Q95 51 86 50Q76 47 65 48Q54 47 44 50Q35 51 31 60Z" fill="${c}"/>${curls(arc(65, 40, 31, 20, 180, 360, 9), 6.5, c, shade(c, 1.35))}${curls([[39, 49], [48, 50], [57, 51], [65, 51], [73, 51], [82, 50], [91, 49], [32, 57], [98, 57]], 4.8, c, shade(c, 1.35))}`,
+      // スパイラルパーマ：ふくらんだシルエットの縁をでこぼこにし、中に細かい巻きの線（明るい線と暗い線）を不規則に入れる
+      spiral: `<path d="M31 60Q28 19 65 18Q102 19 99 60Q95 51 86 50Q76 47 65 48Q54 47 44 50Q35 51 31 60Z" fill="${c}"/>${blobs([[36, 34, 7], [44, 25, 7.5], [55, 20, 7], [66, 18, 7.5], [77, 20, 7], [87, 26, 7.5], [95, 35, 7], [33, 44, 6.5], [98, 45, 6.5], [38, 50, 5], [46, 51, 5.5], [55, 52, 5], [64, 52, 5.5], [73, 52, 5], [82, 51, 5.5], [91, 50, 5], [31, 56, 5], [99, 56, 5]], c)}${squiggles(c)}`,
       spiky: `<path d="M35 52L33 34L44 40L46 24L56 34L65 20L74 34L84 24L86 40L97 34L95 52Q86 42 65 42Q44 42 35 52Z" fill="${c}"/>`,
       perm: `<path d="M33 56Q30 28 65 25Q100 28 97 56Q92 46 82 48Q74 40 65 46Q56 40 48 48Q38 46 33 56Z" fill="${c}"/>${[40, 52, 65, 78, 90].map((x) => `<circle cx="${x}" cy="${x === 65 ? 30 : 36}" r="7" fill="${c}"/>`).join("")}`,
-      wolf: `<path d="${cap(56)}Q84 44 72 42Q62 52 50 46Q40 50 35 56Z" fill="${c}"/>`,
+      // ウルフ：トップは短めで動きを出し、前髪は束感のあるぎざぎざ。顔まわりはあごまでのレイヤー（えり足は nape で肩に流す）
+      wolf: `<path d="M34 60Q31 23 65 22Q99 23 96 60L93 51L90 58L86 49L81 55L77 47L72 54L67 46L62 54L57 47L52 55L47 49L43 57L39 51Z" fill="${c}"/><path d="M34 52Q31 68 37 84L39 75L42 86L44 70Q43 60 41 54Z" fill="${c}"/><path d="M96 52Q99 68 93 84L91 75L88 86L86 70Q87 60 89 54Z" fill="${c}"/>`,
       mlong: `<path d="${cap(54)}Q86 42 66 41Q46 42 35 54Z" fill="${c}"/>`,
       flip: `<path d="${cap(55)}Q86 47 78 43Q66 52 52 47Q42 48 35 55Z" fill="${c}"/>`,
       mwave: `<path d="${cap(55)}Q84 45 72 41Q60 50 46 47Q40 50 35 55Z" fill="${c}"/>`,
@@ -255,7 +275,7 @@
 ${hairBack(av.hair, hc)}${backDetail(av.hair, hc)}
 <path d="M58 88L72 88L73 104L57 104Z" fill="${shade(sk, 0.9)}"/>
 <path d="M16 140Q18 104 50 100Q57 106 65 106Q73 106 80 100Q112 104 114 140Z" fill="${sh}"/><path d="M50 100Q57 107 65 107Q73 107 80 100L76 99Q70 103 65 103Q60 103 54 99Z" fill="${shade(sh, 0.8)}"/>
-<ellipse cx="36" cy="67" rx="4.5" ry="7" fill="${shade(sk, 0.95)}"/><ellipse cx="94" cy="67" rx="4.5" ry="7" fill="${shade(sk, 0.95)}"/>
+${nape(av.hair, hc)}<ellipse cx="36" cy="67" rx="4.5" ry="7" fill="${shade(sk, 0.95)}"/><ellipse cx="94" cy="67" rx="4.5" ry="7" fill="${shade(sk, 0.95)}"/>
 <path d="${facePath(av.face)}" fill="${sk}"/>
 ${hairFront(av.hair, hc)}${detail(av.hair, hc)}${strands(av.strand || 0, hc)}
 ${brows(av.brow, shade(hc, 0.85), mood)}${eyes(av.eye, EYE_COLOR[av.eyeColor] || EYE_COLOR[0], mood, sk)}${bags}${nose(av.nose, sk)}${cheek}${mth}${beard(av.beard, hc)}${glasses(av.glasses)}
