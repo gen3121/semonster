@@ -7,7 +7,7 @@ const path = require("path");
 const { execFileSync } = require("child_process");
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const { initializeTestEnvironment } = require("@firebase/rules-unit-testing");
-const { doc, getDoc, getDocs, setDoc, updateDoc, collection } = require("firebase/firestore");
+const { doc, getDoc, getDocs, setDoc, updateDoc, collection, Timestamp } = require("firebase/firestore");
 
 const BASE = "http://127.0.0.1:5000/";
 const CACHE = path.join(__dirname, ".sdk-cache");
@@ -25,6 +25,15 @@ window.OSHIFIT_EMULATOR={auth:"http://127.0.0.1:9099",firestore:["127.0.0.1",808
   await env.clearFirestore();
   const read = async (fn) => { let out; await env.withSecurityRulesDisabled(async (c) => { out = await fn(c.firestore()); }); return out; };
   await read((db) => setDoc(doc(db, "admins", MAIL), { name: "試験" }));
+  // 書き出しの確認用：2人分の記録（群B と群C、毎日のアンケートは日付をずらす）
+  await read(async (db) => {
+    const T = (d) => Timestamp.fromDate(new Date(d));
+    await setDoc(doc(db, "participants", "u1"), { pid: "AAAA-1111", mode: "study", group: "B", planIds: ["sns23"], baselineDone: true, answers: { Q1: 21 }, scores: { wb: 40 }, createdAt: T("2026-11-23T01:00:00Z"), decidedAt: T("2026-11-23T01:20:00Z") });
+    await setDoc(doc(db, "participants", "u2"), { pid: "BBBB-2222", mode: "study", group: "C", planIds: ["mute"], baselineDone: true, answers: { Q1: 22 }, scores: { wb: 50 }, createdAt: T("2026-11-24T01:00:00Z"), decidedAt: T("2026-11-24T01:20:00Z") });
+    for (const [u, d] of [["u1", "2026-11-24"], ["u1", "2026-11-25"], ["u1", "2026-11-26"], ["u2", "2026-11-25"], ["u2", "2026-11-27"]])
+      await setDoc(doc(db, "participants", u, "daily", d), { date: d, day: 1, mood: 5, yen: 1000, minutes: 60, joy: 5, at: T(d + "T12:00:00Z") });
+    await setDoc(doc(db, "notes", "BBBB-2222"), { text: "デバッグ参加", exclude: true });
+  });
 
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1100, height: 900 } });
@@ -50,6 +59,30 @@ window.OSHIFIT_EMULATOR={auth:"http://127.0.0.1:9099",firestore:["127.0.0.1",808
   await pop.locator("#sign-in").click();
   await page.locator("#manage").waitFor({ timeout: 20000 });
   step("開発者（admins に登録した Google アカウント）でログインすると、「設定と管理」が出る");
+
+  // ---------- データを選んで書き出す
+  await page.locator("#ex-kind").selectOption("daily");
+  await page.locator("#ex-show").click();
+  assert.match(await page.locator("#ex-count").innerText(), /表示中 5件／全 5件/);
+  await page.locator("#ex-from").fill("2026-11-25"); await page.locator("#ex-to").fill("2026-11-26");
+  await page.locator("#ex-show").click();
+  assert.match(await page.locator("#ex-count").innerText(), /表示中 3件／全 5件/);
+  await page.locator("#ex-pid").selectOption("AAAA-1111"); await page.locator("#ex-show").click();
+  assert.match(await page.locator("#ex-count").innerText(), /表示中 2件/);
+  await page.locator("#ex-pid").selectOption(""); await page.locator("#ex-from").fill(""); await page.locator("#ex-to").fill("");
+  await page.locator("#ex-excl").uncheck(); await page.locator("#ex-show").click();
+  assert.match(await page.locator("#ex-count").innerText(), /表示中 3件/, "除外した人（BBBB-2222）を外す");
+  await page.locator("#ex-excl").check(); await page.locator("#ex-group").selectOption("C"); await page.locator("#ex-show").click();
+  assert.match(await page.locator("#ex-count").innerText(), /表示中 2件/);
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.locator("#ex-csv").click()]);
+  const body = fs.readFileSync(await dl.path(), "utf8").replace(/^\uFEFF/, "").split("\r\n");
+  assert.equal(body.length, 3, "見出し＋2行"); assert.ok(body[0].split(",").includes("yen")); assert.ok(body.slice(1).every((l) => l.startsWith("BBBB-2222")));
+  assert.match(dl.suggestedFilename(), /oshifit_daily_groupC\.csv/);
+  await page.locator("#ex-kind").selectOption("baseline"); await page.locator("#ex-group").selectOption(""); await page.locator("#ex-from").fill("2026-11-24"); await page.locator("#ex-show").click();
+  assert.match(await page.locator("#ex-count").innerText(), /表示中 1件／全 2件/, "開始時は開始した日（日本時間）で絞る");
+  await page.locator("#ex-kind").selectOption("daily"); await page.locator("#ex-from").fill(""); await page.locator("#ex-show").click();
+  await page.locator("#extract").screenshot({ path: path.join(OUT, "07_extract.png") });
+  step("「データを選んで書き出す」：種類・期間・研究用の番号・群・除外の有無で絞り、表示中の行だけを CSV に保存できる");
 
   // ---------- ② 実験の条件を作る（版1・履歴1）
   await act(() => page.locator("#pr-create").click());

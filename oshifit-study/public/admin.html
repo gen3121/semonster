@@ -107,6 +107,7 @@ function render(u, P) {
    <section class="kpis">${k.map(([l, v]) => `<div class="card kpi"><span>${l}</span><b>${v}</b></div>`).join("")}</section>
    <section class="card"><h2>確認が必要（${al.length}件）</h2>${al.length ? al.map(([c, t]) => `<div class="alert ${c}">${esc(t)}</div>`).join("") : '<p class="muted">ありません</p>'}
     <p class="muted" style="font-size:12px">連絡先は集めていないため、相談先の表示はアプリが自動で行います。</p></section>
+   ${extractHTML(P)}
    <section class="card"><div class="row" style="justify-content:space-between"><h2>参加者（${P.length}人）</h2><div class="row">
      <button class="btn primary" id="zip-all">分析用にまとめて書き出す（ZIP）</button><button class="btn" data-csv="baseline">開始時（baseline.csv）</button><button class="btn" data-csv="weekly">振り返りごと（weekly.csv）</button><button class="btn" data-csv="trial">最後の調査まで（trial.csv）</button><button class="btn" data-csv="daily">毎日（daily.csv）</button><button class="btn" data-csv="free">自由記述（free.csv）</button></div></div>
     <div class="tablewrap"><table><thead><tr><th>参加ID</th><th>開始日</th><th>群</th><th>提案</th><th>振り返り</th><th>開始からの日数</th><th>WHO-5 開始→最後</th><th>プレ実験</th><th>設定の版</th><th>メモ</th></tr></thead><tbody>
@@ -121,7 +122,75 @@ function render(u, P) {
   on("pr-create", () => saveProto(u, true)); on("pr-save", () => saveProto(u, false)); on("pr-lock", () => lockProto(u, true)); on("pr-unlock", () => lockProto(u, false)); on("op-save", () => saveOps(u));
   el.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => download(b.dataset.csv, P)));
   $("#zip-all").onclick = () => downloadZip(P);
+  wireExtract(P);
 }
+
+// ---------- データを選んで書き出す（種類・期間・参加者・群・除外を選び、表示中の行だけを CSV に保存）
+const KINDS = { daily: "毎日のアンケート（daily）", weekly: "振り返り（weekly）", baseline: "開始時（baseline）", trial: "最後の調査（trial）", free: "自由記述（free）" };
+// 行の日付（日本時間の YYYY-MM-DD）。毎日のアンケートは端末の日付（date）、ほかは記録の時刻から
+const jstDay = (isoStr) => { if (!isoStr) return ""; const t = Date.parse(isoStr); return isNaN(t) ? "" : new Date(t + 9 * 3600e3).toISOString().slice(0, 10); };
+const jstTime = (isoStr) => { if (!isoStr) return ""; const t = Date.parse(isoStr); return isNaN(t) ? "" : new Date(t + 9 * 3600e3).toISOString().slice(0, 19).replace("T", " "); };
+function rowDay(kind, r, P) {
+  if (kind === "daily") return r.date || jstDay(r.at);
+  if (kind === "weekly") return jstDay(r.at);
+  if (kind === "baseline") return jstDay(r.created_at);
+  if (kind === "trial") return jstDay(r.final_at);
+  const p = P.find((x) => x.pid === r.pid); return p ? jstDay(iso(p.createdAt)) : "";   // free：その人の開始日
+}
+function extract(P, f) {
+  const [rows, cols] = tables(P)[f.kind];
+  const byPid = Object.fromEntries(P.map((p) => [p.pid, p]));
+  const out = rows.filter((r) => {
+    const p = byPid[r.pid] || {}, day = rowDay(f.kind, r, P);
+    if (f.from && (!day || day < f.from)) return false;
+    if (f.to && (!day || day > f.to)) return false;
+    if (f.pid && r.pid !== f.pid) return false;
+    if (f.group && p.group !== f.group) return false;
+    if (!f.excluded && p.note?.exclude) return false;
+    return true;
+  }).map((r) => ({ ...r, _day: rowDay(f.kind, r, P) })).sort((a, b) => (a._day < b._day ? 1 : a._day > b._day ? -1 : 0));
+  return { rows: out, cols, total: rows.length };
+}
+function extractHTML(P) {
+  const pids = [...new Set(P.map((p) => p.pid))].sort();
+  return `<section class="card" id="extract"><h2>データを選んで書き出す</h2>
+   <div class="row" style="align-items:flex-end">
+    <label style="display:flex;flex-direction:column;font-size:12px">データ<select id="ex-kind">${Object.entries(KINDS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
+    <label style="display:flex;flex-direction:column;font-size:12px">開始日<input type="date" id="ex-from" style="min-width:0"></label>
+    <label style="display:flex;flex-direction:column;font-size:12px">終了日<input type="date" id="ex-to" style="min-width:0"></label>
+    <label style="display:flex;flex-direction:column;font-size:12px">研究用の番号<select id="ex-pid"><option value="">すべて</option>${pids.map((x) => `<option>${esc(x)}</option>`).join("")}</select></label>
+    <label style="display:flex;flex-direction:column;font-size:12px">群<select id="ex-group"><option value="">すべて</option><option>A</option><option>B</option><option>C</option></select></label>
+    <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="ex-excl" checked style="min-width:0">分析から除外した人も含める</label>
+    <button class="btn primary" id="ex-show">表示</button><button class="btn" id="ex-csv">表示中のデータを CSV 保存</button></div>
+   <p class="muted" id="ex-count" style="margin:4px 0">条件を選んで「表示」を押してください（日付は日本時間。毎日のアンケートは回答した日、振り返り・最後の調査は記録の時刻、開始時と自由記述は開始した日）。</p>
+   <div class="tablewrap" id="ex-table"></div></section>`;
+}
+function readExtract() {
+  return { kind: $("#ex-kind").value, from: $("#ex-from").value, to: $("#ex-to").value, pid: $("#ex-pid").value, group: $("#ex-group").value, excluded: $("#ex-excl").checked };
+}
+const PREVIEW_COLS = { daily: ["pid", "group", "date", "day", "mood", "yen", "minutes", "joy", "Q44", "Q45", "Q47", "Q48"], weekly: ["pid", "group", "week", "day", "at", "stress", "happy", "dBurn", "dMood", "dExec", "sumYen", "sumMin", "W1"],
+  baseline: ["pid", "group", "exclude", "created_at", "decided_at", "plans_chosen", "wb", "burnout", "pss", "cfg_version"], trial: ["pid", "group", "final_day", "final_at", "wb_post", "burnout_post", "pss_post", "exec_rate", "total_yen"], free: ["pid", "where", "text"] };
+let EX = null;
+function wireExtract(P) {
+  if (!$("#ex-show")) return;
+  const show = () => {
+    const f = readExtract();
+    if (f.from && f.to && f.from > f.to) { $("#ex-count").textContent = "開始日が終了日より後になっています。"; return; }
+    EX = { f, ...extract(P, f) };
+    const pc = PREVIEW_COLS[f.kind].filter((c) => EX.cols.includes(c) || c === "group"), shown = EX.rows.slice(0, 200);
+    $("#ex-count").textContent = `表示中 ${EX.rows.length}件／全 ${EX.total}件${EX.rows.length > 200 ? "（表は先頭200件まで。CSV にはすべて入ります）" : ""}。CSV には全部の列（${EX.cols.length}列）が入ります。`;
+    $("#ex-table").innerHTML = EX.rows.length ? `<table><thead><tr><th>日付（日本時間）</th>${pc.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${shown.map((r) => `<tr><td>${esc(r._day)}</td>${pc.map((c) => { let v = r[c]; if (["at", "created_at", "decided_at", "final_at"].includes(c)) v = jstTime(v); return `<td>${esc(v ?? "")}</td>`; }).join("")}</tr>`).join("")}</tbody></table>` : '<p class="muted">条件に合うデータはありません。</p>';
+  };
+  $("#ex-show").onclick = show;
+  $("#ex-csv").onclick = () => {
+    if (!EX) show();
+    if (!EX || !EX.rows.length) { $("#ex-count").textContent = "書き出すデータがありません。条件を変えて「表示」を押してください。"; return; }
+    const f = EX.f, tag = [f.kind, f.from || "", f.to ? "to" + f.to : "", f.pid, f.group ? "group" + f.group : "", f.excluded ? "" : "noexcl"].filter(Boolean).join("_");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv(EX.rows, EX.cols)], { type: "text/csv" }));
+    a.download = `oshifit_${tag}.csv`; document.body.append(a); a.click(); a.remove();
+  };
+}
+window.__oshifitExtract = (P, f) => { const r = extract(P, f); return { n: r.rows.length, total: r.total, pids: r.rows.map((x) => x.pid), days: r.rows.map((x) => x._day) }; };   // 試験用
 
 // ---------- 設定と管理（3つの層：①参加者のデータ ②実験の条件 study/protocol・plans ③運用 ops・notices・notes） ----------
 const CFG_LABEL = {
