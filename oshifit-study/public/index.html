@@ -1470,6 +1470,21 @@ function predCard(){const pp=personalPred();if(!pp)return"";const lab=S.group===
     <span>あなたのずれ b ＝ ずれの合計 ÷（記録の数 ＋ ${f1(pp.burnout.k)}）。記録が少ないうちは、最初の見込みをあまり動かしません（混合モデルのランダム切片の推定と同じ考え方）</span>
     <span>直した見込み ＝ 最初の見込み ＋ b。80%の幅 ＝ 1.2816 × √（b の不確かさ ＋ あなたのずれでは説明できない分）</span>
     <span>ばらつきの大きさは仮の値です。研究のあとに、参加者全体の記録から推定し直します。</span></div></details></section>`}
+/* 振り返りの前に見せる「前回から今日までのまとめ」（毎日のアンケートから自動で出す。質問は変えない） */
+function periodCard(){const from=lastCheckAt(),D=S.daily.filter(d=>(d.at??0)>from&&(d.at??0)<=now()),sm=sumDaily(from,now());
+  const days=Math.max(1,dayNo()-(S.weekly.length?Math.max(...S.weekly.map(w=>w.day||0)):0));
+  const md=D.filter(d=>d.mood!=null),ex=D.filter(d=>Object.keys(d).some(k=>k.startsWith("did_"))),done=ex.filter(d=>Object.keys(d).some(k=>k.startsWith("did_")&&d[k]<=1));
+  const bs=D.map(burn4).filter(x=>x!=null),prev=S.weekly.length?S.weekly[S.weekly.length-1]:null;
+  const cmp=(v,p,u)=>p==null||!S.weekly.length?"":`<span class="xs muted">（前回 ${p.toLocaleString("ja-JP")}${u}）</span>`;
+  return`<section class="card" id="period"><div class="sec"><h3>前回から今日までのまとめ</h3><span class="xs muted">毎日のアンケートから</span></div>
+   ${D.length?`<div class="kv"><span>記録した日</span><b>${D.length}日／${days}日</b></div>
+   <div class="kv"><span>推し活に使ったお金</span><b>${sm.yen.toLocaleString("ja-JP")}円 ${cmp(sm.yen,prev?.sumYen,"円")}</b></div>
+   <div class="kv"><span>推し活の時間</span><b>${f1(sm.min/60)}時間 ${prev?.sumMin!=null?`<span class="xs muted">（前回 ${f1(prev.sumMin/60)}時間）</span>`:""}</b></div>
+   ${md.length?`<div class="kv"><span>気分の平均（1〜7）</span><b>${f1(mean(md.map(d=>d.mood)))}</b></div>`:""}
+   ${bs.length?`<div class="kv"><span>負担（睡眠・お金・義務感・比較、0〜100）の平均</span><b style="color:var(--bad)">${r0(mean(bs))}</b></div>`:""}
+   ${ex.length?`<div class="kv"><span>提案を行った日（一部も含む）</span><b style="color:var(--good)">${done.length}日／${ex.length}日</b></div>`:""}`
+   :`<p class="small muted">この期間の毎日のアンケートはありません。思い出せる範囲で答えてください。</p>`}
+   <p class="xs muted">数字は記録した日だけの合計と平均です。このまとめを見ながら、前回から今日までをふり返って答えてください。</p></section>`}
 function finalItems(){const ids=["W1","W2","W3","W4","W5","H1","H2","H3","H4",...QN.sections.find(s=>s.id==="pss").items.map(i=>i.id),"Q29","Q30","Q31","Q32","Q33","Q34","Q39","Q44","Q45","Q46","Q47","Q48","Q49","Q50","Q51"];
   const L=ids.map(itemOf);if(S.group!=="A")USE.forEach(([id,text])=>L.push({id,text,sec:"OshiFitを使ってみて",lead:"",kind:"list",labels:AGREE5U,vals:AGREE5U.map((_,j)=>j+1)}));
   if(S.group==="B")L.push({id:"how",text:"提案（プランB）を行ってみて、どのように変わりましたか（任意）",sec:"最後に",lead:"",kind:"text",optional:true});return L}
@@ -1822,10 +1837,15 @@ function vHome(){if(!S.group)ensureGroup();const sc=S.sc,g=grp(),ps=planIds().ma
 function vCheckin(){if(!S.group)ensureGroup();const g=grp();
   if(g==="A"||!canCheck()&&!EDIT){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout">${g==="A"?"群Aの方は振り返りは不要です。":`次の振り返りは${daysToNext()}日後からできます（前回から4日以上あけます）。`}</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
   if(nextNo()>N_CHECK){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">6回の振り返りはすべて終わりました。</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
+  if(!SV.ckIntro&&!Object.keys(S.wk).length&&!SV.checkin){app.innerHTML=header(`${nextNo()}／${N_CHECK}回・開始から${dayNo()}日目`)+`<main class="stack" style="padding-top:14px">
+     <div><p class="eyebrow view-eyebrow">REFLECTION ${nextNo()}</p><h2>${nextNo()}回目の振り返り</h2><p class="small muted">まず、前回から今日までの記録を見てから答えてください。</p></div>
+     ${periodCard()}${predCard()}
+     <button class="btn primary block" id="ck-start">振り返りを始める</button></main>${tabbar("checkin")}`;
+    $("#ck-start").onclick=()=>{SV.ckIntro=true;vCheckin()};wire();return}
   const items=checkItems();
   vSurvey("checkin",items,S.wk,`${nextNo()}回目の振り返り`,`${nextNo()}／${N_CHECK}回・開始から${dayNo()}日目`,()=>{const w=S.wk,B=["Q44","Q45","Q47","Q48"];
     const burn=(mean(B.map(k=>w[k]))-1)/6*100,joyN=(w.joy-1)/6*100;
-    const sm=sumDaily(lastCheckAt(),now());const rec={week:nextNo(),day:dayNo(),...w,burn,joyN,sumYen:sm.yen,sumMin:sm.min,nDaily:sm.n};S.weekly.push({...rec,at:now()});const pp=personalPred();if(pp)Object.assign(rec,{adjBurn:r0(pp.burnout.est*10)/10,adjBurnHw:r0(pp.burnout.hw*10)/10,adjWb:r0(pp.wb.est*10)/10,adjWbHw:r0(pp.wb.hw*10)/10,adjN:pp.burnout.n,adjNWb:pp.wb.n});Object.assign(S.weekly[S.weekly.length-1],rec);if(STUDY)OFStore.checkin(S,rec);S.wk={};SV.checkin=null;toast("記録しました");go("home")})}
+    const sm=sumDaily(lastCheckAt(),now());const rec={week:nextNo(),day:dayNo(),...w,burn,joyN,sumYen:sm.yen,sumMin:sm.min,nDaily:sm.n};S.weekly.push({...rec,at:now()});const pp=personalPred();if(pp)Object.assign(rec,{adjBurn:r0(pp.burnout.est*10)/10,adjBurnHw:r0(pp.burnout.hw*10)/10,adjWb:r0(pp.wb.est*10)/10,adjWbHw:r0(pp.wb.hw*10)/10,adjN:pp.burnout.n,adjNWb:pp.wb.n});Object.assign(S.weekly[S.weekly.length-1],rec);if(STUDY)OFStore.checkin(S,rec);S.wk={};SV.checkin=null;SV.ckIntro=null;toast("記録しました");go("home")})}
 function vDaily(){if(!S.group)return go("home");
   if(!dailyOpen()&&!EDIT){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">${S.final?"調査はすべて終わりました。":"今日のアンケートは回答済みです。また明日お願いします。"}</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
   vSurvey("daily",dailyItems(),S.dk,"今日のアンケート",`開始から${dayNo()}日目`,()=>{const rec={date:todayKey(),day:dayNo(),...S.dk};S.daily.push({...rec,at:now()});if(STUDY)OFStore.daily(rec);S.dk={};SV.daily=null;toast("記録しました。また明日お願いします");go("home")})}

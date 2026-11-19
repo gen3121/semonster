@@ -182,6 +182,12 @@ async function answerAll(page, stop) {
     await page.evaluate((off) => localStorage.setItem("__e2e_offset", String(off)), 4 * DAY + 60000);
     await page.reload();
     await page.waitForFunction(() => location.hash === "#checkin");
+    await page.locator("#period").waitFor();
+    const per = await page.locator("#period").innerText();
+    assert.match(per, /1,500円/); assert.match(per, /1\.5時間/); assert.match(per, /記録した日\s*1日/);
+    await page.locator("#predadj").waitFor();
+    await page.screenshot({ path: path.join(OUT, "05_period.png"), fullPage: true });
+    await page.locator("#ck-start").click();
     await page.locator(".qid").waitFor();
     await answerAll(page, async () => (await page.evaluate(() => location.hash)) === "#home");
     let ck; for (let i = 0; i < 25; i++) { ck = await read((db) => getDocs(collection(db, "participants", uid, "checkins"))); if (ck.size) break; await page.waitForTimeout(200); }
@@ -191,6 +197,7 @@ async function answerAll(page, stop) {
     assert.equal(c1.sumYen, 1500, "振り返りに、前回からのお金の合計が入る"); assert.equal(c1.sumMin, 90);
     assert.equal(typeof c1.adjBurn, "number", "本人の記録で直した見込みが保存される"); assert.ok(c1.adjN >= 2 && c1.adjBurnHw > 0 && c1.adjBurnHw < 15);
     await page.locator("#predadj").waitFor(); assert.match(await page.locator("#predadj").innerText(), /記録\d+回/);
+    step("振り返りの前に、前回からのまとめ（お金・時間・気分・負担・提案を行った日）と、直した見込みが出る");
     step("4日後に1回目の振り返り → checkins/1（week=1, day=4、前回からの合計つき）が保存される");
     await page.reload();
     await page.locator(".rounds").waitFor();
