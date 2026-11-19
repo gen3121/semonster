@@ -1,6 +1,6 @@
 rules_version = '2';
 // OshiFit 研究版の Firestore ルール。参加者（メールアドレスでログイン）は自分の記録だけ読み書きでき、開発者（admins に登録した大学アカウント）は全件を閲覧できる。
-// 参加者の記録は開発者も書き換えられない。設定・提案・お知らせ・メモ（config・plans・notices・notes）だけ、開発者が書き込める。
+// 3つの層：①参加者のデータ（participants。開発者も書き換えられない）／②実験の条件（study/protocol・plans。版と履歴、固定）／③運用（ops・notices・notes）
 // 参加をやめても記録は消さない（倫理審査の同意どおり）。やめたあとは書き込めない。
 service cloud.firestore {
   match /databases/{db}/documents {
@@ -62,9 +62,46 @@ service cloud.firestore {
     match /{path=**}/daily/{date} { allow read: if isAdmin(); }
     match /admins/{email} { allow read: if isAdmin(); allow write: if false; }
     match /pilots/{pid} { allow read: if isAdmin(); allow write: if false; }   // プレ実験の参加ID（コンソールから研究者が入れる）
-    // 研究者が管理する項目（Firestore のコンソール、または開発者ページで編集する）
-    match /config/{doc} { allow read: if true; allow write: if isAdmin(); }      // 設定（config/app）。アプリは起動時に読む
-    match /plans/{id} { allow read: if true; allow write: if isAdmin(); }       // 提案の一覧の上書き・追加
+    // ---------- ②実験の条件（版で管理。実験が始まったら locked:true で固定）
+    // 注意：Firebase のコンソールからの書き込みはルールを通らない。条件の変更は開発者ページから行う（版と履歴が残る）
+    function protoLocked() { return exists(/databases/$(db)/documents/study/protocol) && get(/databases/$(db)/documents/study/protocol).data.get('locked', false) == true; }
+    match /study/protocol {
+      allow read: if true;
+      // 作る：版1で、同じ書き込みで履歴の版1も作る
+      allow create: if isAdmin() && request.resource.data.version == 1 && request.resource.data.get('locked', false) == false
+        && existsAfter(/databases/$(db)/documents/study/protocol/history/1);
+      allow update: if isAdmin() && (
+        // 固定する・外す：locked まわりの項目だけが変わる。外すときは理由が要る
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['locked', 'lockedAt', 'lockedBy', 'lockReason'])
+          && (request.resource.data.locked == true || (request.resource.data.get('lockReason', '') is string && request.resource.data.get('lockReason', '').size() > 0)))
+        ||
+        // 条件を変える：固定されていないときだけ。版を1つ上げ、同じ書き込みでその版の履歴を作る
+        (resource.data.get('locked', false) == false && request.resource.data.get('locked', false) == false
+          && request.resource.data.version == resource.data.version + 1
+          && existsAfter(/databases/$(db)/documents/study/protocol/history/$(string(request.resource.data.version))))
+      );
+      allow delete: if false;
+      match /history/{v} {          // 変更の履歴（前の値・新しい値・理由・誰が・いつ）。消せない・書き換えられない
+        allow read: if isAdmin();
+        allow create: if isAdmin() && request.resource.data.version == int(v)
+          && getAfter(/databases/$(db)/documents/study/protocol).data.version == int(v)
+          && request.resource.data.reason is string && request.resource.data.reason.size() > 0;
+        allow update, delete: if false;
+      }
+      match /events/{id} {          // 固定する・外すの記録
+        allow read: if isAdmin();
+        allow create: if isAdmin();
+        allow update, delete: if false;
+      }
+    }
+    // 提案：固定中は「出す・出さない」（active）だけ変えられる
+    match /plans/{id} {
+      allow read: if true;
+      allow create, delete: if isAdmin() && !protoLocked();
+      allow update: if isAdmin() && (!protoLocked() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'updatedAt', 'updatedBy']));
+    }
+    // ---------- ③運用（いつでも変えてよい）
+    match /ops/{doc} { allow read, write: if isAdmin(); }                       // ops/alerts：「確認が必要」の基準
     match /notices/{id} { allow read: if true; allow write: if isAdmin(); }     // お知らせ（はじめに・ホーム・マイページに出す）
     match /notes/{pid} { allow read, write: if isAdmin(); }                     // 参加者ごとのメモ・分析から除外（研究者だけが見る）
   }

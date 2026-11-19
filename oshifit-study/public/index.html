@@ -1198,10 +1198,10 @@ function tendency(A){ // 前研究（k-means、2クラスタ）の傾向に近�
 
 /* ---------- プラン（弱い軸 × 性格） ---------- */
 const PLANS=window.OSHIFIT_PLANS;
-/* 設定：settings.js の初期値。研究版では起動時に Firestore の config/app・plans・notices を読んで上書きする（applySettings） */
+/* 設定：settings.js の初期値。研究版では起動時に Firestore の study/protocol（実験の条件）・plans・notices を読んで上書きする（applySettings） */
 let CFG=window.OSHIFIT_SETTINGS.apply({}).cfg,NOTICES=[];
 function applySettings(remote){if(!remote)return;const st=window.OSHIFIT_SETTINGS;
-  if(remote.config){const r=st.apply(remote.config);CFG=r.cfg;if(r.rejected.length)console.warn("[OshiFit 設定] 受け付けなかった項目",r.rejected)}
+  if(remote.protocol){const r=st.apply(remote.protocol);CFG=r.cfg;if(r.rejected.length)console.warn("[OshiFit 実験の条件] 受け付けなかった項目",r.rejected)}
   const m=st.mergePlans(window.OSHIFIT_PLANS,remote.plans||[]);PLANS.splice(0,PLANS.length,...m.plans);if(m.rejected.length)console.warn("[OshiFit 提案] 受け付けなかった項目",m.rejected);
   PLANS.forEach(p=>{if(p.act!=null)ACT[p.id]=p.act});NOTICES=remote.notices||[];
   REF=CFG.ref;N_CHECK=CFG.nChecks;GAP=CFG.gapDays;FINAL_DAY=CFG.finalDay;PC=CFG.pc;BURDEN=CFG.burden}

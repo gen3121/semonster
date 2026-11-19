@@ -64,9 +64,10 @@ async function answerAll(page, stop) {
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|fonts/.test(m.text())) errors.push(m.text()); });
 
-  // ---------- 研究者が Firestore で管理する項目（設定・お知らせ）
+  // ---------- 研究者が Firestore で管理する項目（②実験の条件・③お知らせ）
   await read(async (db) => {
-    await setDoc(doc(db, "config", "app"), { version: 3, gapDays: 4, nChecks: 6, finalDay: 28, groupA: { axisMin: "x" } });   // 型の違う値は無視される
+    await setDoc(doc(db, "study", "protocol"), { version: 3, gapDays: 4, nChecks: 6, finalDay: 28, groupA: { axisMin: "x" }, locked: true });   // 型の違う値は無視される
+    await setDoc(doc(db, "study", "protocol", "history", "3"), { version: 3, reason: "試験" });
     await setDoc(doc(db, "notices", "n1"), { text: "試験用のお知らせです", active: true, target: "all", level: "info" });
     await setDoc(doc(db, "notices", "n2"), { text: "出さないお知らせ", active: false });
   });
@@ -165,7 +166,7 @@ async function answerAll(page, stop) {
   if (group === "B") { assert.ok(p.planIds.length >= 1); assert.ok(p.pred && p.pred.B && p.pred.hw); assert.ok(p.plansOffered.length >= 1); }
   step(`群${group}に決まり、群・提案・見込み・時刻が保存される`);
   { const pd = await read((db) => getDoc(doc(db, "participants", uid))); assert.equal(pd.data().cfgVersion, 3, "使った設定の版が残る"); assert.equal(pd.data().cfgUsed.groupA.axisMin, 60, "型の違う値は初期値"); }
-  step("群を決めたときの設定（Firestore の config/app の版と値）が、参加者の記録に残る");
+  step("群を決めたときの実験の条件（study/protocol の版と値）が、参加者の記録に残る");
 
   // 群は変えられない：未来の画面に戻れない
   await page.goto(BASE + "#future");
@@ -240,7 +241,7 @@ async function answerAll(page, stop) {
     return window.__oshifitZip([{ uid, ...rev(raw.p), cks: raw.cks.map(rev), daily: raw.daily.map(rev), pilot: 0 }]);
   }, { raw, uid });
   const mh = await ap.evaluate(() => window.__oshifitManage());
-  assert.match(mh, /設定（config\/app）/); assert.match(mh, /提案（plans）/); assert.match(mh, /sns23/); assert.match(mh, /お知らせ（notices）/);
+  assert.match(mh, /実験の条件（study\/protocol）/); assert.match(mh, /運用：確認が必要の基準（ops\/alerts）/); assert.match(mh, /提案（plans）/); assert.match(mh, /sns23/); assert.match(mh, /お知らせ（notices）/);
   step("開発者ページの「設定と管理」に、設定・提案・お知らせ・メモの説明と一覧が出る");
   const zbuf = Buffer.from(zb64, "base64"); assert.equal(zbuf.readUInt32LE(0), 0x04034b50, "ZIP の形");
   fs.writeFileSync(path.join(OUT, "export_test.zip"), zbuf);

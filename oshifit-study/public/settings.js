@@ -1,7 +1,10 @@
 // OshiFit の設定（初期値）と、Firestore の上書きを安全に混ぜる関数。アプリ（index.html）と開発者ページ（admin.html）が使う。
-// 研究者は Firestore の config/app の文書で値を変えられる（コードを変えずに）。書いていない項目は、ここの初期値を使う。
-// 範囲外・型の違う値は無視して初期値を使う（RANGE）。値を変えたら version を1つ上げる（参加者の記録に、そのとき使った版が残る）。
-// 研究の途中で変えると、変える前と後の参加者で条件が変わる。変える前に指導教員と確認し、README_ja.md の変更の記録に書く。
+// Firestore の3つの層：
+//   ① participants/{uid}（参加者のデータ。誰も書き換えられない）
+//   ② study/protocol（実験の条件。版で管理し、変更は study/protocol/history/{版} に自動で残す。実験が始まったら locked:true で固定）と plans/{id}
+//   ③ ops/alerts（運用の値。いつでも変えてよい）、notices/{id}、notes/{pid}
+// 書いていない項目は、ここの初期値を使う。範囲外・型の違う値は無視して初期値を使う（RANGE）。
+// 実験の条件は開発者ページから変える（版が上がり、履歴が残る）。Firestore のコンソールで直接変えると履歴が残らない（開発者ページが警告を出す）。
 (function () {
   "use strict";
   const DEFAULT = {
@@ -18,8 +21,12 @@
     burden: 3,                                             // 2つめ以降の提案1つあたり、推し疲れに足す点数
     interval: { hw: 15, hwWb: 12, hwStep: 5, hwWbStep: 4 }, // 見込みの80%の幅（半幅）と、提案が1つ増えるごとに広げる量
     pc: { burnout: { su: 10, se: 14 }, wb: { su: 9, se: 10 } }, // 個人補正のばらつき（σu・σe）
-    alerts: { noCheckDays: 10, noDailyDays: 3, who5Max: 7 },    // 開発者ページの「確認が必要」の基準
+    alerts: { noCheckDays: 10, noDailyDays: 3, who5Max: 7 },    // ③運用：開発者ページの「確認が必要」の基準（ops/alerts）
   };
+  // ②実験の条件（study/protocol）に入る項目と、③運用（ops/alerts）に入る項目
+  const OPS_KEYS = ["alerts"];
+  const PROTOCOL_KEYS = Object.keys(DEFAULT).filter((k) => !OPS_KEYS.includes(k));
+  const pick = (o, keys) => Object.fromEntries(keys.filter((k) => o && k in o).map((k) => [k, o[k]]));
   // [最小, 最大]。この範囲の数だけ受け付ける
   const RANGE = {
     version: [0, 1e6], gapDays: [1, 14], nChecks: [1, 6], finalDay: [7, 60], finalMaxDay: [7, 90],
@@ -44,9 +51,11 @@
     rejected.push(path); return def;
   }
   const ok = (v, path) => { const r = rangeOf(path); return typeof v === "number" && isFinite(v) && (!r || (v >= r[0] && v <= r[1])); };
-  function apply(remote) {
+  // protocol：study/protocol の文書、ops：ops/alerts の文書（{noCheckDays, …}）。どちらも省略可
+  function apply(protocol, ops) {
     const rejected = [];
-    const cfg = merge(DEFAULT, remote || {}, "", rejected);
+    const remote = { ...pick(protocol || {}, PROTOCOL_KEYS), alerts: ops || undefined };
+    const cfg = merge(DEFAULT, remote, "", rejected);
     if (cfg.finalMaxDay < cfg.finalDay) { cfg.finalMaxDay = cfg.finalDay; rejected.push("finalMaxDay（finalDay より小さい）"); }
     return { cfg, rejected };
   }
@@ -70,5 +79,7 @@
     }
     return { plans: out, rejected };
   }
-  window.OSHIFIT_SETTINGS = { DEFAULT, RANGE, apply, mergePlans };
+  // 実験の条件だけを取り出す（参加者の記録 cfgUsed と、変更の履歴に使う）
+  const protocolOf = (cfg) => JSON.parse(JSON.stringify(pick(cfg, PROTOCOL_KEYS)));
+  window.OSHIFIT_SETTINGS = { DEFAULT, RANGE, apply, mergePlans, protocolOf, PROTOCOL_KEYS, OPS_KEYS };
 })();

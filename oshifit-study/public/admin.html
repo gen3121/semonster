@@ -35,7 +35,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 const ms = (t) => (t && t.toMillis ? t.toMillis() : null);
 let PLANS = window.OSHIFIT_PLANS.map((p) => p.id);   // Firestore の plans で足した提案も、読み込んだあとに加える
 const ST = window.OSHIFIT_SETTINGS;
-let CFG = ST.apply({}).cfg, MG = { cfgRaw: null, cfgRejected: [], plans: ST.mergePlans(window.OSHIFIT_PLANS, []).plans, planRejected: [], notices: [], notes: {} };
+let CFG = ST.apply({}).cfg, MG = { proto: null, ops: null, history: [], events: [], cfgRejected: [], plans: ST.mergePlans(window.OSHIFIT_PLANS, []).plans, planDocs: new Set(), planRejected: [], notices: [], notes: {} };
 const SC = ["wb", "joy", "sleep", "money", "duty", "compare", "burnout", "who5raw", "shs", "pss"];
 const items = (ids) => QN.sections.filter((s) => ids.includes(s.id)).flatMap((s) => s.items.map((i) => i.id));
 const BASE_ITEMS = QN.sections.flatMap((s) => s.items.map((i) => i.id)).filter((id) => id !== "Q62");
@@ -67,8 +67,11 @@ A.onAuthStateChanged(auth, async (u) => {
   catch (e) { el.innerHTML = `<section class="card"><h1>開発者ページ</h1><p>このアカウント（${esc(u.email || "メールアドレスなし")}）には閲覧の権限がありません。</p><p class="muted" style="font-size:12px">Firestore の admins に、このメールアドレスと同じ名前のドキュメントがあるか確認してください（大文字・小文字も同じにします）。</p><button class="btn" id="out">ログアウト</button></section>`; $("#out").onclick = () => A.signOut(auth); return; }
   el.innerHTML = `<p class="muted">データを読み込んでいます…</p>`;
   const [ps, cks, pil, dly, cf, pl, nt, nn] = await Promise.all([F.getDocs(F.collection(db, "participants")), F.getDocs(F.collectionGroup(db, "checkins")), F.getDocs(F.collection(db, "pilots")), F.getDocs(F.collectionGroup(db, "daily")),
-    F.getDoc(F.doc(db, "config", "app")), F.getDocs(F.collection(db, "plans")), F.getDocs(F.collection(db, "notices")), F.getDocs(F.collection(db, "notes"))]);
-  MG.cfgRaw = cf.exists() ? cf.data() : null; const ap = ST.apply(MG.cfgRaw || {}); CFG = ap.cfg; MG.cfgRejected = ap.rejected;
+    F.getDoc(F.doc(db, "study", "protocol")), F.getDocs(F.collection(db, "plans")), F.getDocs(F.collection(db, "notices")), F.getDocs(F.collection(db, "notes"))]);
+  const [hs, ev, op] = await Promise.all([F.getDocs(F.collection(db, "study", "protocol", "history")), F.getDocs(F.collection(db, "study", "protocol", "events")), F.getDoc(F.doc(db, "ops", "alerts"))]);
+  MG.proto = cf.exists() ? cf.data() : null; MG.ops = op.exists() ? op.data() : null;
+  MG.history = hs.docs.map((d) => d.data()).sort((a, b) => a.version - b.version); MG.events = ev.docs.map((d) => d.data()).sort((a, b) => (ms(a.at) || 0) - (ms(b.at) || 0));
+  const ap = ST.apply(MG.proto || {}, MG.ops || {}); CFG = ap.cfg; MG.cfgRejected = ap.rejected; MG.planDocs = new Set(pl.docs.map((d) => d.id));
   const mp = ST.mergePlans(window.OSHIFIT_PLANS, pl.docs.map((d) => ({ ...d.data(), id: d.id }))); MG.plans = mp.plans; MG.planRejected = mp.rejected; PLANS = MG.plans.map((p) => p.id);
   MG.notices = nt.docs.map((d) => ({ ...d.data(), id: d.id })); MG.notes = Object.fromEntries(nn.docs.map((d) => [d.id, d.data()]));
   const dByUid = {}; dly.docs.forEach((c) => { const uid = c.ref.parent.parent.id; (dByUid[uid] = dByUid[uid] || []).push(c.data()); });
@@ -100,7 +103,7 @@ function alerts(P) {
 function render(u, P) {
   const al = alerts(P), cnt = (f) => P.filter(f).length, d = (t) => (ms(t) ? new Date(ms(t)).toLocaleDateString("ja-JP") : "–");
   const k = [["同意して開始", P.length], ["質問紙を完了", cnt((p) => p.baselineDone)], ["群A（順調）", cnt((p) => p.group === "A")], ["群B（プランB）", cnt((p) => p.group === "B")], ["群C（プランA）", cnt((p) => p.group === "C")], ["最後の調査まで完了", cnt((p) => p.final)], ["注意確認の誤答", cnt((p) => p.answers && p.answers.Q42 != null && p.answers.Q42 !== 2)], ["プレ実験の参加者", cnt((p) => p.pilot)], ["参加をやめた人", cnt((p) => p.withdrawn)]];
-  el.innerHTML = `<div class="row" style="justify-content:space-between"><div><h1>開発者ページ</h1><p class="muted">${esc(u.email)} でログイン中。参加者の回答は閲覧のみ（書き換え・削除はできません）。設定・提案・お知らせ・メモだけ管理できます</p></div><button class="btn" id="out">ログアウト</button></div>
+  el.innerHTML = `<div class="row" style="justify-content:space-between"><div><h1>開発者ページ</h1><p class="muted">${esc(u.email)} でログイン中。参加者の回答は閲覧のみ（書き換え・削除はできません）。実験の条件・提案・運用の値・お知らせ・メモは下の「設定と管理」で管理します</p></div><button class="btn" id="out">ログアウト</button></div>
    <section class="kpis">${k.map(([l, v]) => `<div class="card kpi"><span>${l}</span><b>${v}</b></div>`).join("")}</section>
    <section class="card"><h2>確認が必要（${al.length}件）</h2>${al.length ? al.map(([c, t]) => `<div class="alert ${c}">${esc(t)}</div>`).join("") : '<p class="muted">ありません</p>'}
     <p class="muted" style="font-size:12px">連絡先は集めていないため、相談先の表示はアプリが自動で行います。</p></section>
@@ -113,50 +116,128 @@ function render(u, P) {
   $("#out").onclick = () => A.signOut(auth);
   el.querySelectorAll("[data-note]").forEach((b) => (b.onclick = () => editNote(b.dataset.note, u)));
   el.querySelectorAll("[data-seed]").forEach((b) => (b.onclick = () => seed(b.dataset.seed, u)));
+  el.querySelectorAll("[data-plan]").forEach((b) => (b.onclick = () => togglePlan(b.dataset.plan, u)));
+  const on = (id, f) => { const x = $("#" + id); if (x) x.onclick = f; };
+  on("pr-create", () => saveProto(u, true)); on("pr-save", () => saveProto(u, false)); on("pr-lock", () => lockProto(u, true)); on("pr-unlock", () => lockProto(u, false)); on("op-save", () => saveOps(u));
   el.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => download(b.dataset.csv, P)));
   $("#zip-all").onclick = () => downloadZip(P);
 }
 
-// ---------- 設定と管理（Firestore の config・plans・notices・notes） ----------
+// ---------- 設定と管理（3つの層：①参加者のデータ ②実験の条件 study/protocol・plans ③運用 ops・notices・notes） ----------
 const CFG_LABEL = {
-  version: "設定の版（変えたら1つ上げる）", gapDays: "振り返りの間隔（日）", nChecks: "振り返りの回数（最大6）", finalDay: "最後の調査が開く日", finalMaxDay: "振り返りが残っていても最後の調査を開く日",
+  gapDays: "振り返りの間隔（日）", nChecks: "振り返りの回数（最大6）", finalDay: "最後の調査が開く日", finalMaxDay: "振り返りが残っていても最後の調査を開く日",
   "groupA.axisMin": "群A：軸の点数の基準", "groupA.axisCount": "群A：基準を満たす軸の数", "groupA.who5Min": "群A：WHO-5 素点の下限",
-  "weights.trait": "提案の点数：性格の重み", "weights.act": "提案の点数：活動の重み", diminish: "提案を複数選んだときの倍率（1つめ・2つめ・3つめ）", clashFactor: "相性の悪い組み合わせの倍率", burden: "提案1つ増えるごとの負担（推し疲れ＋）",
+  "weights.trait": "提案の点数：性格の重み", "weights.act": "提案の点数：活動の重み", diminish: "複数の提案の倍率（1つめ,2つめ,3つめ）", clashFactor: "相性の悪い組み合わせの倍率", burden: "提案1つ増えるごとの負担（推し疲れ＋）",
   "interval.hw": "推し疲れの見込みの幅（±）", "interval.hwWb": "幸福度の見込みの幅（±）", "interval.hwStep": "提案1つ増えるごとに広げる幅（推し疲れ）", "interval.hwWbStep": "提案1つ増えるごとに広げる幅（幸福度）",
-  "alerts.noCheckDays": "確認が必要：振り返りがない日数", "alerts.noDailyDays": "確認が必要：毎日のアンケートがない日数", "alerts.who5Max": "確認が必要：WHO-5 素点がこの値以下",
+  "ref.wb": "目安：幸福度", "ref.joy": "目安：充実", "ref.sleep": "目安：睡眠・生活", "ref.money": "目安：お金", "ref.duty": "目安：義務感", "ref.compare": "目安：SNS・比較",
+  "pc.burnout.su": "個人補正：推し疲れ σu", "pc.burnout.se": "個人補正：推し疲れ σe", "pc.wb.su": "個人補正：幸福度 σu", "pc.wb.se": "個人補正：幸福度 σe",
+  noCheckDays: "振り返りがない日数", noDailyDays: "毎日のアンケートがない日数", who5Max: "WHO-5 素点がこの値以下",
 };
 const flat = (o, pre = "") => Object.entries(o).flatMap(([k, v]) => (v && typeof v === "object" && !Array.isArray(v) ? flat(v, pre + k + ".") : [[pre + k, v]]));
+const setPath = (o, path, v) => { const ks = path.split("."); let c = o; ks.slice(0, -1).forEach((k) => (c = c[k] = c[k] || {})); c[ks[ks.length - 1]] = v; };
+const protoNow = () => { const p = ST.protocolOf(CFG); delete p.version; return p; };
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function protoWarn() {
+  if (!MG.proto) return "";
+  const last = MG.history[MG.history.length - 1];
+  if (!last || last.version !== MG.proto.version) return `<div class="alert bad">今の版（${esc(MG.proto.version)}）の変更の記録がありません。Firestore のコンソールで直接変えた可能性があります。開発者ページから変更し直してください。</div>`;
+  const after = { ...(last.after || {}) }; delete after.version;
+  if (!same(after, protoNow())) return `<div class="alert bad">今の値が、版 ${esc(last.version)} の記録と違います。Firestore のコンソールで直接変えた可能性があります（記録が残らないため、開発者ページから変えてください）。</div>`;
+  return "";
+}
 function manageHTML() {
-  const D = Object.fromEntries(flat(ST.DEFAULT)), C = flat(CFG);
-  const today = new Date().toISOString().slice(0, 10);
-  return `<section class="card"><h2>設定と管理（Firestore）</h2>
-   <p class="muted" style="font-size:12px">Firestore のコンソールで <b>config/app</b>・<b>plans</b>・<b>notices</b>・<b>notes</b> の文書を追加・編集すると、アプリと開発者ページに反映されます（参加者の画面は、次に開いたとき）。下のボタンは、まだ文書がないときに初期値を書き込むためのものです。研究の途中で設定や提案を変えるときは、指導教員と確認し、README_ja.md の変更の記録に書いてください。提案の題名・やり方は倫理委員会で承認済みです。</p>
-   <h3>設定（config/app）　${MG.cfgRaw ? `Firestore にあり・版 ${esc(MG.cfgRaw.version ?? "–")}` : "Firestore にまだない（初期値で動いています）"}</h3>
-   ${MG.cfgRejected.length ? `<div class="alert bad">受け付けなかった項目（範囲外か型の違い。初期値を使っています）：${esc(MG.cfgRejected.join("、"))}</div>` : ""}
-   <div class="tablewrap"><table><thead><tr><th>項目（Firestore のフィールド名）</th><th>説明</th><th>今の値</th><th>初期値</th></tr></thead><tbody>
-    ${C.filter(([k]) => !k.startsWith("ref.") && !k.startsWith("pc.")).map(([k, v]) => `<tr><td class="mono">${esc(k)}</td><td>${esc(CFG_LABEL[k] || "")}</td><td${JSON.stringify(v) !== JSON.stringify(D[k]) ? ' style="font-weight:700;color:#b3261e"' : ""}>${esc(JSON.stringify(v))}</td><td>${esc(JSON.stringify(D[k]))}</td></tr>`).join("")}
-    <tr><td class="mono">ref.*</td><td>提案を選ぶときの各軸の目安</td><td>${esc(JSON.stringify(CFG.ref))}</td><td>${esc(JSON.stringify(ST.DEFAULT.ref))}</td></tr>
-    <tr><td class="mono">pc.*</td><td>個人補正のばらつき（σu・σe）</td><td>${esc(JSON.stringify(CFG.pc))}</td><td>${esc(JSON.stringify(ST.DEFAULT.pc))}</td></tr>
-   </tbody></table></div>
-   <div class="row"><button class="btn" data-seed="config" ${MG.cfgRaw ? "disabled" : ""}>初期値を config/app に書き込む</button></div>
-   <h3>提案（plans）　${MG.plans.filter((p) => p.active !== false).length}件を出す・全${MG.plans.length}件</h3>
+  const locked = !!MG.proto?.locked, D = Object.fromEntries(flat(protoNowDefault())), today = new Date().toISOString().slice(0, 10);
+  const rows = flat(protoNow()).map(([k, v]) => `<tr><td class="mono">${esc(k)}</td><td>${esc(CFG_LABEL[k] || "")}</td><td><input class="pf" data-k="${esc(k)}" value="${esc(Array.isArray(v) ? v.join(",") : v)}" ${locked || !MG.proto ? "disabled" : ""} style="width:110px${same(v, D[k]) ? "" : ";font-weight:700;color:#b3261e"}"></td><td>${esc(Array.isArray(D[k]) ? D[k].join(",") : D[k])}</td></tr>`).join("");
+  const A = CFG.alerts;
+  return `<section class="card" id="manage"><h2>設定と管理</h2>
+   <p class="muted" style="font-size:12px">Firestore は3つの層に分けています。<b>①参加者のデータ</b>（participants。だれも書き換えられない）／<b>②実験の条件</b>（study/protocol と plans。版で管理し、変えると履歴が残る。実験が始まったら「固定する」）／<b>③運用</b>（ops・notices・notes。いつでも変えてよい）。<br>②は、Firebase のコンソールで直接変えると履歴が残らないので、<b>必ずこのページから</b>変えてください。提案の題名・やり方は倫理委員会で承認済みです。</p>
+
+   <h3>② 実験の条件（study/protocol）　${MG.proto ? `版 ${esc(MG.proto.version)}・${locked ? '<b style="color:#b3261e">固定中</b>（変えられません）' : "変更できます（実験が始まったら固定してください）"}` : "まだありません（初期値で動いています）"}</h3>
+   ${protoWarn()}${MG.cfgRejected.length ? `<div class="alert bad">受け付けなかった項目（範囲外か型の違い。初期値を使っています）：${esc(MG.cfgRejected.join("、"))}</div>` : ""}
+   <div class="tablewrap"><table><thead><tr><th>項目</th><th>説明</th><th>今の値</th><th>初期値</th></tr></thead><tbody>${rows}</tbody></table></div>
+   ${!MG.proto ? `<div class="row"><button class="btn primary" id="pr-create">初期値で実験の条件を作る（版 1）</button></div>`
+     : locked ? `<div class="row"><button class="btn" id="pr-unlock">固定を外す（理由が必要）</button></div>`
+     : `<div class="row"><input id="pr-reason" placeholder="変更の理由（必須。例：大井先生と相談し、間隔を5日に）" style="flex:1;min-width:260px"><button class="btn primary" id="pr-save">変更を保存（版 ${esc((MG.proto.version || 0) + 1)} にする）</button><button class="btn" id="pr-lock">固定する（実験の開始時に）</button></div>`}
+   <details><summary>変更の記録（${MG.history.length}件）・固定の記録（${MG.events.length}件）</summary>
+    <div class="tablewrap"><table><thead><tr><th>版</th><th>日時</th><th>だれが</th><th>理由</th><th>変えた項目（前 → 後）</th></tr></thead><tbody>
+     ${MG.history.slice().reverse().map((h) => `<tr><td>${esc(h.version)}</td><td>${h.at ? new Date(ms(h.at)).toLocaleString("ja-JP") : ""}</td><td>${esc(h.by || "")}</td><td>${esc(h.reason || "")}</td><td style="font-size:12px">${esc((h.changed || []).map((c) => `${c.k}：${JSON.stringify(c.before)} → ${JSON.stringify(c.after)}`).join("／") || "（作成）")}</td></tr>`).join("")}
+    </tbody></table></div>
+    <ul style="font-size:12px">${MG.events.map((e) => `<li>${e.at ? new Date(ms(e.at)).toLocaleString("ja-JP") : ""}　${esc(e.by || "")}　${e.type === "lock" ? "固定した" : "固定を外した"}${e.reason ? "（" + esc(e.reason) + "）" : ""}</li>`).join("")}</ul></details>
+
+   <h3>② 提案（plans）　${MG.plans.filter((p) => p.active !== false).length}件を出す・全${MG.plans.length}件　${locked ? "（固定中：出す・出さないだけ変えられます）" : ""}</h3>
    ${MG.planRejected.length ? `<div class="alert bad">受け付けなかった提案：${esc(MG.planRejected.join("、"))}</div>` : ""}
    <div class="tablewrap"><table><thead><tr><th>id</th><th>題名</th><th>軸</th><th>効果（eff）</th><th>性格</th><th>出す</th><th>元</th></tr></thead><tbody>
-    ${MG.plans.map((p) => `<tr><td class="mono">${esc(p.id)}</td><td>${esc(p.title)}</td><td>${esc(p.axis)}</td><td>${esc(p.eff)}</td><td>${esc(p.trait || "–")}</td><td>${p.active === false ? "出さない" : "出す"}</td><td>${esc(p.source)}</td></tr>`).join("")}
+    ${MG.plans.map((p) => `<tr><td class="mono">${esc(p.id)}</td><td>${esc(p.title)}</td><td>${esc(p.axis)}</td><td>${esc(p.eff)}</td><td>${esc(p.trait || "–")}</td><td>${p.active === false ? "出さない" : "出す"} ${MG.planDocs.has(p.id) ? `<button class="btn" data-plan="${esc(p.id)}" style="padding:2px 8px">${p.active === false ? "出す" : "出さない"}にする</button>` : ""}</td><td>${esc(p.source)}</td></tr>`).join("")}
    </tbody></table></div>
-   <p class="muted" style="font-size:12px">Firestore の plans/{id} に書ける項目：title（題名）・how（やり方）・axis（wb・joy・sleep・money・duty・compare）・eff（0〜40）・trait（E・E-・O・C・N・A か空）・act（sns・watch・goods・event・-event）・multi（true/false）・active（false で新しい参加者に出さない）。書いていない項目は初期値のまま。</p>
-   <div class="row"><button class="btn" data-seed="plans">今の提案を plans に書き込む（まだない id だけ）</button></div>
-   <h3>お知らせ（notices）　${MG.notices.length}件</h3>
+   <p class="muted" style="font-size:12px">固定する前に「今の提案を plans に書き込む」を押してください（固定中は新しい文書を作れません）。題名・やり方・効果の値を変えたり、新しい提案を足したりするのは、固定する前に Firestore の plans/{id} で行います。書ける項目：title・how・axis（wb・joy・sleep・money・duty・compare）・eff（0〜40）・trait（E・E-・O・C・N・A か空）・act（sns・watch・goods・event・-event）・multi・active。</p>
+   <div class="row"><button class="btn" data-seed="plans" ${locked ? "disabled" : ""}>今の提案を plans に書き込む（まだない id だけ）</button></div>
+
+   <h3>③ 運用：確認が必要の基準（ops/alerts）　${MG.ops ? "Firestore にあり" : "初期値"}</h3>
+   <div class="row">${["noCheckDays", "noDailyDays", "who5Max"].map((k) => `<label style="font-size:13px">${esc(CFG_LABEL[k])} <input class="of" data-k="${k}" value="${esc(A[k])}" style="width:60px"></label>`).join("")}<button class="btn" id="op-save">保存</button></div>
+
+   <h3>③ お知らせ（notices）　${MG.notices.length}件</h3>
    ${MG.notices.length ? `<div class="tablewrap"><table><thead><tr><th>id</th><th>文</th><th>出す</th><th>期間</th><th>対象</th><th>種類</th></tr></thead><tbody>${MG.notices.map((n) => `<tr><td class="mono">${esc(n.id)}</td><td>${esc(n.text)}</td><td>${n.active === true && (!n.from || n.from <= today) && (!n.to || today <= n.to) ? "<b>表示中</b>" : "出さない"}</td><td>${esc(n.from || "")}〜${esc(n.to || "")}</td><td>${esc(n.target || "all")}</td><td>${esc(n.level || "info")}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">ありません</p>'}
-   <p class="muted" style="font-size:12px">Firestore の notices/{id} に書ける項目：text（文）・active（true で出す）・from・to（YYYY-MM-DD、省略可）・target（all＝全員／participants＝登録した人だけ）・level（info／warn＝赤）。はじめに・ホーム・マイページの上に出ます。</p>
+   <p class="muted" style="font-size:12px">Firestore の notices/{id} で追加・編集します。項目：text・active（true で出す）・from・to（YYYY-MM-DD、省略可）・target（all／participants）・level（info／warn＝赤）。はじめに・ホーム・マイページの上に出ます。</p>
    <div class="row"><button class="btn" data-seed="notice">見本のお知らせを書き込む（active:false）</button></div>
-   <h3>参加者ごとのメモ（notes）</h3>
-   <p class="muted" style="font-size:12px">参加者の表の「メモ」から書けます（Firestore の notes/{研究用の番号}：text・exclude）。exclude を true にした人は、CSV の exclude 列が 1 になり、分析の本分析から外れます（感度分析には入る）。参加者には見えません。</p></section>`;
+
+   <h3>③ 参加者ごとのメモ（notes）</h3>
+   <p class="muted" style="font-size:12px">参加者の表の「メモ」から書けます（notes/{研究用の番号}：text・exclude）。exclude にした人は CSV の exclude 列が 1 になり、分析の本分析から外れます（感度分析には入る）。参加者には見えません。</p></section>`;
+}
+const protoNowDefault = () => { const p = ST.protocolOf(ST.DEFAULT); delete p.version; return p; };
+function readProtoForm() {
+  const o = protoNow(), bad = [];
+  document.querySelectorAll(".pf").forEach((i) => {
+    const k = i.dataset.k, t = i.value.trim();
+    const v = k === "diminish" ? t.split(",").map((x) => Number(x.trim())) : Number(t);
+    if ((Array.isArray(v) ? v.some((x) => !isFinite(x)) : !isFinite(v)) || t === "") bad.push(k); else setPath(o, k, v);
+  });
+  const chk = ST.apply(o); if (chk.rejected.length) bad.push(...chk.rejected);
+  return { o, bad };
+}
+async function saveProto(u, create) {
+  const by = u.email, at = F.serverTimestamp(), b = F.writeBatch(db);
+  const pref = F.doc(db, "study", "protocol");
+  if (create) {
+    const after = protoNowDefault();
+    b.set(pref, { ...after, version: 1, locked: false, updatedAt: at, updatedBy: by });
+    b.set(F.doc(db, "study", "protocol", "history", "1"), { version: 1, reason: "初期値で作成", before: null, after, changed: [], at, by });
+  } else {
+    const reason = $("#pr-reason").value.trim(); if (!reason) return alert("変更の理由を書いてください");
+    const { o, bad } = readProtoForm(); if (bad.length) return alert("受け付けられない値があります：" + bad.join("、"));
+    const before = protoNow(), changed = flat(o).filter(([k, v]) => !same(v, Object.fromEntries(flat(before))[k])).map(([k, v]) => ({ k, before: Object.fromEntries(flat(before))[k], after: v }));
+    if (!changed.length) return alert("変わった項目がありません");
+    const v = (MG.proto.version || 0) + 1;
+    if (!confirm(`版 ${v} にします。\n${changed.map((c) => `${c.k}：${JSON.stringify(c.before)} → ${JSON.stringify(c.after)}`).join("\n")}\n\nこの版より前に群を決めた参加者は、前の条件のままです。よろしいですか？`)) return;
+    b.update(pref, { ...o, version: v, updatedAt: at, updatedBy: by });
+    b.set(F.doc(db, "study", "protocol", "history", String(v)), { version: v, reason, before, after: o, changed, at, by });
+  }
+  try { await b.commit(); alert("保存しました。読み込み直します。"); location.reload(); } catch (e) { alert("保存できませんでした：" + (e.code || e.message)); }
+}
+async function lockProto(u, lock) {
+  const by = u.email, at = F.serverTimestamp();
+  let reason = "";
+  if (lock) { if (!confirm("実験の条件を固定します。固定中は条件と提案の内容を変えられません（出す・出さないは変えられます）。よろしいですか？")) return; }
+  else { reason = (prompt("固定を外す理由（必須）") || "").trim(); if (!reason) return; }
+  try {
+    await F.updateDoc(F.doc(db, "study", "protocol"), lock ? { locked: true, lockedAt: at, lockedBy: by } : { locked: false, lockReason: reason });
+    await F.addDoc(F.collection(db, "study", "protocol", "events"), { type: lock ? "lock" : "unlock", reason, at, by, version: MG.proto.version });
+    location.reload();
+  } catch (e) { alert("できませんでした：" + (e.code || e.message)); }
+}
+async function saveOps(u) {
+  const o = {}; let bad = [];
+  document.querySelectorAll(".of").forEach((i) => { const v = Number(i.value.trim()); if (!isFinite(v)) bad.push(i.dataset.k); else o[i.dataset.k] = v; });
+  const chk = ST.apply({}, o); bad = bad.concat(chk.rejected); if (bad.length) return alert("受け付けられない値があります：" + bad.join("、"));
+  try { await F.setDoc(F.doc(db, "ops", "alerts"), { ...o, updatedAt: F.serverTimestamp(), updatedBy: u.email }); alert("保存しました"); location.reload(); } catch (e) { alert("保存できませんでした：" + (e.code || e.message)); }
+}
+async function togglePlan(id, u) {
+  const p = MG.plans.find((x) => x.id === id), next = p.active === false;
+  if (!confirm(`「${p.title}」を${next ? "出す" : "出さない"}にします。すでに選んだ参加者の記録には影響しません。`)) return;
+  try { await F.updateDoc(F.doc(db, "plans", id), { active: next, updatedAt: F.serverTimestamp(), updatedBy: u.email }); location.reload(); } catch (e) { alert("できませんでした：" + (e.code || e.message)); }
 }
 async function seed(kind, u) {
   const by = u.email, at = F.serverTimestamp();
   try {
-    if (kind === "config") { if (!confirm("config/app に初期値（版 1）を書き込みます。よろしいですか？")) return; await F.setDoc(F.doc(db, "config", "app"), { ...JSON.parse(JSON.stringify(ST.DEFAULT)), version: 1, updatedAt: at, updatedBy: by }); }
     if (kind === "plans") {
       const have = new Set((await F.getDocs(F.collection(db, "plans"))).docs.map((d) => d.id));
       const add = window.OSHIFIT_PLANS.filter((p) => !have.has(p.id));
@@ -165,7 +246,7 @@ async function seed(kind, u) {
       for (const p of add) await F.setDoc(F.doc(db, "plans", p.id), { title: p.title, how: p.how, axis: p.axis, eff: p.eff, trait: p.trait || "", multi: !!p.multi, active: true, updatedAt: at, updatedBy: by });
     }
     if (kind === "notice") await F.setDoc(F.doc(db, "notices", "sample"), { text: "（見本）メンテナンスのため、11月30日の夜はつながりにくくなります。", active: false, from: "", to: "", target: "all", level: "info", updatedAt: at, updatedBy: by });
-    alert("書き込みました。ページを読み込み直すと反映されます。");
+    alert("書き込みました。読み込み直します。"); location.reload();
   } catch (e) { alert("書き込めませんでした：" + (e.code || e.message)); }
 }
 async function editNote(pid, u) {
@@ -245,7 +326,7 @@ function exportFiles(P) {
     "分析：python -m analysis.run --data <この ZIP> --out <結果のフォルダ>（ZIP のまま渡せる）",
     "注意：参加者の実データです。リポジトリにコミットしない。free.csv（自由記述）は個人が特定される内容がないか確認してから使う。",
   ].join("\r\n");
-  const cfgOut = { 使った設定_初期値とFirestoreを混ぜたもの: CFG, Firestoreのconfig_app: MG.cfgRaw, 受け付けなかった項目: MG.cfgRejected, 参加者ごとの版: "baseline.csv の cfg_version、各参加者の cfgUsed は Firestore に残る" };
+  const cfgOut = { 実験の条件_今の値: protoNow(), 版: MG.proto?.version ?? 0, 固定中: !!MG.proto?.locked, 運用_確認が必要の基準: CFG.alerts, 変更の記録: MG.history.map((h) => ({ ...h, at: iso(h.at) })), 固定の記録: MG.events.map((e) => ({ ...e, at: iso(e.at) })), 受け付けなかった項目: MG.cfgRejected, 参加者ごとの版: "baseline.csv の cfg_version（群を決めたときの版）。各参加者の cfgUsed は Firestore に残る" };
   return [...files, ["config.json", JSON.stringify(cfgOut, null, 2)], ["plans.json", JSON.stringify(MG.plans, null, 2)], ["README_export.txt", "\ufeff" + info + "\r\n"]];
 }
 function downloadZip(P) {

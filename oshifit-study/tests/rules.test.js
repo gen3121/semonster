@@ -112,23 +112,48 @@ test("開発者（admins に登録・メール確認済み）だけが全件を�
   const pw = env.authenticatedContext("adm5", { email: "oi@oit.ac.jp", email_verified: false, firebase: { sign_in_provider: "password" } }).firestore();
   await assertFails(getDocs(collection(pw, "participants")));                    // パスワード登録・未確認では見られない
 });
-test("設定・提案・お知らせは誰でも読めて、開発者だけが書ける。メモは開発者だけ", async () => {
+test("実験の条件：作るときと変えるときは、版を上げて同じ書き込みで履歴を残す。固定中は変えられない", async () => {
+  const { writeBatch } = require("firebase/firestore");
+  const ad = admin(), mi = me();
   const anon = env.unauthenticatedContext().firestore();
-  await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), "config", "app"), { version: 1, gapDays: 4 }); });
-  await assertSucceeds(getDoc(doc(anon, "config", "app")));
-  await assertSucceeds(getDocs(collection(me(), "plans")));
-  await assertSucceeds(getDocs(collection(anon, "notices")));
-  await assertFails(setDoc(doc(me(), "config", "app"), { version: 2 }));
-  await assertFails(setDoc(doc(me(), "plans", "walk"), { title: "x" }));
-  await assertFails(setDoc(doc(me(), "notices", "n1"), { text: "x", active: true }));
-  await assertSucceeds(setDoc(doc(admin(), "config", "app"), { version: 2, gapDays: 5 }));
-  await assertSucceeds(setDoc(doc(admin(), "plans", "walk"), { title: "散歩", how: "歩く", axis: "wb", eff: 8 }));
-  await assertSucceeds(setDoc(doc(admin(), "notices", "n1"), { text: "メンテナンスのお知らせ", active: true }));
-  await assertFails(getDoc(doc(me(), "notes", "AB12-CD34")));
-  await assertFails(setDoc(doc(me(), "notes", "AB12-CD34"), { exclude: true }));
-  await assertSucceeds(setDoc(doc(admin(), "notes", "AB12-CD34"), { text: "問い合わせあり", exclude: false }));
-  await assertSucceeds(getDoc(doc(admin(), "notes", "AB12-CD34")));
-  await assertFails(setDoc(doc(fake(), "config", "app"), { version: 3 }));
+  const P = (db) => doc(db, "study", "protocol"), H = (db, v) => doc(db, "study", "protocol", "history", String(v));
+  await assertFails(setDoc(P(ad), { version: 1, gapDays: 4 }));                                    // 履歴なしでは作れない
+  let b = writeBatch(ad); b.set(P(ad), { version: 1, gapDays: 4, locked: false }); b.set(H(ad, 1), { version: 1, reason: "初期値", after: { gapDays: 4 } });
+  await assertSucceeds(b.commit());
+  await assertSucceeds(getDoc(P(anon)));                                                                  // 誰でも読める（アプリが使う）
+  await assertFails(getDoc(H(mi, 1)));                                                                  // 履歴は開発者だけ
+  await assertFails(updateDoc(P(ad), { gapDays: 5 }));                                               // 版を上げないと変えられない
+  b = writeBatch(ad); b.update(P(ad), { version: 2, gapDays: 5 }); b.set(H(ad, 2), { version: 2, reason: "" });
+  await assertFails(b.commit());                                                                          // 理由のない履歴は不可
+  b = writeBatch(ad); b.update(P(ad), { version: 2, gapDays: 5 }); b.set(H(ad, 2), { version: 2, reason: "先生と相談して5日に" });
+  await assertSucceeds(b.commit());
+  await assertFails(updateDoc(H(ad, 2), { reason: "書き換え" }));                                    // 履歴は書き換えられない
+  await assertFails(setDoc(P(mi), { version: 3 }));
+  await assertSucceeds(updateDoc(P(ad), { locked: true, lockedAt: serverTimestamp(), lockedBy: "oi@oit.ac.jp" }));   // 固定
+  b = writeBatch(ad); b.update(P(ad), { version: 3, gapDays: 6 }); b.set(H(ad, 3), { version: 3, reason: "x" });
+  await assertFails(b.commit());                                                                          // 固定中は変えられない
+  await assertFails(updateDoc(P(ad), { locked: false }));                                            // 外すには理由が要る
+  await assertSucceeds(updateDoc(P(ad), { locked: false, lockReason: "誤りの修正" }));
+});
+test("提案は固定中は出す・出さないだけ。運用とお知らせとメモは開発者だけが書ける", async () => {
+  const { writeBatch } = require("firebase/firestore");
+  const ad = admin(), mi = me();
+  await assertSucceeds(setDoc(doc(ad, "plans", "walk"), { title: "散歩", how: "歩く", axis: "wb", eff: 8, active: true }));
+  await assertSucceeds(getDocs(collection(env.unauthenticatedContext().firestore(), "plans")));
+  await assertFails(setDoc(doc(mi, "plans", "walk2"), { title: "x" }));
+  const b = writeBatch(ad); b.set(doc(ad, "study", "protocol"), { version: 1, locked: false }); b.set(doc(ad, "study", "protocol", "history", "1"), { version: 1, reason: "初期値" }); await b.commit();
+  await updateDoc(doc(ad, "study", "protocol"), { locked: true });
+  await assertFails(updateDoc(doc(ad, "plans", "walk"), { eff: 20 }));                               // 固定中は効果の値を変えない
+  await assertSucceeds(updateDoc(doc(ad, "plans", "walk"), { active: false, updatedBy: "oi@oit.ac.jp" }));
+  await assertFails(setDoc(doc(ad, "plans", "walk3"), { title: "新しい提案" }));                     // 固定中は足せない
+  await assertSucceeds(setDoc(doc(ad, "ops", "alerts"), { noCheckDays: 8 }));
+  await assertFails(getDoc(doc(mi, "ops", "alerts")));
+  await assertSucceeds(setDoc(doc(ad, "notices", "n1"), { text: "お知らせ", active: true }));
+  await assertSucceeds(getDocs(collection(env.unauthenticatedContext().firestore(), "notices")));
+  await assertFails(setDoc(doc(mi, "notices", "n2"), { text: "x" }));
+  await assertFails(getDoc(doc(mi, "notes", "AB12-CD34")));
+  await assertSucceeds(setDoc(doc(ad, "notes", "AB12-CD34"), { text: "問い合わせあり", exclude: false }));
+  await assertFails(setDoc(doc(fake(), "ops", "alerts"), { noCheckDays: 1 }));
 });
 test("群を決めたときの設定の版と値は、あとから変えられない", async () => {
   const r = doc(me(), "participants", "u1");

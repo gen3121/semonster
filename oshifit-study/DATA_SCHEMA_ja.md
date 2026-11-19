@@ -38,17 +38,23 @@ participants/{uid}/daily/{YYYY-MM-DD} … 毎日のアンケート（全群。1�
   joy, Q44, Q45, Q47, Q48   1〜7
   did_<planId>   群B・C だけ。0=行った 1=一部 2=行わなかった
 （participants/{uid} の追加項目）
-  cfgVersion     群を決めたときに使った設定の版（config/app の version。なければ 0）。変えられない
-  cfgUsed        群を決めたときに使った設定の値（初期値と config/app を混ぜたもの）。変えられない
+  cfgVersion     群を決めたときの実験の条件の版（study/protocol の version。なければ 0）。変えられない
+  cfgUsed        群を決めたときの実験の条件の値（初期値と study/protocol を混ぜたもの）。変えられない
 
 admins/{email}                     … 開発者ページを見られる人（大学アカウント）
-config/app                         … 設定（研究者が管理。誰でも読める・開発者だけ書ける）。項目と初期値は public/settings.js
+――― ②実験の条件（版で管理。実験が始まったら固定）―――
+study/protocol                     … 実験の条件（誰でも読める。開発者ページからだけ変える）。項目と初期値は public/settings.js
   version, gapDays, nChecks, finalDay, finalMaxDay, groupA{axisMin, axisCount, who5Min}, ref{…}, weights{trait, act},
-  diminish[…], clashFactor, burden, interval{hw, hwWb, hwStep, hwWbStep}, pc{burnout{su,se}, wb{su,se}}, alerts{noCheckDays, noDailyDays, who5Max}
+  diminish[…], clashFactor, burden, interval{hw, hwWb, hwStep, hwWbStep}, pc{burnout{su,se}, wb{su,se}},
+  locked（true で固定。固定中は変えられない）, lockedAt, lockedBy, lockReason（外した理由）, updatedAt, updatedBy
   （範囲外・型の違う値は無視して初期値を使う。書いていない項目も初期値）
-plans/{id}                         … 提案の上書き・追加（研究者が管理）。初期値は public/plans.js
+study/protocol/history/{版}        … 変更の記録（version, reason, before, after, changed[{k, before, after}], at, by）。消せない・書き換えられない
+study/protocol/events/{自動ID}     … 固定する・外すの記録（type: lock/unlock, reason, at, by, version）
+plans/{id}                         … 提案の上書き・追加。初期値は public/plans.js。固定中は active だけ変えられる
   title, how, axis, eff, trait, act, multi, active（false で新しい参加者に出さない。選んだ人の記録には残る）
-notices/{id}                       … お知らせ（研究者が管理）。text, active, from, to（YYYY-MM-DD）, target（all / participants）, level（info / warn）
+――― ③運用（いつでも変えてよい）―――
+ops/alerts                         … 「確認が必要」の基準（noCheckDays, noDailyDays, who5Max）。開発者だけが読み書き
+notices/{id}                       … お知らせ。text, active, from, to（YYYY-MM-DD）, target（all / participants）, level（info / warn）
 notes/{pid}                        … 参加者ごとのメモ（開発者だけが読み書き。参加者には見えない）。text, exclude（true で分析の本分析から外す）, updatedAt, updatedBy
 
 pilots/{pid}                       … プレ実験の参加ID（研究者が入れる。参加者からは見えない）
@@ -78,7 +84,7 @@ weekly.csv には `sumYen, sumMin, nDaily, adjBurn, adjBurnHw, adjWb, adjWbHw, a
 `n_checkins`（振り返りの回数）、`exec_rate` は毎日のアンケートの「今日、提案を行ったか」から計算（旧版は振り返りから）、`total_yen, total_min, n_daily`（28日間の毎日のアンケートの合計と回答日数）、`exec_rate`（群Bで「行った=1、一部=0.5、行わなかった=0」の平均）
 
 ### config.json・plans.json（ZIP にだけ入る）
-書き出したときの設定（初期値と config/app を混ぜたもの、Firestore の元の値、受け付けなかった項目）と、提案の一覧（初期値と plans を混ぜたもの）。分析の手順7は plans.json があればそれを使う。
+書き出したときの実験の条件（今の値・版・固定中か）、変更の記録と固定の記録、運用の基準、受け付けなかった項目と、提案の一覧（初期値と plans を混ぜたもの）。分析の手順7は plans.json があればそれを使う。
 
 ### free.csv（自由記述。個人が特定される内容がないか確認してから使う）
 `pid, where(baseline_Q62 / final_how), text`

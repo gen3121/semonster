@@ -83,11 +83,11 @@
   function baseline(S) { clearTimeout(debounceT); return upd({ answers: { ...S.answers }, scores: S.sc, baselineDone: true, baselineAt: fb.fs.serverTimestamp() }); }
   function avatar(S) { return upd({ avatar: { ...S.avatar }, avatarDone: true }); }
   // 群を決める（一度だけ。ルールで変更を禁止）。decidedAt はサーバーの時刻
-  // cfg：そのとき使った設定（Firestore の config/app の版と値）を記録に残す。研究の途中で設定を変えても、誰がどの条件だったか分かる
+  // cfg：そのとき使った実験の条件（Firestore の study/protocol の版と値）を記録に残す。研究の途中で設定を変えても、誰がどの条件だったか分かる
   function decide(S, pred, cfg) {
     const data = { group: S.group, planIds: S.group === "A" ? [] : S.group === "B" ? S.plan.ids : [S.plan.id], plansOffered: S.plans || [], scores: S.sc, decidedAt: fb.fs.serverTimestamp() };
     if (pred) data.pred = pred;
-    if (cfg) { data.cfgVersion = cfg.version || 0; data.cfgUsed = JSON.parse(JSON.stringify(cfg)); }
+    if (cfg) { data.cfgVersion = cfg.version || 0; data.cfgUsed = window.OSHIFIT_SETTINGS.protocolOf(cfg); }
     return upd(data);
   }
   function checkin(S, rec) {
@@ -99,11 +99,11 @@
   function daily(rec) { const { fs } = fb; return fs.setDoc(fs.doc(ref, "daily", rec.date), { ...rec, at: fs.serverTimestamp() }).catch(report); }
 
 
-  // 設定・提案・お知らせ（誰でも読める。研究者が Firestore で管理する）。読めなければ null（初期値で動く）
+  // 実験の条件・提案・お知らせ（誰でも読める。研究者が管理する）。読めなければ null（初期値で動く）
   async function settings() {
     const { fs, db } = await load();
-    const [c, p, n] = await Promise.all([fs.getDoc(fs.doc(db, "config", "app")), fs.getDocs(fs.collection(db, "plans")), fs.getDocs(fs.collection(db, "notices"))]);
-    return { config: c.exists() ? c.data() : null, plans: p.docs.map((d) => ({ ...d.data(), id: d.id })), notices: n.docs.map((d) => ({ ...d.data(), id: d.id })) };
+    const [c, p, n] = await Promise.all([fs.getDoc(fs.doc(db, "study", "protocol")), fs.getDocs(fs.collection(db, "plans")), fs.getDocs(fs.collection(db, "notices"))]);
+    return { protocol: c.exists() ? c.data() : null, plans: p.docs.map((d) => ({ ...d.data(), id: d.id })), notices: n.docs.map((d) => ({ ...d.data(), id: d.id })) };
   }
   window.OFStore = { settings, init, signup, login, social, logout, resetPassword, begin, draft, baseline, avatar, decide, checkin, final, daily, get failed() { return failed; }, get uid() { return uid; }, get email() { return email; } };
 })();
