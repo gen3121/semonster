@@ -19,8 +19,8 @@
     ["bob", "ボブ", "f"], ["sbob", "ショートボブ", "u"], ["pony", "ポニーテール", "f"], ["twin", "ツインテール", "f"],
     ["bun", "お団子", "f"], ["halfup", "ハーフアップ", "f"], ["braid", "三つ編み", "f"],
     ["short", "ショート", "u"], ["vshort", "ベリーショート", "m"], ["side", "サイドパート", "m"], ["mash", "マッシュ", "u"],
-    ["center", "センター分け", "u"], ["spiky", "ツンツン", "m"], ["perm", "パーマ", "u"], ["wolf", "ウルフ", "u"],
-    ["mlong", "ロング（後ろで結ぶ）", "u"], ["buzz", "坊主", "m"],
+    ["center", "センターパート", "u"], ["spiky", "ツンツン", "m"], ["perm", "ゆるパーマ", "u"], ["spiral", "スパイラルパーマ", "u"],
+    ["wolf", "ウルフ", "u"], ["mlong", "ロング（後ろで結ぶ）", "u"], ["buzz", "坊主", "m"], ["gorin", "坊主（五厘）", "m"], ["skin", "スキンヘッド", "m"],
   ];
   const FACE = ["たまご", "まる", "ほそ長", "四角", "ベース"];
   const BROW = ["ふつう", "太め", "細め", "上がり", "下がり", "まっすぐ"];
@@ -65,8 +65,15 @@
       mlong: `<path d="M34 60Q34 29 65 28Q96 29 96 60L94 80L36 80Z" fill="${d}"/><ellipse cx="65" cy="96" rx="6" ry="10" fill="${d}"/>`,
       wolf: `<path d="M33 62Q32 28 65 27Q98 28 97 62L98 92Q90 86 86 96L44 96Q40 86 32 92Z" fill="${d}"/>`,
       perm: `<path d="M32 60Q31 28 65 27Q99 28 98 60Q102 72 94 80L36 80Q28 72 32 60Z" fill="${d}"/>`,
+      center: `<path d="M33 62Q32 27 65 26Q98 27 97 62L95 76Q65 82 35 76Z" fill="${d}"/>`,
+      spiral: `<path d="M29 62Q26 20 65 19Q104 20 101 62Q103 74 97 80L33 80Q27 74 29 62Z" fill="${d}"/>${curls([[31, 72], [99, 72], [34, 79], [96, 79]], 5.5, d, shade(c, 1.3))}`,
     }[k] || "";
   }
+  // 巻き毛（スパイラルパーマ）：小さな円を並べ、中に巻きの線を入れる
+  function curls(pts, r, fill, line) {
+    return pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}"/><path d="M${x - r * 0.5} ${y + r * 0.1}Q${x} ${y - r * 0.7} ${x + r * 0.5} ${y + r * 0.1}" stroke="${line}" stroke-width="1.1" fill="none" opacity=".7"/>`).join("");
+  }
+  const arc = (cx, cy, rx, ry, a0, a1, n) => Array.from({ length: n }, (_, i) => { const a = (a0 + ((a1 - a0) * i) / (n - 1)) * Math.PI / 180; return [Math.round((cx + rx * Math.cos(a)) * 10) / 10, Math.round((cy + ry * Math.sin(a)) * 10) / 10]; });
   // 前髪・頭頂部（顔の上に描く）
   function hairFront(k, c) {
     const hl = shade(c, 1.12), cap = (y = 48) => `M35 ${y}Q35 26 65 25Q95 26 95 ${y}`;
@@ -86,14 +93,19 @@
       vshort: `<path d="${cap(48)}Q85 38 65 38Q45 38 35 48Z" fill="${c}"/>`,
       side: `<path d="${cap(54)}Q90 40 60 40Q52 46 40 46Q36 50 35 54Z" fill="${c}"/><path d="M60 40Q64 33 74 31" stroke="${hl}" stroke-width="1.6" fill="none"/>`,
       mash: `<path d="M34 58Q33 25 65 24Q97 25 96 58Q88 50 65 50Q42 50 34 58Z" fill="${c}"/>`,
-      center: `<path d="${cap(56)}Q88 42 68 38L65 44L62 38Q42 42 35 56Z" fill="${c}"/>`,
+      // センターパート：真ん中で分け、前髪を左右に流して耳の上までかぶせる（カーテンバング）
+      center: `<path d="M34 60Q31 24 65 23Q99 24 96 60Q95 57 92 55Q84 52 78 45Q70 38 66 27L64 27Q60 38 52 45Q46 52 38 55Q35 57 34 60Z" fill="${c}"/><path d="M38 50Q37 56 39 60L36 62Q34 56 34 50Z" fill="${c}"/><path d="M92 50Q93 56 91 60L94 62Q96 56 96 50Z" fill="${c}"/><path d="M65 24L65 29" stroke="${shade(c, 0.65)}" stroke-width="1.3"/><path d="M61 32Q53 40 44 51" stroke="${hl}" stroke-width="1.3" fill="none" opacity=".6"/><path d="M69 32Q77 40 86 51" stroke="${hl}" stroke-width="1.3" fill="none" opacity=".6"/>`,
+      // スパイラルパーマ：丸いシルエットに細かい巻きを重ね、前髪も巻いて眉の上まで
+      spiral: `<path d="M31 60Q28 19 65 18Q102 19 99 60Q95 51 86 50Q76 47 65 48Q54 47 44 50Q35 51 31 60Z" fill="${c}"/>${curls(arc(65, 40, 31, 20, 180, 360, 9), 6.5, c, shade(c, 1.35))}${curls([[39, 49], [48, 50], [57, 51], [65, 51], [73, 51], [82, 50], [91, 49], [32, 57], [98, 57]], 4.8, c, shade(c, 1.35))}`,
       spiky: `<path d="M35 52L33 34L44 40L46 24L56 34L65 20L74 34L84 24L86 40L97 34L95 52Q86 42 65 42Q44 42 35 52Z" fill="${c}"/>`,
       perm: `<path d="M33 56Q30 28 65 25Q100 28 97 56Q92 46 82 48Q74 40 65 46Q56 40 48 48Q38 46 33 56Z" fill="${c}"/>${[40, 52, 65, 78, 90].map((x) => `<circle cx="${x}" cy="${x === 65 ? 30 : 36}" r="7" fill="${c}"/>`).join("")}`,
       wolf: `<path d="${cap(56)}Q84 44 72 42Q62 52 50 46Q40 50 35 56Z" fill="${c}"/>`,
       mlong: `<path d="${cap(54)}Q86 42 66 41Q46 42 35 54Z" fill="${c}"/>`,
+      gorin: `<path d="M37 54Q36 30 65 29Q94 30 93 54Q91 45 84 42Q75 38 65 38Q55 38 46 42Q39 45 37 54Z" fill="${c}" opacity=".38"/>`,   // 五厘：地肌が透ける短さ
+      skin: `<ellipse cx="56" cy="40" rx="7" ry="3.5" fill="#fff" opacity=".35" transform="rotate(-18 56 40)"/>`,   // スキンヘッド：髪なし、頭のつやだけ
       buzz: `<path d="M38 52Q37 30 65 29Q93 30 92 52Q90 44 84 41Q75 37 65 37Q55 37 46 41Q40 44 38 52Z" fill="${c}" opacity=".85"/>`,   // 頭の形に沿わせる（両端が浮かない）
     }[k] || "";
-    return top + (k === "buzz" || k === "spiky" ? "" : `<path d="M50 30Q60 27 70 29" stroke="${hl}" stroke-width="2" fill="none" opacity=".55" stroke-linecap="round"/>`);
+    return top + (["buzz", "spiky", "gorin", "skin", "spiral", "center"].includes(k) ? "" : `<path d="M50 30Q60 27 70 29" stroke="${hl}" stroke-width="2" fill="none" opacity=".55" stroke-linecap="round"/>`);
   }
   function brows(b, c, mood) {
     const t = mood === "tired" ? 2 : mood === "bright" ? -1 : 0;
@@ -157,11 +169,19 @@
   }
 
   // mood: "bright"（元気）| "neutral" | "tired"（少し疲れ。誇張しない）
+  // mood は文字（区分）か {mood, smile 0〜1, fatigue 0〜1}（2つの未来で、得点の差をそのまま表情の差にする）
   function render(av, mood = "neutral", size = 120) {
+    const fx = typeof mood === "object" && mood ? mood : null;
+    if (fx) mood = fx.mood || "neutral";
     av = { ...defaults(av && av.gender), ...(av || {}) };
     const hc = PALETTE[av.hairColor] || PALETTE[2], sk = SKIN[av.skin] || SKIN[3], sh = mood === "tired" ? shade(PALETTE[av.shirt] || "#2170e4", 0.7) : PALETTE[av.shirt] || "#2170e4";
     const H = Math.round((size * 140) / 130);
-    const cheek = mood === "bright" ? `<ellipse cx="46" cy="79" rx="5" ry="3" fill="#f5a9c0" opacity=".7"/><ellipse cx="84" cy="79" rx="5" ry="3" fill="#f5a9c0" opacity=".7"/>` : "";
+    // ほお紅は女性を選んだ人だけ（男性に付けると化粧のように見えるため）
+    const cheek = mood === "bright" && av.gender === "女性" ? `<ellipse cx="46" cy="79" rx="5" ry="3" fill="#f5a9c0" opacity=".55"/><ellipse cx="84" cy="79" rx="5" ry="3" fill="#f5a9c0" opacity=".55"/>` : "";
+    // 疲れ：目の下のくまの濃さを推し疲れの値に比例させる。笑顔：口の上がり方を幸福度に比例させる
+    const fat = fx ? Math.max(0, (fx.fatigue - 0.2) / 0.6) : mood === "tired" ? 0.7 : 0;
+    const bags = fat > 0.02 ? `<path d="M47 73Q54 77 61 73" stroke="${shade(sk, 0.72)}" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="${(Math.min(fat, 1) * 0.9).toFixed(2)}"/><path d="M69 73Q76 77 83 73" stroke="${shade(sk, 0.72)}" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="${(Math.min(fat, 1) * 0.9).toFixed(2)}"/>` : "";
+    const mth = fx ? (() => { const s = Math.max(0, Math.min(1, fx.smile)), y = 84 + (s - 0.45) * 16; return s >= 0.62 ? `<path d="M56 82Q65 ${y + 6} 74 82Q65 85 56 82Z" fill="#b5525e"/>` : `<path d="M58 84Q65 ${y.toFixed(1)} 72 84" fill="none" stroke="#b5525e" stroke-width="2.2" stroke-linecap="round"/>`; })() : mouth(av.mouth, mood);
     return `<svg width="${size}" height="${H}" viewBox="0 0 130 140" role="img" aria-label="あなたのアバター">
 ${hairBack(av.hair, hc)}
 <path d="M58 88L72 88L73 104L57 104Z" fill="${shade(sk, 0.9)}"/>
@@ -169,7 +189,7 @@ ${hairBack(av.hair, hc)}
 <ellipse cx="36" cy="67" rx="4.5" ry="7" fill="${shade(sk, 0.95)}"/><ellipse cx="94" cy="67" rx="4.5" ry="7" fill="${shade(sk, 0.95)}"/>
 <path d="${facePath(av.face)}" fill="${sk}"/>
 ${hairFront(av.hair, hc)}
-${brows(av.brow, shade(hc, 0.85), mood)}${eyes(av.eye, EYE_COLOR[av.eyeColor] || EYE_COLOR[0], mood, sk)}${nose(av.nose, sk)}${cheek}${mouth(av.mouth, mood)}${beard(av.beard, hc)}${glasses(av.glasses)}
+${brows(av.brow, shade(hc, 0.85), mood)}${eyes(av.eye, EYE_COLOR[av.eyeColor] || EYE_COLOR[0], mood, sk)}${bags}${nose(av.nose, sk)}${cheek}${mth}${beard(av.beard, hc)}${glasses(av.glasses)}
 </svg>`;
   }
 
