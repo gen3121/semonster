@@ -1651,7 +1651,7 @@ function vStart(){app.className="app land";
      <div class="road"><p class="eyebrow">28 DAYS</p><div class="track4">${[0,4,8,12,16,20,24,28].map((d,i)=>`<div class="mile ${i===0?"s":i===7?"f":""}"><span class="dot"></span><b>${i===0?"開始":i===7?"最後の調査":`${i}回目`}</b><span>${i===0?"0日目":i===7?"28日目〜":`${d}日目ごろ`}</span></div>`).join("")}</div>
      <p class="xs" style="color:var(--ink-muted)">振り返りは前回から4日以上あけて、4〜5日ごとに6回（各約2分）。3回目だけ、最近2週間の気分（WHO-5）も答えます。</p></div></div></section>
    <section class="band about-band" id="sec-about">${wave("var(--bg)")}<div class="in"><div class="sechead"><p class="eyebrow">ABOUT THE STUDY</p><h2 class="jp-xl">安心して参加してもらうために</h2></div>
-     <div class="facts-grid">${[["写真は使わない","アバターは写真を使わず、顔の形や髪型を自分で選んで作ります。"],["メールはログインだけに使う","メールアドレスはログインのためだけに使い、回答とは別に管理します。名前は集めません。"],["困ったときは連絡を","わからないことや困ったことがあれば、マイページの問い合わせ先にご連絡ください。"],["プレ実験の方も歓迎","プレ実験に参加した方も参加できます。マイページの研究用の番号を研究者にお知らせください。"]].map(([t,d],i)=>`<div class="fact"><span class="fno">${["AVATAR","PRIVACY","CONTACT","PILOT"][i]}</span><h3>${t}</h3><p class="small muted">${d}</p></div>`).join("")}</div></div></section>
+     <div class="facts-grid">${[["写真は使わない","アバターは写真を使わず、顔の形や髪型を自分で選んで作ります。"],["メールはログインだけに使う","メールアドレスはログインのためだけに使い、回答とは別に管理します。名前は集めません。"],["困ったときは連絡を","わからないことや困ったことがあれば、マイページの問い合わせ先にご連絡ください。"],["参加は自由","参加するかどうかは自由です。途中で答えるのをやめても、成績などの不利益はありません。それまでの回答は研究に使います。"]].map(([t,d],i)=>`<div class="fact"><span class="fno">${["AVATAR","PRIVACY","CONTACT","FREE"][i]}</span><h3>${t}</h3><p class="small muted">${d}</p></div>`).join("")}</div></div></section>
    <section class="band join-band" id="sec-join"><div class="in"><div class="joincard"><div class="stack" style="gap:12px"><p class="eyebrow">JOIN</p><h2 class="jp-xl">さっそく、はじめてみる</h2>
        <ul class="facts"><li>約${BASE_ITEMS.length}の質問（約${Math.max(8,Math.round(BASE_ITEMS.length*10/60))}分）</li><li>約28日間、4〜5日ごとに6回の振り返り（各約2分）。28日目以降に最後の調査</li><li>メールアドレスで登録し、次からはログインして続きから答えられます</li></ul>
        <div class="row" style="flex-wrap:wrap;gap:10px"><a class="btn primary pill big" id="go" href="#signup">新規登録してはじめる${ARROW}</a><a class="btn pill big" id="to-login" href="#login">ログイン</a></div></div><div class="joinart">${miniSVG("home")}</div></div></div></section>
@@ -1867,7 +1867,7 @@ function vMypage(){if(!S.group)ensureGroup();const g=grp(),ps=planIds().map(plan
    <section class="card"><div class="sec"><h3>アカウント</h3>${STUDY?'<button class="btn sm" id="logout">ログアウト</button>':""}</div>
     ${STUDY&&OFStore.email?`<p class="small">ログイン中：<b>${esc(OFStore.email)}</b></p>`:""}
     <div class="idbox"><span class="small muted">研究用の番号</span><span class="mono" id="pid">${S.id}</span><button class="btn sm" id="copy">コピー</button></div>
-    <p class="xs muted">プレ実験に参加した方は、この番号を研究者に知らせてください。</p></section>
+    <p class="xs muted">問い合わせのときは、この番号を書いてください。</p></section>
    <section class="card"><div class="sec"><h3>参加の状況</h3></div><div>
     <div class="kv"><span>群</span><b>${g==="A"?"群A（今のままで順調）":g==="B"?"群B（プランBを実行）":"群C（プランAを選択）"}</b></div>
     ${p?`<div class="kv"><span>提案</span><b>${esc(planTitle(p))}</b></div>`:""}
