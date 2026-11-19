@@ -1725,14 +1725,14 @@ let AVTAB="hair";
 function vAvatar(){const A=window.OFAvatar,gender=S.answers.Q2;
   if(!S.avatar||S.avatar.v!==2)S.avatar=A.defaults(gender);const av=S.avatar;av.gender=gender||null;
   const styles=A.stylesFor(gender);if(!styles.some(([k])=>k===av.hair))av.hair=styles[0][0];
-  const TABS=[["face","顔の形"],["skin","肌の色"],["hair","髪型"],["hairColor","髪の色"],["brow","まゆ"],["eye","目"],["eyeColor","目の色"],["nose","鼻"],["mouth","口"],["glasses","めがね"],...(gender==="女性"?[]:[["beard","ひげ"]]),["shirt","服の色"]];
+  const TABS=[["face","顔の形"],["skin","肌の色"],["hair","髪型"],["hairColor","髪の色"],["brow","まゆ"],["eye","目"],["eyeColor","目の色"],["nose","鼻"],["mouth","口"],["glasses","めがね"],...(gender==="男性"?[]:[["strand","おくれ毛"]]),...(gender==="女性"?[]:[["beard","ひげ"]]),["shirt","服の色"]];
   if(!TABS.some(t=>t[0]===AVTAB))AVTAB="hair";
-  const LISTS={face:A.FACE,brow:A.BROW,eye:A.EYE,nose:A.NOSE,mouth:A.MOUTH,glasses:A.GLASSES,beard:A.BEARD};
+  const LISTS={face:A.FACE,brow:A.BROW,eye:A.EYE,nose:A.NOSE,mouth:A.MOUTH,glasses:A.GLASSES,beard:A.BEARD,strand:A.STRAND};
   const COLORS={skin:A.SKIN,hairColor:A.PALETTE,eyeColor:A.EYE_COLOR,shirt:A.PALETTE};
   let grid="";
   if(AVTAB==="hair")grid=`<div class="avgrid">${styles.map(([k,n])=>`<button class="avopt" data-k="hair" data-v="${k}" aria-pressed="${av.hair===k}">${A.render({...av,hair:k},"neutral",62)}<span>${esc(n)}</span></button>`).join("")}</div>`;
   else if(COLORS[AVTAB])grid=`<div class="swgrid">${COLORS[AVTAB].map((c,i)=>`<button class="sw" data-k="${AVTAB}" data-v="${i}" aria-pressed="${av[AVTAB]===i}" aria-label="${TABS.find(t=>t[0]===AVTAB)[1]} ${i+1}" style="background:${c}"></button>`).join("")}</div>`;
-  else grid=`<div class="avgrid">${LISTS[AVTAB].map((n,i)=>`<button class="avopt" data-k="${AVTAB}" data-v="${i}" aria-pressed="${av[AVTAB]===i}">${A.render({...av,[AVTAB]:i},"neutral",62)}<span>${esc(n)}</span></button>`).join("")}</div>`;
+  else grid=`<div class="avgrid">${LISTS[AVTAB].map((n,i)=>`<button class="avopt" data-k="${AVTAB}" data-v="${i}" aria-pressed="${(av[AVTAB]??0)===i}">${A.render({...av,[AVTAB]:i},"neutral",62)}<span>${esc(n)}</span></button>`).join("")}</div>`;
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(1)}<div><p class="eyebrow view-eyebrow">AVATAR</p><h2>アバターを作る</h2><p class="small muted">自分に似せて作ってください。28日後の2つの未来を、この分身で見比べます。</p></div>
    <section class="card avstage"><div class="avprev">${A.render(av,"neutral",150)}</div><button class="btn sm" id="av-rand">おまかせ</button></section>
    <section class="card" style="gap:10px"><div class="avtabs" role="tablist">${TABS.map(([k,l])=>`<button class="avtab" role="tab" data-tab="${k}" aria-selected="${AVTAB===k}">${l}</button>`).join("")}</div>${grid}</section></main>

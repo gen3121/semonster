@@ -18,9 +18,11 @@
     ["long", "ストレートロング", "f"], ["wave", "ゆるふわロング", "f"], ["semi", "セミロング", "f"], ["hime", "姫カット", "f"],
     ["bob", "ボブ", "f"], ["sbob", "ショートボブ", "u"], ["pony", "ポニーテール", "f"], ["twin", "ツインテール", "f"],
     ["bun", "お団子", "f"], ["halfup", "ハーフアップ", "f"], ["braid", "三つ編み", "f"],
+    ["flip", "外ハネボブ", "f"], ["mwave", "ミディアムウェーブ", "f"],
     ["short", "ショート", "u"], ["vshort", "ベリーショート", "m"], ["side", "サイドパート", "m"], ["mash", "マッシュ", "u"],
     ["center", "センターパート", "u"], ["spiky", "ツンツン", "m"], ["perm", "ゆるパーマ", "u"], ["spiral", "スパイラルパーマ", "u"],
     ["wolf", "ウルフ", "u"], ["mlong", "ロング（後ろで結ぶ）", "u"], ["buzz", "坊主", "m"], ["gorin", "坊主（五厘）", "m"], ["skin", "スキンヘッド", "m"],
+    ["upbang", "アップバング", "m"], ["twoblock", "ツーブロック", "m"], ["mohican", "ソフトモヒカン", "m"],
   ];
   const FACE = ["たまご", "まる", "ほそ長", "四角", "ベース"];
   const BROW = ["ふつう", "太め", "細め", "上がり", "下がり", "まっすぐ"];
@@ -29,6 +31,7 @@
   const MOUTH = ["にっこり", "ふつう", "小さめ", "大きめ", "口角上げ", "への字ぎみ"];
   const GLASSES = ["なし", "まる", "四角", "細ぶち", "サングラス"];
   const BEARD = ["なし", "口ひげ", "あごひげ", "無精ひげ", "フル"];
+  const STRAND = ["なし", "細め", "S字（巻き）", "顔まわりカット"];   // おくれ毛（髪型と組み合わせる。結んだ髪型でも使える）
 
   const stylesFor = (gender) => HAIR.filter(([, , t]) => gender === "男性" ? t !== "f" : gender === "女性" ? t !== "m" : true);
   function defaults(gender) {
@@ -65,6 +68,8 @@
       mlong: `<path d="M34 60Q34 29 65 28Q96 29 96 60L94 80L36 80Z" fill="${d}"/><ellipse cx="65" cy="96" rx="6" ry="10" fill="${d}"/>`,
       wolf: `<path d="M33 62Q32 28 65 27Q98 28 97 62L98 92Q90 86 86 96L44 96Q40 86 32 92Z" fill="${d}"/>`,
       perm: `<path d="M32 60Q31 28 65 27Q99 28 98 60Q102 72 94 80L36 80Q28 72 32 60Z" fill="${d}"/>`,
+      flip: `<path d="M31 62Q30 27 65 26Q100 27 99 62Q100 80 96 86Q102 88 106 82Q105 92 95 93L35 93Q25 92 24 82Q28 88 34 86Q30 80 31 62Z" fill="${d}"/>`,
+      mwave: `<path d="M31 60Q30 26 65 25Q100 26 99 60Q104 74 98 86Q104 98 98 110Q65 117 32 110Q26 98 32 86Q26 74 31 60Z" fill="${d}"/>`,
       center: `<path d="M33 62Q32 27 65 26Q98 27 97 62L95 76Q65 82 35 76Z" fill="${d}"/>`,
       spiral: `<path d="M29 62Q26 20 65 19Q104 20 101 62Q103 74 97 80L33 80Q27 74 29 62Z" fill="${d}"/>${curls([[31, 72], [99, 72], [34, 79], [96, 79]], 5.5, d, shade(c, 1.3))}`,
     }[k] || "";
@@ -101,11 +106,30 @@
       perm: `<path d="M33 56Q30 28 65 25Q100 28 97 56Q92 46 82 48Q74 40 65 46Q56 40 48 48Q38 46 33 56Z" fill="${c}"/>${[40, 52, 65, 78, 90].map((x) => `<circle cx="${x}" cy="${x === 65 ? 30 : 36}" r="7" fill="${c}"/>`).join("")}`,
       wolf: `<path d="${cap(56)}Q84 44 72 42Q62 52 50 46Q40 50 35 56Z" fill="${c}"/>`,
       mlong: `<path d="${cap(54)}Q86 42 66 41Q46 42 35 54Z" fill="${c}"/>`,
+      flip: `<path d="${cap(55)}Q86 47 78 43Q66 52 52 47Q42 48 35 55Z" fill="${c}"/>`,
+      mwave: `<path d="${cap(55)}Q84 45 72 41Q60 50 46 47Q40 50 35 55Z" fill="${c}"/>`,
+      // アップバング：前髪を上げて、おでこを出す
+      upbang: `<path d="M35 58Q31 24 62 15Q72 12 82 18Q99 28 95 58Q93 47 87 42Q80 36 72 35Q65 33 58 35Q48 37 42 44Q37 49 35 58Z" fill="${c}"/><path d="M54 30Q60 16 76 20" stroke="${hl}" stroke-width="1.6" fill="none" opacity=".7"/><path d="M64 30Q70 22 82 26" stroke="${shade(c, 0.7)}" stroke-width="1.2" fill="none"/>`,
+      // ツーブロック：上は重め、耳の上は刈り上げ（地肌が透ける）
+      twoblock: `<path d="M36 60Q35 44 40 42L41 60Z" fill="${c}" opacity=".35"/><path d="M94 60Q95 44 90 42L89 60Z" fill="${c}" opacity=".35"/><path d="M39 50Q37 23 65 21Q93 23 91 50Q86 43 76 44Q66 49 56 44Q46 43 39 50Z" fill="${c}"/>`,
+      // ソフトモヒカン：真ん中を高く、横は短く
+      mohican: `<path d="M37 54Q36 30 65 29Q94 30 93 54Q90 45 84 42Q75 38 65 38Q55 38 46 42Q40 45 37 54Z" fill="${c}" opacity=".4"/><path d="M48 42L50 24L56 30L60 16L65 26L70 16L74 30L80 24L82 42Q74 36 65 37Q56 36 48 42Z" fill="${c}"/>`,
       gorin: `<path d="M37 54Q36 30 65 29Q94 30 93 54Q91 45 84 42Q75 38 65 38Q55 38 46 42Q39 45 37 54Z" fill="${c}" opacity=".38"/>`,   // 五厘：地肌が透ける短さ
       skin: `<ellipse cx="56" cy="40" rx="7" ry="3.5" fill="#fff" opacity=".35" transform="rotate(-18 56 40)"/>`,   // スキンヘッド：髪なし、頭のつやだけ
       buzz: `<path d="M38 52Q37 30 65 29Q93 30 92 52Q90 44 84 41Q75 37 65 37Q55 37 46 41Q40 44 38 52Z" fill="${c}" opacity=".85"/>`,   // 頭の形に沿わせる（両端が浮かない）
     }[k] || "";
-    return top + (["buzz", "spiky", "gorin", "skin", "spiral", "center"].includes(k) ? "" : `<path d="M50 30Q60 27 70 29" stroke="${hl}" stroke-width="2" fill="none" opacity=".55" stroke-linecap="round"/>`);
+    return top + (["buzz", "spiky", "gorin", "skin", "spiral", "center", "upbang", "twoblock", "mohican"].includes(k) ? "" : `<path d="M50 30Q60 27 70 29" stroke="${hl}" stroke-width="2" fill="none" opacity=".55" stroke-linecap="round"/>`);
+  }
+  // おくれ毛：耳の前から頬に沿って下ろす細い毛
+  function strands(t, c) {
+    if (!t) return "";
+    const L = [
+      "",
+      `<path d="M41 50Q38 66 42 86" stroke="${c}" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M89 50Q92 66 88 86" stroke="${c}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,
+      `<path d="M41 50Q35 60 41 68Q48 76 41 84Q37 89 42 92" stroke="${c}" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M89 50Q95 60 89 68Q82 76 89 84Q93 89 88 92" stroke="${c}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,
+      `<path d="M35 50Q34 70 41 84Q45 70 45 54Z" fill="${c}"/><path d="M95 50Q96 70 89 84Q85 70 85 54Z" fill="${c}"/>`,
+    ][t] || "";
+    return L;
   }
   function brows(b, c, mood) {
     const t = mood === "tired" ? 2 : mood === "bright" ? -1 : 0;
@@ -188,10 +212,10 @@ ${hairBack(av.hair, hc)}
 <path d="M16 140Q18 104 50 100Q57 106 65 106Q73 106 80 100Q112 104 114 140Z" fill="${sh}"/><path d="M50 100Q57 107 65 107Q73 107 80 100L76 99Q70 103 65 103Q60 103 54 99Z" fill="${shade(sh, 0.8)}"/>
 <ellipse cx="36" cy="67" rx="4.5" ry="7" fill="${shade(sk, 0.95)}"/><ellipse cx="94" cy="67" rx="4.5" ry="7" fill="${shade(sk, 0.95)}"/>
 <path d="${facePath(av.face)}" fill="${sk}"/>
-${hairFront(av.hair, hc)}
+${hairFront(av.hair, hc)}${strands(av.strand || 0, hc)}
 ${brows(av.brow, shade(hc, 0.85), mood)}${eyes(av.eye, EYE_COLOR[av.eyeColor] || EYE_COLOR[0], mood, sk)}${bags}${nose(av.nose, sk)}${cheek}${mth}${beard(av.beard, hc)}${glasses(av.glasses)}
 </svg>`;
   }
 
-  window.OFAvatar = { render, defaults, stylesFor, PALETTE, SKIN, EYE_COLOR, HAIR, FACE, BROW, EYE, NOSE, MOUTH, GLASSES, BEARD };
+  window.OFAvatar = { render, defaults, stylesFor, PALETTE, SKIN, EYE_COLOR, HAIR, FACE, BROW, EYE, NOSE, MOUTH, GLASSES, BEARD, STRAND };
 })();
