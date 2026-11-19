@@ -1,0 +1,3 @@
+
+# Claude Code のその PC だけの設定（impeccable のフックなど）。共有しない
+.claude/settings.local.json
