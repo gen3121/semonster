@@ -17,6 +17,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parent.parent          # oshifit-study/
 QN_PATH = ROOT / "public" / "questionnaire.json"
 INDEX_PATH = ROOT / "public" / "index.html"
+PLANS_PATH = ROOT / "public" / "plans.js"   # 提案の初期値（アプリ・開発者ページと同じファイル）
 SYNTH_MARKER = "合成データ_SYNTHETIC.txt"              # 合成データの目印（列ではなくファイルで示す）
 
 
@@ -134,20 +135,29 @@ PLANS_FALLBACK = {  # index.html が読めないときだけ使う（2026-11-12 
     "calm": ("joy", 10), "event": ("joy", 12), "good3": ("wb", 10)}
 
 
-def load_plans(path: Path = INDEX_PATH) -> tuple[dict, str]:
-    """{id: {"axis":..., "eff":...}} と読み込み元を返す。"""
+def load_plans(path: Path = PLANS_PATH, data_dir: Path | None = None) -> tuple[dict, str]:
+    """{id: {"axis":..., "eff":...}} と読み込み元を返す。
+    data_dir に開発者ページで書き出した plans.json（Firestore の上書きを混ぜた、実験で使った一覧）があれば、それを優先する。"""
+    if data_dir is not None and (Path(data_dir) / "plans.json").exists():
+        try:
+            arr = json.loads((Path(data_dir) / "plans.json").read_text(encoding="utf-8"))
+            found = {p["id"]: {"axis": p["axis"], "eff": float(p["eff"])} for p in arr if p.get("id") and p.get("axis") and p.get("eff") is not None}
+            if found:
+                return found, "書き出したデータの plans.json（実験で使った一覧）"
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
     try:
         txt = path.read_text(encoding="utf-8")
-        blk = txt[txt.index("const PLANS=["):]
+        blk = txt[txt.index("OSHIFIT_PLANS=["):]
         blk = blk[:blk.index("];")]
         found = {}
         for m in re.finditer(r'\{id:"([^"]+)",axis:"([^"]+)".*?eff:(\d+(?:\.\d+)?)', blk):
             found[m.group(1)] = {"axis": m.group(2), "eff": float(m.group(3))}
         if len(found) >= 10:
-            return found, "public/index.html の PLANS"
+            return found, "public/plans.js（提案の初期値）"
     except (OSError, ValueError):
         pass
-    return {k: {"axis": a, "eff": float(e)} for k, (a, e) in PLANS_FALLBACK.items()}, "analysis/common.py の控え（index.html を読めなかった）"
+    return {k: {"axis": a, "eff": float(e)} for k, (a, e) in PLANS_FALLBACK.items()}, "analysis/common.py の控え（plans.js を読めなかった）"
 
 
 # ---------------------------------------------------------------- 実行の状態

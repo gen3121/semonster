@@ -83,7 +83,7 @@ def interval_update(df):
 
 def run(ctx: Ctx):
     df = ctx.store["main"]
-    plans, src = load_plans()
+    plans, src = load_plans(data_dir=ctx.data_dir)
     ctx.md("## 手順7 研究終了後：提案の改善量と見込みの幅の更新", "")
     tab, tau = plan_effects(ctx, df, plans)
     ctx.save_csv("s7_plan_effects.csv", tab)

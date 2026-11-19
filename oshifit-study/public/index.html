@@ -401,6 +401,8 @@ tr:last-child td{border-bottom:0}
 <script src="config.js"></script>
 <script src="store.js"></script>
 <script src="avatar.js"></script>
+<script src="settings.js"></script>
+<script src="plans.js"></script>
 <script>window.OSHIFIT_Q={
  "short_omit": [
   "Q35",
@@ -1184,7 +1186,7 @@ function scores(A){const o={};SC.axes.forEach(ax=>o[ax.key]=axisScore(ax,A));
   o.who5raw=["W1","W2","W3","W4","W5"].reduce((a,k)=>a+(A[k]??0),0);
   const h=["H1","H2","H3","H4"].map(k=>k==="H4"&&A[k]!=null?8-A[k]:A[k]); o.shs=h.some(x=>x==null)?null:mean(h);
   const ps=QN.sections.find(x=>x.id==="pss"); if(ps){const v=ps.items.map(i=>A[i.id]==null?null:(i.reverse?4-A[i.id]:A[i.id])); o.pss=v.some(x=>x==null)?null:v.reduce((a,b)=>a+b,0);} return o;}
-function isGood(sc){const n=SC.axes.filter(ax=>sc[ax.key]>=60).length; return {n,ok:n>=5&&sc.who5raw>=13};}
+function isGood(sc){const g=CFG.groupA,n=SC.axes.filter(ax=>sc[ax.key]>=g.axisMin).length; return {n,ok:n>=g.axisCount&&sc.who5raw>=g.who5Min};}
 function big5(A){const g=k=>A[k],r=k=>6-A[k],f=(a,b)=>r0((a+b-2)/8*100);
   if(["Q7","Q8","Q9","Q10","Q11","Q12","Q13","Q14","Q15","Q16"].some(k=>A[k]==null))return null;
   return{E:f(g("Q7"),r("Q12")),A:f(r("Q8"),g("Q13")),C:f(g("Q9"),r("Q14")),N:f(g("Q10"),r("Q15")),O:f(g("Q11"),r("Q16"))};}
@@ -1195,32 +1197,23 @@ function tendency(A){ // 前研究（k-means、2クラスタ）の傾向に近�
    :{name:"低SNS・マイペース型",desc:"SNSは控えめで、自分のペースで楽しむ傾向。前研究では推し疲れが比較的低めでした。"};}
 
 /* ---------- プラン（弱い軸 × 性格） ---------- */
-const PLANS=[
- {id:"sns23",axis:"sleep",title:"寝る30分前からSNSはお休みモード",how:"寝る時刻を決め、その30分前に通知をオフにして、スマホを手の届かない所に置く。夜に出た推しの投稿は翌朝まとめて見る",eff:16,trait:null}, // idは集計の互換のため sns23 のまま（旧：SNSは23時まで）
- {id:"archive",axis:"sleep",title:"リアタイは週2回まで、ほかはアーカイブで",how:"見逃しは翌日の決めた時間に見る",eff:12,trait:"C"},
- {id:"budget",axis:"money",title:"今月のグッズ予算を先に決める",how:"予算を決め、超えたら翌月に回す",eff:16,trait:"C"},
- {id:"declutter",axis:"money",title:"グッズを棚卸しして、使わないものをフリマで次のファンへ",how:"月に1回、1年以上飾っていない・使っていないグッズを選び、フリマアプリで出品する。売上は次の推し活の予算に回す",eff:12,trait:"O"},
- {id:"donate",axis:"wb",title:"使わないモノを寄付につなげる",how:"推しグッズはフリマで譲って売上の一部を寄付、本・CD・DVDは買取金額が寄付になるサービスへ、ぬいぐるみ・文具・おもちゃは寄付団体へ送る",eff:10,trait:"A"},
- {id:"oneday",axis:"money",title:"欲しいグッズは1日おいてから決める",how:"カートに入れて24時間後にもう一度見る",eff:12,trait:"N"},
- {id:"choose3",axis:"duty",title:"次の振り返りまでに追う推しの予定を3つまでに絞る",how:"推しの予定（配信・イベント・発売日など）を書き出し、追うものを3つまで選ぶ。残りは「今回は見送る」と決め、通知が来たら「リストにないから見送る」と自分に言う",eff:15,trait:null,multi:true}, // 推しが2人・2組以上（Q5b）で、義務感・人間関係が60点未満の人だけに出す
- {id:"skipok",axis:"duty",title:"「行かない回」を1つ決めておく",how:"遠征やイベントは無理のない回だけ選ぶ",eff:12,trait:"C"},
- {id:"mute",axis:"compare",title:"「当選」「〇〇円分」などの言葉に反応しない練習をする",how:"SNSでこうした言葉を見かけたら、ほかの人と比べる前にいったん画面を閉じ、ひと呼吸おいて「自分は自分の推し活」と心の中で言う",eff:15,trait:"N"},
- {id:"snsonce",axis:"compare",title:"SNSを見るのは1日2回・各15分まで",how:"見る時間を決め、それ以外は通知オフ",eff:12,trait:"E-"},
- {id:"party",axis:"joy",title:"友達と同時視聴の日をつくる",how:"週末に1回、感想を話しながら見る",eff:12,trait:"E"},
- {id:"create",axis:"joy",title:"感想メモや創作で推しを残す",how:"視聴後に3行の感想、または絵・文章",eff:12,trait:"O"},
- {id:"calm",axis:"joy",title:"寝る前15分は推しの曲だけの時間",how:"画面を見ずに音楽だけで過ごす",eff:10,trait:"A"},
- {id:"event",axis:"joy",title:"行きたいイベントを1つ予定に入れる",how:"1か月以内に行けるイベントを1つ選び、日程と予算を先に決めておく",eff:12,trait:"E"},
- {id:"good3",axis:"wb",title:"推しのおかげで良かったことを3つ書く",how:"週に2回、寝る前に推しに関する良かったことを3つメモする",eff:10,trait:null},
-];
+const PLANS=window.OSHIFIT_PLANS;
+/* 設定：settings.js の初期値。研究版では起動時に Firestore の config/app・plans・notices を読んで上書きする（applySettings） */
+let CFG=window.OSHIFIT_SETTINGS.apply({}).cfg,NOTICES=[];
+function applySettings(remote){if(!remote)return;const st=window.OSHIFIT_SETTINGS;
+  if(remote.config){const r=st.apply(remote.config);CFG=r.cfg;if(r.rejected.length)console.warn("[OshiFit 設定] 受け付けなかった項目",r.rejected)}
+  const m=st.mergePlans(window.OSHIFIT_PLANS,remote.plans||[]);PLANS.splice(0,PLANS.length,...m.plans);if(m.rejected.length)console.warn("[OshiFit 提案] 受け付けなかった項目",m.rejected);
+  PLANS.forEach(p=>{if(p.act!=null)ACT[p.id]=p.act});NOTICES=remote.notices||[];
+  REF=CFG.ref;N_CHECK=CFG.nChecks;GAP=CFG.gapDays;FINAL_DAY=CFG.finalDay;PC=CFG.pc;BURDEN=CFG.burden}
 function traitFit(p,b){if(!p.trait||!b)return 0;const m={E:b.E,"E-":100-b.E,O:b.O,C:b.C,N:b.N,A:b.A}[p.trait];return (m-50)/50}
 /* 提案の選び方 v1.1：軸の得点を「ふつうの目安」と比べた不足分＋その活動の比重＋性格の合い方 */
-const REF={wb:52,joy:70,sleep:70,money:65,duty:70,compare:70};
+let REF={wb:52,joy:70,sleep:70,money:65,duty:70,compare:70};   // 初期値。CFG.ref で上書き
 const ACT={sns23:"sns",archive:"watch",budget:"goods",oneday:"goods",declutter:"goods",skipok:"event",mute:"sns",snsonce:"sns",party:"watch",create:"watch",calm:"watch",event:"-event"};
 function actFit(p,A){const a=ACT[p.id];if(p.id==="choose3"){const f=QN.sections.find(s=>s.id==="freq").items.map(i=>A[i.id]).filter(v=>v!=null);return f.length?(mean(f)-1)/4:.3}
   if(!a)return .3;const v=freqOf(A,a.replace("-",""));if(v==null||isNaN(v))return .3;const x=(v-1)/4;return a[0]==="-"?1-x:x}
 const isMulti=A=>A.Q5b!=null&&A.Q5b!=="1人・1組";
 function plansFor(sc,A){const b=big5(A);
-  const rank=PLANS.filter(p=>!p.multi||(isMulti(A)&&sc.duty<60)).map(p=>({p,s:(REF[p.axis]-sc[p.axis])+traitFit(p,b)*12+actFit(p,A)*18})).sort((x,y)=>y.s-x.s);
+  const rank=PLANS.filter(p=>p.active!==false&&(!p.multi||(isMulti(A)&&sc.duty<60))).map(p=>({p,s:(REF[p.axis]-sc[p.axis])+traitFit(p,b)*CFG.weights.trait+actFit(p,A)*CFG.weights.act})).sort((x,y)=>y.s-x.s);
   const out=[],used=new Set();for(const r of rank){if(out.length===3)break;if(used.has(r.p.axis))continue;out.push(r.p);used.add(r.p.axis)}
   return out.map(p=>({id:p.id,why:whyText(p,sc,b,A)}));}
 /* 予算プランは、本人の金額の区分（Q6）から上限の目安（区分の約8割）を出す */
@@ -1305,7 +1298,7 @@ const planById=id=>PLANS.find(p=>p.id===id);
    ・相性が悪い組み合わせ（向きが逆の提案）：両方の効果を半分にし、ぶつかる要素を下げる。画面で「おすすめしない」と理由を出す
    ・相性が良い組み合わせ：理由だけ示し、効果の上乗せはしない（根拠がないため）
    ・続けるための負担：2つめから、提案1つにつき推し疲れを +3 点とする（提案を増やすほど負担も増えると考える） */
-const BURDEN=3;
+let BURDEN=3;   // 初期値。CFG.burden で上書き
 const CLASH=[["event","budget","money",6,"イベントに行くとお金を使うので、「予算を先に決める」とぶつかりやすい"],
   ["event","skipok","duty",6,"予定を「足す」提案と「行かない回を決める」提案は、向きが逆"],
   ["event","choose3","duty",6,"予定を「足す」提案と「追う予定を絞る」提案は、向きが逆"]];
@@ -1313,15 +1306,15 @@ const SYNERGY=[["sns23","calm","どちらも寝る前の時間の使い方で、
   ["declutter","donate","手放す作業を一度で済ませられる"],["create","good3","どちらも「書く」ことで、良い気持ちを残せる"]];
 const pairIn=(ids,a,b)=>ids.includes(a)&&ids.includes(b);
 function predictMulti(sc,ids){let B={...sc};const ps=ids.map(planById).sort((x,y)=>y.eff-x.eff);
-  const f=Object.fromEntries(ps.map((p,i)=>[p.id,[1,.8,.6][i]??.5]));
+  const dm=CFG.diminish,f=Object.fromEntries(ps.map((p,i)=>[p.id,dm[i]??dm[dm.length-1]]));
   const clashes=CLASH.filter(([a,b])=>pairIn(ids,a,b)),synergies=SYNERGY.filter(([a,b])=>pairIn(ids,a,b));
-  clashes.forEach(([a,b])=>{f[a]*=.5;f[b]*=.5});
+  clashes.forEach(([a,b])=>{f[a]*=CFG.clashFactor;f[b]*=CFG.clashFactor});
   ps.forEach(p=>{const e=p.eff*f[p.id];B[p.axis]=clamp(B[p.axis]+e,0,100); if(p.axis!=="wb") B.wb=clamp(B.wb+e/4,0,100);
     if(p.axis!=="joy"&&p.axis!=="wb") B.burnout=clamp(B.burnout-e/4,0,100); else B.joy=clamp(B.joy+e,0,100);});
   clashes.forEach(([,,ax,pen])=>{B[ax]=clamp(B[ax]-pen,0,100);B.burnout=clamp(B.burnout+pen/4,0,100)});
   if(ps.length>1)B.burnout=clamp(B.burnout+BURDEN*(ps.length-1),0,100);
   if(sc.pss!=null&&sc.burnout!=null) B.pss=clamp(sc.pss*(1+(B.burnout-sc.burnout)/Math.max(sc.burnout,1)*.25),0,56); // 仮定：推し疲れの変化の1/4の割合でPSS-Jも動く
-  return{A:sc,B,hw:15+5*(ids.length-1),hwWb:12+4*(ids.length-1),plans:ps,clashes,synergies};}
+  const iv=CFG.interval;return{A:sc,B,hw:iv.hw+iv.hwStep*(ids.length-1),hwWb:iv.hwWb+iv.hwWbStep*(ids.length-1),plans:ps,clashes,synergies};}
 /* 示した提案のすべての組み合わせを見積もり、幸福度の上がり方と推し疲れの下がり方の合計が最も大きいものを「おすすめ」にする */
 function combos(sc,ids){const out=[];for(let m=1;m<1<<ids.length;m++){const c=ids.filter((_,i)=>m>>i&1),pr=predictMulti(sc,c);
     out.push({ids:c,pr,dWb:pr.B.wb-sc.wb,dBurn:pr.B.burnout-sc.burnout,score:(pr.B.wb-sc.wb)-(pr.B.burnout-sc.burnout)})}
@@ -1332,7 +1325,7 @@ const planIds=()=>!S.plan?[]:(S.plan.ids&&S.plan.ids.length?S.plan.ids:[S.plan.i
 function predict(sc,planId){const p=planById(planId);const B={...sc};
   B[p.axis]=clamp(sc[p.axis]+p.eff,0,100); if(p.axis!=="wb") B.wb=clamp(sc.wb+p.eff/4,0,100);
   if(p.axis!=="joy"&&p.axis!=="wb") B.burnout=clamp(sc.burnout-p.eff/4,0,100); else B.joy=clamp(sc.joy+p.eff,0,100);
-  return{A:sc,B,hw:15,hwWb:12,plan:p};}
+  return{A:sc,B,hw:CFG.interval.hw,hwWb:CFG.interval.hwWb,plan:p};}
 
 /* アバターは avatar.js（Mii を参考にしたパーツ式。写真は使わない） */
 function defAv(){return window.OFAvatar.defaults(S.answers&&S.answers.Q2)}
@@ -1458,13 +1451,13 @@ function statsCard(){const tr=moodTrend(),ex=(S.group==="B"||S.group==="C")?exec
      b = Σずれ ÷ (n + k)、k = σe² ÷ σu²（記録が少ないうちは 0 に近く、たまるほど本人の値に近づく）
      80%の幅 = 1.2816 × √(σe²÷(n+k) + τ²)、τ² = (最初の幅÷1.2816)² − σu²（本人のずれでは説明できない分）
    σu・σe は仮の値。研究後に分析の手順8（混合モデル）で推定し直して、ここを書き換える。 */
-const PC={burnout:{su:10,se:14},wb:{su:9,se:10}},Z80=1.2816,PC_H=28;
+let PC={burnout:{su:10,se:14},wb:{su:9,se:10}};const Z80=1.2816,PC_H=28;   // PC の初期値。CFG.pc で上書き
 const burn4=r=>{const v=["Q44","Q45","Q47","Q48"].map(k=>r[k]);return v.some(x=>x==null)?null:(mean(v)-1)/(SMAX-1)*100};
 function shrink(res,{su,se},hw0,prior){const n=res.length,k=se*se/(su*su),b=n?res.reduce((a,x)=>a+x,0)/(n+k):0;
   const tau2=Math.max((hw0/Z80)**2-su*su,1),hw=Z80*Math.sqrt(se*se/(n+k)+tau2),est=clamp(prior+b,0,100);
   return{prior,est,b,n,hw,lo:clamp(est-hw,0,100),hi:clamp(est+hw,0,100),k}}
 function personalPred(){if(!S.group||!S.sc)return null;const base=S.sc;
-  const pr=S.group==="B"?(S.pred&&S.pred.B?S.pred:predictMulti(base,planIds())):{B:base,hw:15,hwWb:12};
+  const pr=S.group==="B"?(S.pred&&S.pred.B?S.pred:predictMulti(base,planIds())):{B:base,hw:CFG.interval.hw,hwWb:CFG.interval.hwWb};
   const fr=d=>clamp(d/PC_H,0,1),b0=burn4(S.answers);if(b0==null||base.burnout==null)return null;
   const dB=pr.B.burnout-base.burnout,dW=pr.B.wb-base.wb;
   const ob=[...S.daily,...S.weekly].filter(r=>r.day!=null).map(r=>[r.day,burn4(r)]).filter(([,y])=>y!=null);
@@ -1663,11 +1656,11 @@ function vStart(){app.className="app land";
    <section class="band flow-band" id="sec-flow">${wave("var(--l-ink)")}<div class="in"><div class="sechead inv"><p class="eyebrow">HOW IT WORKS</p><h2 class="jp-xl">最初の質問と、約28日間の振り返り</h2></div>
      <ol class="flowcards">${[["質問に答える","今の推し活と気分について、約"+BASE_ITEMS.length+"問。選ぶと自動で次の質問へ進みます。"],["アバターを作る","顔の形・髪型・色を選んで、自分に似せた分身を作ります。写真は使いません。"],["6つの軸を見る","良いところは青、見直したいところは赤。算出の根拠も見られます。"],["2つの未来を比べる","プランA「現在のままの推し活」と、プランB「最適化された推し活」の、28日後の見込みを並べます。"]].map(([t,d],i)=>`<li><span class="big">0${i+1}</span><h3>${t}</h3><p>${d}</p></li>`).join("")}</ol>
      <div class="road"><p class="eyebrow">28 DAYS</p><div class="track4">${[0,4,8,12,16,20,24,28].map((d,i)=>`<div class="mile ${i===0?"s":i===7?"f":""}"><span class="dot"></span><b>${i===0?"開始":i===7?"最後の調査":`${i}回目`}</b><span>${i===0?"0日目":i===7?"28日目〜":`${d}日目ごろ`}</span></div>`).join("")}</div>
-     <p class="xs" style="color:var(--ink-muted)">振り返りは前回から4日以上あけて、4〜5日ごとに6回（各約2分）。3回目だけ、最近2週間の気分（WHO-5）も答えます。</p></div></div></section>
+     <p class="xs" style="color:var(--ink-muted)">振り返りは前回から${GAP}日以上あけて、${GAP}日ごとに${N_CHECK}回（各約1分）。3回目だけ、最近2週間の気分（WHO-5）も答えます。</p></div></div></section>
    <section class="band about-band" id="sec-about">${wave("var(--bg)")}<div class="in"><div class="sechead"><p class="eyebrow">ABOUT THE STUDY</p><h2 class="jp-xl">安心して参加してもらうために</h2></div>
      <div class="facts-grid">${[["写真は使わない","アバターは写真を使わず、顔の形や髪型を自分で選んで作ります。"],["メールはログインだけに使う","メールアドレスはログインのためだけに使い、回答とは別に管理します。名前は集めません。"],["困ったときは連絡を","わからないことや困ったことがあれば、マイページの問い合わせ先にご連絡ください。"],["参加は自由","参加するかどうかは自由です。途中で答えるのをやめても、成績などの不利益はありません。それまでの回答は研究に使います。"]].map(([t,d],i)=>`<div class="fact"><span class="fno">${["AVATAR","PRIVACY","CONTACT","FREE"][i]}</span><h3>${t}</h3><p class="small muted">${d}</p></div>`).join("")}</div></div></section>
    <section class="band join-band" id="sec-join"><div class="in"><div class="joincard"><div class="stack" style="gap:12px"><p class="eyebrow">JOIN</p><h2 class="jp-xl">さっそく、はじめてみる</h2>
-       <ul class="facts"><li>約${BASE_ITEMS.length}の質問（約${Math.max(8,Math.round(BASE_ITEMS.length*10/60))}分）</li><li>約28日間、4〜5日ごとに6回の振り返り（各約2分）。28日目以降に最後の調査</li><li>メールアドレスで登録し、次からはログインして続きから答えられます</li></ul>
+       <ul class="facts"><li>約${BASE_ITEMS.length}の質問（約${Math.max(8,Math.round(BASE_ITEMS.length*10/60))}分）</li><li>約${FINAL_DAY}日間、毎日のアンケート（約1分）と、${GAP}日ごとに${N_CHECK}回の振り返り（各約1分）。${FINAL_DAY}日目以降に最後の調査</li><li>メールアドレスで登録し、次からはログインして続きから答えられます</li></ul>
        <div class="row" style="flex-wrap:wrap;gap:10px"><a class="btn primary pill big" id="go" href="#signup">新規登録してはじめる${ARROW}</a><a class="btn pill big" id="to-login" href="#login">ログイン</a></div></div><div class="joinart">${miniSVG("home")}</div></div></div></section>
    <footer class="lfoot">${wave("var(--l-ink)")}<div class="in"><div class="fgrid"><div><p class="display sm">OshiFit</p><p class="small">OshiFitで推し活を持続可能に！</p></div>
      <div class="small"><b>大阪工業大学大学院 情報科学研究科</b><br>倫理審査 承認済みの研究です<br>問い合わせ先：<span class="mono">m1m02530106@oit.ac.jp</span></div></div><p class="xs" style="color:var(--ink-muted)">© 2026 OshiFit 研究プロジェクト</p></div></footer>
@@ -1765,7 +1758,7 @@ function vAnalysis(){const sc=ensureBase(),A=S.answers,b=big5(A),g=isGood(sc);
     ${radar([{v:FV(sc),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
     <p class="xs muted">点線は60点。60点以上を青（良好）、60点未満を赤（見直したい）。どの要素も高いほど良い向きです。</p>
     ${outBars([["幸福度（WHO-5）",[sc.wb],true,52,"高いほど良い・線は13点"],["ストレス度（PSS-J）",[pss100(sc)],false,null,"高いほど負担"],["推し活のストレス（推し疲れ）",[sc.burnout],false,null,"高いほど負担"]],["今"])}</section>
-   ${g.ok?`<p class="callout good"><b>群A（今のままで順調）</b>：5つの要素の多くが60点以上で、WHO-5も13点以上です。プランの提案はありません。28日目にもう一度だけ回答をお願いします。</p>`:""}
+   ${g.ok?`<p class="callout good"><b>群A（今のままで順調）</b>：5つの要素の多くが${CFG.groupA.axisMin}点以上で、WHO-5も${CFG.groupA.who5Min}点以上です。プランの提案はありません。${FINAL_DAY}日目にもう一度だけ回答をお願いします。</p>`:""}
    <section class="axes">${FACTORS().map(a=>{const v=r0(sc[a.key]),ok=v>=60;return`<div class="ax ${ok?"good":"bad"}"><div class="h"><span>${a.name}</span><span class="chip ${ok?"good":"bad"}">${ok?"良好":"見直したい"}</span></div><div class="v">${v}<small> / 100</small></div><div class="track"><i style="width:${v}%"></i></div></div>`}).join("")}</section>
    <section class="axes"><div class="ax ${sc.burnout<50?"good":"bad"}"><div class="h"><span>推し疲れ</span></div><div class="v">${r0(sc.burnout)}<small> / 100</small></div><p class="xs muted">高いほど負担が大きい</p></div>
     <div class="ax ${sc.who5raw>=13?"good":"bad"}"><div class="h"><span>WHO-5（気分）</span></div><div class="v">${sc.who5raw}<small> / 25</small></div><p class="xs muted">13点以上が目安</p></div>
@@ -1775,7 +1768,7 @@ function vAnalysis(){const sc=ensureBase(),A=S.answers,b=big5(A),g=isGood(sc);
     ${b?[["外向性","E"],["協調性","A"],["勤勉性","C"],["神経症傾向","N"],["開放性","O"]].map(([n,k])=>`<div class="trait"><span>${n}</span><div class="track"><i style="width:${b[k]}%"></i></div><span class="num" style="text-align:right">${b[k]}</span></div>`).join(""):""}
     <details><summary>算出の根拠</summary><div class="formula">${SC.axes.map(a=>`<span><b>${a.name}</b>：${esc(a.formula)}</span>`).join("")}<span><b>推し疲れ</b>：${esc(SC.burnout.formula)}</span><span><b>SHS</b>：${esc(SC.shs.formula)}</span><span><b>PSS-J</b>：${esc(SC.pss.formula)}</span></div></details></section></main>
    ${g.ok?dock("an-back","ホームへ","an-go"):dock("an-back","2つの未来を見る","an-go")}`;
-  $("#an-back").onclick=()=>go("avatar");$("#an-go").onclick=()=>{if(g.ok){if(STUDY&&S.group)return go("home");S.group="A";S.plan={id:null,ids:[],accepted:false};S.decidedAt=now();if(STUDY)OFStore.decide(S,null);go("home")}else go("future")};wire()}
+  $("#an-back").onclick=()=>go("avatar");$("#an-go").onclick=()=>{if(g.ok){if(STUDY&&S.group)return go("home");S.group="A";S.plan={id:null,ids:[],accepted:false};S.decidedAt=now();if(STUDY)OFStore.decide(S,null,CFG);go("home")}else go("future")};wire()}
 let PI=0;
 function pbar(name,a,b,hw,higher){const d=b-a,good=higher?d>=0:d<=0,col=good?"var(--good)":"var(--bad)";
   const row=(lab,v,c,w)=>`<div class="pb"><span>${lab}</span><div class="pt">${w?`<span class="rg" style="left:${clamp(v-w,0,100)}%;width:${clamp(v+w,0,100)-clamp(v-w,0,100)}%;background:${c}"></span>`:""}<span class="pm" style="left:calc(${clamp(v,0,100)}% - 1.5px);background:${c}"></span></div></div>`;
@@ -1810,15 +1803,15 @@ function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.inner
   app.querySelectorAll("[data-combo]").forEach(b=>b.onclick=()=>{PSEL.clear();b.dataset.combo.split(",").forEach(id=>PSEL.add(id));keep(vFuture)});
   $("#pickAll").onclick=()=>{if(chosen.length===S.plans.length)PSEL.clear();else S.plans.forEach(x=>PSEL.add(x.id));keep(vFuture)};
   const pick=g=>{if(g==="B"&&!chosen.length)return;if(STUDY&&S.group)return go("home"); // 選んだ群は変えられない
-   S.group=g;S.plan={id:g==="B"?chosen[0]:p.id,ids:g==="B"?chosen:[],accepted:g==="B"};S.decidedAt=now();S.weekly=[];S.final=null;S.fin={};SV.final=null;if(STUDY){const pr2=predictMulti(sc,g==="B"?chosen:[p.id]);S.pred={A:pr2.A,B:pr2.B,hw:pr2.hw,hwWb:pr2.hwWb};OFStore.decide(S,S.pred)}toast(g==="B"?`プランB「最適化された推し活」（${chosen.length}つの提案）で始めます`:"プランA「現在のままの推し活」で続けます");go("home")};
+   S.group=g;S.plan={id:g==="B"?chosen[0]:p.id,ids:g==="B"?chosen:[],accepted:g==="B"};S.decidedAt=now();S.weekly=[];S.final=null;S.fin={};SV.final=null;if(STUDY){const pr2=predictMulti(sc,g==="B"?chosen:[p.id]);S.pred={A:pr2.A,B:pr2.B,hw:pr2.hw,hwWb:pr2.hwWb};OFStore.decide(S,S.pred,CFG)}toast(g==="B"?`プランB「最適化された推し活」（${chosen.length}つの提案）で始めます`:"プランA「現在のままの推し活」で続けます");go("home")};
   $("#pickB").onclick=()=>pick("B");$("#pickA").onclick=()=>pick("C");wire()}
-const N_CHECK=6,GAP=4,FINAL_DAY=28;
+let N_CHECK=6,GAP=4,FINAL_DAY=28;   // 初期値。CFG で上書き
 function dayNo(){return S.decidedAt?Math.floor((now()-S.decidedAt)/DAY):0}
 function nextNo(){return S.weekly.length+1}
 function lastAt(){return S.weekly.length?Math.max(...S.weekly.map(x=>x.at)):S.decidedAt}
 function daysToNext(){return Math.max(0,GAP-Math.floor((now()-lastAt())/DAY))}
 function grp(){return S.group}
-function finalOpen(){return !!S.decidedAt&&dayNo()>=FINAL_DAY&&(grp()==="A"||S.weekly.length>=N_CHECK||dayNo()>=FINAL_DAY+7)}
+function finalOpen(){return !!S.decidedAt&&dayNo()>=FINAL_DAY&&(grp()==="A"||S.weekly.length>=N_CHECK||dayNo()>=CFG.finalMaxDay)}
 function canCheck(){return !!S.decidedAt&&grp()!=="A"&&nextNo()<=N_CHECK&&daysToNext()===0&&!finalOpen()}
 function vHome(){if(!S.group)ensureGroup();const sc=S.sc,g=grp(),ps=planIds().map(planById);
   const W=S.weekly,pts=k=>W.map((w,i)=>w[k]==null?null:`${20+i*48},${110-w[k]*0.9}`).filter(Boolean).join(" ");
@@ -1828,11 +1821,11 @@ function vHome(){if(!S.group)ensureGroup();const sc=S.sc,g=grp(),ps=planIds().ma
     <div class="isle">${miniSVG("base")}<div class="av">${avatar(S.avatar,moodOf(sc),74)}</div></div></section>
    <section class="card" id="daily-card"><div class="sec"><h3>今日のアンケート</h3><span class="xs muted">毎日・約1分</span></div>
     ${S.final?`<p class="small muted">調査はすべて終わりました。</p>`:dailyDone()?`<p class="small">今日は回答済みです。また明日お願いします。</p>`:`<a class="btn primary block" href="#daily">今日のアンケートに答える（約1分）</a>`}</section>
-   ${g!=="A"?`<section class="card"><div class="sec"><h3>振り返り　全${N_CHECK}回</h3><span class="xs muted">4〜5日ごと</span></div>
+   ${g!=="A"?`<section class="card"><div class="sec"><h3>振り返り　全${N_CHECK}回</h3><span class="xs muted">${GAP}日ごと</span></div>
     ${(()=>{const sm=sumDaily(lastCheckAt(),now());return`<p class="xs muted">前回の振り返りから今日まで：お金 ${sm.yen.toLocaleString("ja-JP")}円・時間 ${f1(sm.min/60)}時間（記録 ${sm.n}日）</p>`})()}
     <div class="rounds">${[1,2,3,4,5,6].map(i=>`<div><span class="xs muted">${i}回</span><div class="c ${i<=W.length?"done":i===nextNo()?"next":""}">${i<=W.length?"✓":i}</div></div>`).join("")}</div>
     ${canCheck()?`<a class="btn primary block" href="#checkin">${nextNo()}回目の振り返りをする（約1分）</a>`:nextNo()<=N_CHECK&&!finalOpen()?`<p class="small muted">次の振り返りは${daysToNext()}日後からできます。</p>`:""}
-    ${finalOpen()?`<a class="btn primary block" href="#final">最後の調査に答える</a>`:nextNo()>N_CHECK?`<p class="small muted">6回の振り返りが終わりました。最後の調査は${Math.max(0,FINAL_DAY-dayNo())}日後に開きます。</p>`:""}</section>`
+    ${finalOpen()?`<a class="btn primary block" href="#final">最後の調査に答える</a>`:nextNo()>N_CHECK?`<p class="small muted">${N_CHECK}回の振り返りが終わりました。最後の調査は${Math.max(0,FINAL_DAY-dayNo())}日後に開きます。</p>`:""}</section>`
     :`<section class="card">${finalOpen()?`<a class="btn primary block" href="#final">最後の調査に答える</a>`:`<p class="small muted">最後の調査まで、あと${Math.max(0,FINAL_DAY-dayNo())}日です。</p>`}</section>`}
    ${W.length?`<section class="card"><div class="sec"><h3>振り返りごとの変化</h3><span class="xs"><b style="color:var(--bad)">━</b> 推し疲れ　<b style="color:var(--good)">━</b> 推し活中の幸せ</span></div>
     <svg viewBox="0 0 280 120" width="100%" role="img" aria-label="振り返りごとの推し疲れと幸せ"><line x1="20" y1="110" x2="260" y2="110" stroke="var(--line)"/><polyline points="${pts("burn")}" fill="none" stroke="var(--bad)" stroke-width="2.4"/><polyline points="${pts("joyN")}" fill="none" stroke="var(--good)" stroke-width="2.4"/>${W.map((w,i)=>`<text x="${20+i*48}" y="120" font-size="9" text-anchor="middle" fill="var(--muted)">${i+1}回</text>`).join("")}</svg></section>`:""}
@@ -1849,8 +1842,8 @@ function vHome(){if(!S.group)ensureGroup();const sc=S.sc,g=grp(),ps=planIds().ma
     const ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//OshiFit//JA",...daily,...ev.flatMap(([t,n],i)=>["BEGIN:VEVENT",`UID:oshifit-${S.id}-${i}`,`DTSTAMP:${f(Date.now())}T000000Z`,`DTSTART;VALUE=DATE:${f(t)}`,`DTEND;VALUE=DATE:${f(t+DAY)}`,`SUMMARY:${n}`,"URL:"+location.origin+"/","END:VEVENT"]),"END:VCALENDAR"].join("\r\n");
     const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([ics],{type:"text/calendar"}));a.download="oshifit.ics";document.body.append(a);a.click();a.remove();toast("カレンダーのファイルを作りました")};wire()}
 function vCheckin(){if(!S.group)ensureGroup();const g=grp();
-  if(g==="A"||!canCheck()&&!EDIT){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout">${g==="A"?"群Aの方は振り返りは不要です。":`次の振り返りは${daysToNext()}日後からできます（前回から4日以上あけます）。`}</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
-  if(nextNo()>N_CHECK){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">6回の振り返りはすべて終わりました。</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
+  if(g==="A"||!canCheck()&&!EDIT){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout">${g==="A"?"群Aの方は振り返りは不要です。":`次の振り返りは${daysToNext()}日後からできます（前回から${GAP}日以上あけます）。`}</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
+  if(nextNo()>N_CHECK){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">${N_CHECK}回の振り返りはすべて終わりました。</p><a class="btn" href="#home">ホームへ</a></main>${tabbar("checkin")}`;wire();return}
   if(!SV.ckIntro&&!Object.keys(S.wk).length&&!SV.checkin){app.innerHTML=header(`${nextNo()}／${N_CHECK}回・開始から${dayNo()}日目`)+`<main class="stack" style="padding-top:14px">
      <div><p class="eyebrow view-eyebrow">REFLECTION ${nextNo()}</p><h2>${nextNo()}回目の振り返り</h2><p class="small muted">まず、前回から今日までの記録を見てから答えてください。</p></div>
      ${periodCard()}${predCard()}
@@ -1931,12 +1924,19 @@ function allowed(v){if(!STUDY)return v;
   if(!S.group){if(["avatar","analysis"].includes(v))return v;if(v==="future")return S.avatarDone?v:"avatar";return S.avatarDone?"analysis":"avatar"}
   if(["start","q","avatar","future"].includes(v))return"home";
   return v}
-function render(){document.querySelectorAll(".scrim").forEach(x=>x.remove());const h=location.hash.slice(1);VIEW=VIEWS[h]?h:"start";const ok=allowed(VIEW);if(ok!==VIEW){VIEW=ok;if(location.hash!=="#"+ok){history.replaceState(null,"","#"+ok)}}app.className="app";const y=scrollY,k=KEEP;KEEP=false;if(!k)scrollTo(0,0);VIEWS[VIEW]();if(k)scrollTo(0,y)}
+function render(){document.querySelectorAll(".scrim").forEach(x=>x.remove());const h=location.hash.slice(1);VIEW=VIEWS[h]?h:"start";const ok=allowed(VIEW);if(ok!==VIEW){VIEW=ok;if(location.hash!=="#"+ok){history.replaceState(null,"","#"+ok)}}app.className="app";const y=scrollY,k=KEEP;KEEP=false;if(!k)scrollTo(0,0);VIEWS[VIEW]();showNotices();if(k)scrollTo(0,y)}
+/* お知らせ（Firestore の notices）：active が true で、期間内（from〜to、YYYY-MM-DD）のものを、はじめに・ホーム・マイページの上に出す */
+function activeNotices(){const t=todayKey();return NOTICES.filter(n=>n&&n.active===true&&typeof n.text==="string"&&n.text.trim()&&(!n.from||n.from<=t)&&(!n.to||t<=n.to)&&(!n.target||n.target==="all"||(n.target==="participants"&&S.consented)))}
+function showNotices(){if(!["start","home","mypage"].includes(VIEW))return;const N=activeNotices(),m=app.querySelector("main");if(!N.length)return;
+  const box=document.createElement("div");box.className="stack";box.id="notices";box.style.gap="8px";
+  box.innerHTML=N.map(n=>`<p class="callout ${n.level==="warn"?"bad":""}" role="status"><b>お知らせ</b>　${esc(n.text)}</p>`).join("");
+  if(m)m.prepend(box);else{const h=app.querySelector("header");box.style.cssText="gap:8px;max-width:760px;margin:12px auto 0;padding:0 16px";if(h)h.after(box);else app.prepend(box)}}
 let draftT=null;
 function saveDraft(key){if(STUDY&&key==="q"&&!S.baselineDone)OFStore.draft(S)}
 window.OSHIFIT_ON_SAVE_ERROR=()=>toast("保存できませんでした。通信がつながると自動でもう一度送ります");
 async function boot(){
   if(STUDY){app.innerHTML=`<main class="stack" style="padding-top:40px;text-align:center"><p class="muted">読み込んでいます…</p></main>`;
+    try{applySettings(await OFStore.settings())}catch(e){console.warn("[OshiFit 設定] 読み込めなかったので初期値を使う",e)}
     try{const saved=await OFStore.init();if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers)}}
     catch(e){console.error(e);app.innerHTML=`<main class="stack" style="padding-top:40px"><p class="callout bad">サーバーにつながりませんでした。通信を確認して、ページを読み込み直してください。</p></main>`;return}}
   addEventListener("hashchange",render);render()}

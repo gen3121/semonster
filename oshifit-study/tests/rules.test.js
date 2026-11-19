@@ -112,3 +112,28 @@ test("開発者（admins に登録・メール確認済み）だけが全件を�
   const pw = env.authenticatedContext("adm5", { email: "oi@oit.ac.jp", email_verified: false, firebase: { sign_in_provider: "password" } }).firestore();
   await assertFails(getDocs(collection(pw, "participants")));                    // パスワード登録・未確認では見られない
 });
+test("設定・提案・お知らせは誰でも読めて、開発者だけが書ける。メモは開発者だけ", async () => {
+  const anon = env.unauthenticatedContext().firestore();
+  await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), "config", "app"), { version: 1, gapDays: 4 }); });
+  await assertSucceeds(getDoc(doc(anon, "config", "app")));
+  await assertSucceeds(getDocs(collection(me(), "plans")));
+  await assertSucceeds(getDocs(collection(anon, "notices")));
+  await assertFails(setDoc(doc(me(), "config", "app"), { version: 2 }));
+  await assertFails(setDoc(doc(me(), "plans", "walk"), { title: "x" }));
+  await assertFails(setDoc(doc(me(), "notices", "n1"), { text: "x", active: true }));
+  await assertSucceeds(setDoc(doc(admin(), "config", "app"), { version: 2, gapDays: 5 }));
+  await assertSucceeds(setDoc(doc(admin(), "plans", "walk"), { title: "散歩", how: "歩く", axis: "wb", eff: 8 }));
+  await assertSucceeds(setDoc(doc(admin(), "notices", "n1"), { text: "メンテナンスのお知らせ", active: true }));
+  await assertFails(getDoc(doc(me(), "notes", "AB12-CD34")));
+  await assertFails(setDoc(doc(me(), "notes", "AB12-CD34"), { exclude: true }));
+  await assertSucceeds(setDoc(doc(admin(), "notes", "AB12-CD34"), { text: "問い合わせあり", exclude: false }));
+  await assertSucceeds(getDoc(doc(admin(), "notes", "AB12-CD34")));
+  await assertFails(setDoc(doc(fake(), "config", "app"), { version: 3 }));
+});
+test("群を決めたときの設定の版と値は、あとから変えられない", async () => {
+  const r = doc(me(), "participants", "u1");
+  await setDoc(r, base);
+  await assertSucceeds(updateDoc(r, { group: "B", planIds: ["sns23"], decidedAt: serverTimestamp(), cfgVersion: 2, cfgUsed: { gapDays: 4 } }));
+  await assertFails(updateDoc(r, { cfgVersion: 3 }));
+  await assertFails(updateDoc(r, { cfgUsed: { gapDays: 2 } }));
+});

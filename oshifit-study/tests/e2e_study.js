@@ -6,7 +6,7 @@ const { execFileSync } = require("child_process");
 const assert = require("node:assert/strict");
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
 const { initializeTestEnvironment } = require("@firebase/rules-unit-testing");
-const { doc, getDoc, getDocs, collection } = require("firebase/firestore");
+const { doc, getDoc, getDocs, collection, setDoc } = require("firebase/firestore");
 
 const BASE = "http://127.0.0.1:5000/";
 const OUT = process.env.SHOTS || path.join(__dirname, "shots");
@@ -63,6 +63,17 @@ async function answerAll(page, stop) {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource|fonts/.test(m.text())) errors.push(m.text()); });
+
+  // ---------- 研究者が Firestore で管理する項目（設定・お知らせ）
+  await read(async (db) => {
+    await setDoc(doc(db, "config", "app"), { version: 3, gapDays: 4, nChecks: 6, finalDay: 28, groupA: { axisMin: "x" } });   // 型の違う値は無視される
+    await setDoc(doc(db, "notices", "n1"), { text: "試験用のお知らせです", active: true, target: "all", level: "info" });
+    await setDoc(doc(db, "notices", "n2"), { text: "出さないお知らせ", active: false });
+  });
+  await page.goto(BASE);
+  await page.locator("#notices").getByText("試験用のお知らせです").waitFor();
+  assert.equal(await page.getByText("出さないお知らせ").count(), 0);
+  step("Firestore の notices のお知らせ（active:true だけ）が、はじめにの画面に出る");
 
   // ---------- 同意 → 開始時の質問
   await page.goto(BASE);
@@ -153,6 +164,8 @@ async function answerAll(page, stop) {
   assert.ok(p.decidedAt && p.decidedAt.toMillis(), "決めた時刻（サーバー）");
   if (group === "B") { assert.ok(p.planIds.length >= 1); assert.ok(p.pred && p.pred.B && p.pred.hw); assert.ok(p.plansOffered.length >= 1); }
   step(`群${group}に決まり、群・提案・見込み・時刻が保存される`);
+  { const pd = await read((db) => getDoc(doc(db, "participants", uid))); assert.equal(pd.data().cfgVersion, 3, "使った設定の版が残る"); assert.equal(pd.data().cfgUsed.groupA.axisMin, 60, "型の違う値は初期値"); }
+  step("群を決めたときの設定（Firestore の config/app の版と値）が、参加者の記録に残る");
 
   // 群は変えられない：未来の画面に戻れない
   await page.goto(BASE + "#future");
@@ -226,6 +239,9 @@ async function answerAll(page, stop) {
     const rev = (o) => JSON.parse(JSON.stringify(o), (k, v) => (v && v.__ts ? { toMillis: () => v.__ts } : v));
     return window.__oshifitZip([{ uid, ...rev(raw.p), cks: raw.cks.map(rev), daily: raw.daily.map(rev), pilot: 0 }]);
   }, { raw, uid });
+  const mh = await ap.evaluate(() => window.__oshifitManage());
+  assert.match(mh, /設定（config\/app）/); assert.match(mh, /提案（plans）/); assert.match(mh, /sns23/); assert.match(mh, /お知らせ（notices）/);
+  step("開発者ページの「設定と管理」に、設定・提案・お知らせ・メモの説明と一覧が出る");
   const zbuf = Buffer.from(zb64, "base64"); assert.equal(zbuf.readUInt32LE(0), 0x04034b50, "ZIP の形");
   fs.writeFileSync(path.join(OUT, "export_test.zip"), zbuf);
   for (const f of ["baseline.csv", "weekly.csv", "daily.csv", "trial.csv", "free.csv", "README_export.txt"]) assert.ok(zbuf.includes(Buffer.from(f)), "ZIP に " + f);

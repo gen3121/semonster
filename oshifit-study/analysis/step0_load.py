@@ -134,7 +134,9 @@ def run(ctx: Ctx):
     wide["is_B"] = (wide["group"] == "B").astype(int)
     wide = wide.copy()
 
-    main = wide[(wide["att_ok"] == 1) & (wide["pilot"].fillna(0) == 0)].reset_index(drop=True)
+    # 研究者のメモで「分析から除外」にした人（baseline.csv の exclude = 1）は本分析から外す。感度分析には入れる
+    wide["exclude"] = pd.to_numeric(base["exclude"], errors="coerce").fillna(0).values if "exclude" in base.columns else 0
+    main = wide[(wide["att_ok"] == 1) & (wide["pilot"].fillna(0) == 0) & (wide["exclude"] == 0)].reset_index(drop=True)
     sens = wide.reset_index(drop=True)
     ctx.store.update(main=main, sens=sens, weekly=weekly, wide=wide)
 
@@ -152,12 +154,13 @@ def run(ctx: Ctx):
     summary = {"n_baseline": len(base), "duplicated_pid_removed": int(dup), "n_weekly_rows": len(weekly),
                "n_trial_rows": len(trial), "n_trial_with_who5": int(has_post), "n_free": free_n,
                "attention_failed": int((wide["att_ok"] == 0).sum()), "pilot": int((wide["pilot"] == 1).sum()),
+               "excluded_by_note": int((wide["exclude"] == 1).sum()),
                "score_mismatches": len(mm), "samples": counts}
     ctx.save_json("s0_summary.json", summary)
     ctx.md(f"- baseline {len(base)} 人、weekly {len(weekly)} 行、trial {len(trial)} 行、free {free_n} 件。"
            f"重複した pid {dup} 件は先の行を残した。",
            f"- 注意確認（{att_id} = {att_ans}）に合わなかった人：{summary['attention_failed']} 人。"
-           f"プレ実験（pilot = 1）：{summary['pilot']} 人。本分析では両方を除き、感度分析では含める。",
+           f"プレ実験（pilot = 1）：{summary['pilot']} 人。研究者のメモで除外（exclude = 1）：{summary['excluded_by_note']} 人。本分析ではこれらを除き、感度分析では含める。",
            f"- 得点は questionnaire.json の規則で項目から計算し直し、保存値と照合した。"
            f"食い違い（差が0.5より大きい、または片方が空）：{len(mm)} 件（s0_score_mismatches.csv）。"
            "以後の分析は計算し直した値を使う。", "")

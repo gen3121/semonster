@@ -19,6 +19,8 @@ th{background:var(--low);color:var(--muted);font-size:12px}.mono{font-family:ui-
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;min-width:260px;background:var(--card);color:var(--fg)}
 </style>
 <script src="config.js"></script>
+<script src="settings.js"></script>
+<script src="plans.js"></script>
 </head><body><main id="app"><p class="muted">読み込んでいます…</p></main>
 <script type="module">
 // 開発者ページ（閲覧のみ）。admins/{メールアドレス} に登録した大学アカウントだけが全件を読める（firestore.rules）。
@@ -31,7 +33,9 @@ const QN = await (await fetch("questionnaire.json")).json();
 const $ = (s) => document.querySelector(s), el = $("#app"), DAY = 864e5;
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const ms = (t) => (t && t.toMillis ? t.toMillis() : null);
-const PLANS = ["sns23", "archive", "budget", "declutter", "donate", "oneday", "choose3", "skipok", "mute", "snsonce", "party", "create", "calm", "event", "good3"];
+let PLANS = window.OSHIFIT_PLANS.map((p) => p.id);   // Firestore の plans で足した提案も、読み込んだあとに加える
+const ST = window.OSHIFIT_SETTINGS;
+let CFG = ST.apply({}).cfg, MG = { cfgRaw: null, cfgRejected: [], plans: ST.mergePlans(window.OSHIFIT_PLANS, []).plans, planRejected: [], notices: [], notes: {} };
 const SC = ["wb", "joy", "sleep", "money", "duty", "compare", "burnout", "who5raw", "shs", "pss"];
 const items = (ids) => QN.sections.filter((s) => ids.includes(s.id)).flatMap((s) => s.items.map((i) => i.id));
 const BASE_ITEMS = QN.sections.flatMap((s) => s.items.map((i) => i.id)).filter((id) => id !== "Q62");
@@ -62,12 +66,16 @@ A.onAuthStateChanged(auth, async (u) => {
   try { const me = await F.getDoc(F.doc(db, "admins", u.email)); if (!me.exists()) throw new Error("not admin"); }
   catch (e) { el.innerHTML = `<section class="card"><h1>開発者ページ</h1><p>このアカウント（${esc(u.email || "メールアドレスなし")}）には閲覧の権限がありません。</p><p class="muted" style="font-size:12px">Firestore の admins に、このメールアドレスと同じ名前のドキュメントがあるか確認してください（大文字・小文字も同じにします）。</p><button class="btn" id="out">ログアウト</button></section>`; $("#out").onclick = () => A.signOut(auth); return; }
   el.innerHTML = `<p class="muted">データを読み込んでいます…</p>`;
-  const [ps, cks, pil, dly] = await Promise.all([F.getDocs(F.collection(db, "participants")), F.getDocs(F.collectionGroup(db, "checkins")), F.getDocs(F.collection(db, "pilots")), F.getDocs(F.collectionGroup(db, "daily"))]);
+  const [ps, cks, pil, dly, cf, pl, nt, nn] = await Promise.all([F.getDocs(F.collection(db, "participants")), F.getDocs(F.collectionGroup(db, "checkins")), F.getDocs(F.collection(db, "pilots")), F.getDocs(F.collectionGroup(db, "daily")),
+    F.getDoc(F.doc(db, "config", "app")), F.getDocs(F.collection(db, "plans")), F.getDocs(F.collection(db, "notices")), F.getDocs(F.collection(db, "notes"))]);
+  MG.cfgRaw = cf.exists() ? cf.data() : null; const ap = ST.apply(MG.cfgRaw || {}); CFG = ap.cfg; MG.cfgRejected = ap.rejected;
+  const mp = ST.mergePlans(window.OSHIFIT_PLANS, pl.docs.map((d) => ({ ...d.data(), id: d.id }))); MG.plans = mp.plans; MG.planRejected = mp.rejected; PLANS = MG.plans.map((p) => p.id);
+  MG.notices = nt.docs.map((d) => ({ ...d.data(), id: d.id })); MG.notes = Object.fromEntries(nn.docs.map((d) => [d.id, d.data()]));
   const dByUid = {}; dly.docs.forEach((c) => { const uid = c.ref.parent.parent.id; (dByUid[uid] = dByUid[uid] || []).push(c.data()); });
   const pilots = new Set(pil.docs.map((d) => d.id));
   const P = ps.docs.map((d) => ({ uid: d.id, ...d.data() }));
   const byUid = {}; cks.docs.forEach((c) => { const uid = c.ref.parent.parent.id; (byUid[uid] = byUid[uid] || []).push(c.data()); });
-  P.forEach((p) => { p.cks = (byUid[p.uid] || []).sort((a, b) => a.week - b.week); p.daily = (dByUid[p.uid] || []).sort((a, b) => a.day - b.day); p.pilot = pilots.has(p.pid) ? 1 : 0; });
+  P.forEach((p) => { p.cks = (byUid[p.uid] || []).sort((a, b) => a.week - b.week); p.daily = (dByUid[p.uid] || []).sort((a, b) => a.day - b.day); p.pilot = pilots.has(p.pid) ? 1 : 0; p.note = MG.notes[p.pid] || null; });
   render(u, P);
 });
 
@@ -75,15 +83,15 @@ function alerts(P) {
   const out = [], now = Date.now();
   for (const p of P) {
     const dec = ms(p.decidedAt);
-    if (dec && !p.withdrawn && (p.group === "B" || p.group === "C") && !p.final && p.cks.length < 6) {
+    if (dec && !p.withdrawn && (p.group === "B" || p.group === "C") && !p.final && p.cks.length < CFG.nChecks) {
       const last = p.cks.length ? Math.max(...p.cks.map((c) => ms(c.at) || 0)) : dec;
       const gap = Math.floor((now - last) / DAY);
-      if (gap >= 10) out.push(["bad", `${p.pid}：振り返りが10日以上ない（${gap}日。開始から${Math.floor((now - dec) / DAY)}日目・${p.cks.length}回済み）`]);
+      if (gap >= CFG.alerts.noCheckDays) out.push(["bad", `${p.pid}：振り返りが${CFG.alerts.noCheckDays}日以上ない（${gap}日。開始から${Math.floor((now - dec) / DAY)}日目・${p.cks.length}回済み）`]);
     }
-    if (dec && !p.withdrawn && !p.final) { const lastD = p.daily.length ? Math.max(...p.daily.map((x) => ms(x.at) || 0)) : dec; const gapD = Math.floor((now - lastD) / DAY); if (gapD >= 3) out.push(["w", `${p.pid}：毎日のアンケートが${gapD}日ない（記録 ${p.daily.length}日）`]); }
-    const w0 = p.scores && p.scores.who5raw; if (w0 != null && w0 <= 7) out.push(["bad", `${p.pid}：開始時のWHO-5が${w0}点（7点以下）`]);
-    const c3 = p.cks.find((c) => c.week === 3); if (c3 && c3.W1 != null) { const r = ["W1", "W2", "W3", "W4", "W5"].reduce((a, k) => a + (c3[k] ?? 0), 0); if (r <= 7) out.push(["bad", `${p.pid}：3回目のWHO-5が${r}点（7点以下）`]); }
-    const wf = p.final && p.final.scores && p.final.scores.who5raw; if (wf != null && wf <= 7) out.push(["bad", `${p.pid}：最後の調査のWHO-5が${wf}点（7点以下）`]);
+    if (dec && !p.withdrawn && !p.final) { const lastD = p.daily.length ? Math.max(...p.daily.map((x) => ms(x.at) || 0)) : dec; const gapD = Math.floor((now - lastD) / DAY); if (gapD >= CFG.alerts.noDailyDays) out.push(["w", `${p.pid}：毎日のアンケートが${gapD}日ない（記録 ${p.daily.length}日）`]); }
+    const w0 = p.scores && p.scores.who5raw; if (w0 != null && w0 <= CFG.alerts.who5Max) out.push(["bad", `${p.pid}：開始時のWHO-5が${w0}点（${CFG.alerts.who5Max}点以下）`]);
+    const c3 = p.cks.find((c) => c.week === 3); if (c3 && c3.W1 != null) { const r = ["W1", "W2", "W3", "W4", "W5"].reduce((a, k) => a + (c3[k] ?? 0), 0); if (r <= CFG.alerts.who5Max) out.push(["bad", `${p.pid}：3回目のWHO-5が${r}点（${CFG.alerts.who5Max}点以下）`]); }
+    const wf = p.final && p.final.scores && p.final.scores.who5raw; if (wf != null && wf <= CFG.alerts.who5Max) out.push(["bad", `${p.pid}：最後の調査のWHO-5が${wf}点（${CFG.alerts.who5Max}点以下）`]);
     if (p.answers && p.answers.Q42 != null && p.answers.Q42 !== 2) out.push(["w", `${p.pid}：注意確認（Q42）の誤答`]);
   }
   return out;
@@ -92,18 +100,81 @@ function alerts(P) {
 function render(u, P) {
   const al = alerts(P), cnt = (f) => P.filter(f).length, d = (t) => (ms(t) ? new Date(ms(t)).toLocaleDateString("ja-JP") : "–");
   const k = [["同意して開始", P.length], ["質問紙を完了", cnt((p) => p.baselineDone)], ["群A（順調）", cnt((p) => p.group === "A")], ["群B（プランB）", cnt((p) => p.group === "B")], ["群C（プランA）", cnt((p) => p.group === "C")], ["最後の調査まで完了", cnt((p) => p.final)], ["注意確認の誤答", cnt((p) => p.answers && p.answers.Q42 != null && p.answers.Q42 !== 2)], ["プレ実験の参加者", cnt((p) => p.pilot)], ["参加をやめた人", cnt((p) => p.withdrawn)]];
-  el.innerHTML = `<div class="row" style="justify-content:space-between"><div><h1>開発者ページ</h1><p class="muted">${esc(u.email)} でログイン中・閲覧のみ（書き換え・削除はできません）</p></div><button class="btn" id="out">ログアウト</button></div>
+  el.innerHTML = `<div class="row" style="justify-content:space-between"><div><h1>開発者ページ</h1><p class="muted">${esc(u.email)} でログイン中。参加者の回答は閲覧のみ（書き換え・削除はできません）。設定・提案・お知らせ・メモだけ管理できます</p></div><button class="btn" id="out">ログアウト</button></div>
    <section class="kpis">${k.map(([l, v]) => `<div class="card kpi"><span>${l}</span><b>${v}</b></div>`).join("")}</section>
    <section class="card"><h2>確認が必要（${al.length}件）</h2>${al.length ? al.map(([c, t]) => `<div class="alert ${c}">${esc(t)}</div>`).join("") : '<p class="muted">ありません</p>'}
     <p class="muted" style="font-size:12px">連絡先は集めていないため、相談先の表示はアプリが自動で行います。</p></section>
    <section class="card"><div class="row" style="justify-content:space-between"><h2>参加者（${P.length}人）</h2><div class="row">
      <button class="btn primary" id="zip-all">分析用にまとめて書き出す（ZIP）</button><button class="btn" data-csv="baseline">開始時（baseline.csv）</button><button class="btn" data-csv="weekly">振り返りごと（weekly.csv）</button><button class="btn" data-csv="trial">最後の調査まで（trial.csv）</button><button class="btn" data-csv="daily">毎日（daily.csv）</button><button class="btn" data-csv="free">自由記述（free.csv）</button></div></div>
-    <div class="tablewrap"><table><thead><tr><th>参加ID</th><th>開始日</th><th>群</th><th>提案</th><th>振り返り</th><th>開始からの日数</th><th>WHO-5 開始→最後</th><th>プレ実験</th></tr></thead><tbody>
-    ${P.map((p) => { const dec = ms(p.decidedAt); return `<tr><td class="mono">${esc(p.pid)}</td><td>${d(p.createdAt)}</td><td>${p.group ? "群" + p.group : "未決定"}${p.withdrawn ? "（やめた）" : ""}</td><td>${esc((p.planIds || []).join("・") || "–")}</td><td>${p.group === "A" ? "–" : p.cks.length + " / 6"}</td><td>${dec ? Math.floor((Date.now() - dec) / DAY) + "日目" : "–"}</td><td>${p.scores?.who5raw ?? "–"} → ${p.final?.scores?.who5raw ?? "–"}</td><td>${p.pilot ? "はい" : ""}</td></tr>`; }).join("")}
-    </tbody></table></div></section>`;
+    <div class="tablewrap"><table><thead><tr><th>参加ID</th><th>開始日</th><th>群</th><th>提案</th><th>振り返り</th><th>開始からの日数</th><th>WHO-5 開始→最後</th><th>プレ実験</th><th>設定の版</th><th>メモ</th></tr></thead><tbody>
+    ${P.map((p) => { const dec = ms(p.decidedAt); return `<tr><td class="mono">${esc(p.pid)}</td><td>${d(p.createdAt)}</td><td>${p.group ? "群" + p.group : "未決定"}${p.withdrawn ? "（やめた）" : ""}</td><td>${esc((p.planIds || []).join("・") || "–")}</td><td>${p.group === "A" ? "–" : p.cks.length + " / " + CFG.nChecks}</td><td>${dec ? Math.floor((Date.now() - dec) / DAY) + "日目" : "–"}</td><td>${p.scores?.who5raw ?? "–"} → ${p.final?.scores?.who5raw ?? "–"}</td><td>${p.pilot ? "はい" : ""}</td><td>${p.cfgVersion ?? "–"}</td><td>${p.note?.exclude ? '<b style="color:#b3261e">分析から除外</b> ' : ""}${esc(p.note?.text || "")} <button class="btn" data-note="${esc(p.pid)}" style="padding:2px 8px">メモ</button></td></tr>`; }).join("")}
+    </tbody></table></div></section>
+   ${manageHTML()}`;
   $("#out").onclick = () => A.signOut(auth);
+  el.querySelectorAll("[data-note]").forEach((b) => (b.onclick = () => editNote(b.dataset.note, u)));
+  el.querySelectorAll("[data-seed]").forEach((b) => (b.onclick = () => seed(b.dataset.seed, u)));
   el.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => download(b.dataset.csv, P)));
   $("#zip-all").onclick = () => downloadZip(P);
+}
+
+// ---------- 設定と管理（Firestore の config・plans・notices・notes） ----------
+const CFG_LABEL = {
+  version: "設定の版（変えたら1つ上げる）", gapDays: "振り返りの間隔（日）", nChecks: "振り返りの回数（最大6）", finalDay: "最後の調査が開く日", finalMaxDay: "振り返りが残っていても最後の調査を開く日",
+  "groupA.axisMin": "群A：軸の点数の基準", "groupA.axisCount": "群A：基準を満たす軸の数", "groupA.who5Min": "群A：WHO-5 素点の下限",
+  "weights.trait": "提案の点数：性格の重み", "weights.act": "提案の点数：活動の重み", diminish: "提案を複数選んだときの倍率（1つめ・2つめ・3つめ）", clashFactor: "相性の悪い組み合わせの倍率", burden: "提案1つ増えるごとの負担（推し疲れ＋）",
+  "interval.hw": "推し疲れの見込みの幅（±）", "interval.hwWb": "幸福度の見込みの幅（±）", "interval.hwStep": "提案1つ増えるごとに広げる幅（推し疲れ）", "interval.hwWbStep": "提案1つ増えるごとに広げる幅（幸福度）",
+  "alerts.noCheckDays": "確認が必要：振り返りがない日数", "alerts.noDailyDays": "確認が必要：毎日のアンケートがない日数", "alerts.who5Max": "確認が必要：WHO-5 素点がこの値以下",
+};
+const flat = (o, pre = "") => Object.entries(o).flatMap(([k, v]) => (v && typeof v === "object" && !Array.isArray(v) ? flat(v, pre + k + ".") : [[pre + k, v]]));
+function manageHTML() {
+  const D = Object.fromEntries(flat(ST.DEFAULT)), C = flat(CFG);
+  const today = new Date().toISOString().slice(0, 10);
+  return `<section class="card"><h2>設定と管理（Firestore）</h2>
+   <p class="muted" style="font-size:12px">Firestore のコンソールで <b>config/app</b>・<b>plans</b>・<b>notices</b>・<b>notes</b> の文書を追加・編集すると、アプリと開発者ページに反映されます（参加者の画面は、次に開いたとき）。下のボタンは、まだ文書がないときに初期値を書き込むためのものです。研究の途中で設定や提案を変えるときは、指導教員と確認し、README_ja.md の変更の記録に書いてください。提案の題名・やり方は倫理委員会で承認済みです。</p>
+   <h3>設定（config/app）　${MG.cfgRaw ? `Firestore にあり・版 ${esc(MG.cfgRaw.version ?? "–")}` : "Firestore にまだない（初期値で動いています）"}</h3>
+   ${MG.cfgRejected.length ? `<div class="alert bad">受け付けなかった項目（範囲外か型の違い。初期値を使っています）：${esc(MG.cfgRejected.join("、"))}</div>` : ""}
+   <div class="tablewrap"><table><thead><tr><th>項目（Firestore のフィールド名）</th><th>説明</th><th>今の値</th><th>初期値</th></tr></thead><tbody>
+    ${C.filter(([k]) => !k.startsWith("ref.") && !k.startsWith("pc.")).map(([k, v]) => `<tr><td class="mono">${esc(k)}</td><td>${esc(CFG_LABEL[k] || "")}</td><td${JSON.stringify(v) !== JSON.stringify(D[k]) ? ' style="font-weight:700;color:#b3261e"' : ""}>${esc(JSON.stringify(v))}</td><td>${esc(JSON.stringify(D[k]))}</td></tr>`).join("")}
+    <tr><td class="mono">ref.*</td><td>提案を選ぶときの各軸の目安</td><td>${esc(JSON.stringify(CFG.ref))}</td><td>${esc(JSON.stringify(ST.DEFAULT.ref))}</td></tr>
+    <tr><td class="mono">pc.*</td><td>個人補正のばらつき（σu・σe）</td><td>${esc(JSON.stringify(CFG.pc))}</td><td>${esc(JSON.stringify(ST.DEFAULT.pc))}</td></tr>
+   </tbody></table></div>
+   <div class="row"><button class="btn" data-seed="config" ${MG.cfgRaw ? "disabled" : ""}>初期値を config/app に書き込む</button></div>
+   <h3>提案（plans）　${MG.plans.filter((p) => p.active !== false).length}件を出す・全${MG.plans.length}件</h3>
+   ${MG.planRejected.length ? `<div class="alert bad">受け付けなかった提案：${esc(MG.planRejected.join("、"))}</div>` : ""}
+   <div class="tablewrap"><table><thead><tr><th>id</th><th>題名</th><th>軸</th><th>効果（eff）</th><th>性格</th><th>出す</th><th>元</th></tr></thead><tbody>
+    ${MG.plans.map((p) => `<tr><td class="mono">${esc(p.id)}</td><td>${esc(p.title)}</td><td>${esc(p.axis)}</td><td>${esc(p.eff)}</td><td>${esc(p.trait || "–")}</td><td>${p.active === false ? "出さない" : "出す"}</td><td>${esc(p.source)}</td></tr>`).join("")}
+   </tbody></table></div>
+   <p class="muted" style="font-size:12px">Firestore の plans/{id} に書ける項目：title（題名）・how（やり方）・axis（wb・joy・sleep・money・duty・compare）・eff（0〜40）・trait（E・E-・O・C・N・A か空）・act（sns・watch・goods・event・-event）・multi（true/false）・active（false で新しい参加者に出さない）。書いていない項目は初期値のまま。</p>
+   <div class="row"><button class="btn" data-seed="plans">今の提案を plans に書き込む（まだない id だけ）</button></div>
+   <h3>お知らせ（notices）　${MG.notices.length}件</h3>
+   ${MG.notices.length ? `<div class="tablewrap"><table><thead><tr><th>id</th><th>文</th><th>出す</th><th>期間</th><th>対象</th><th>種類</th></tr></thead><tbody>${MG.notices.map((n) => `<tr><td class="mono">${esc(n.id)}</td><td>${esc(n.text)}</td><td>${n.active === true && (!n.from || n.from <= today) && (!n.to || today <= n.to) ? "<b>表示中</b>" : "出さない"}</td><td>${esc(n.from || "")}〜${esc(n.to || "")}</td><td>${esc(n.target || "all")}</td><td>${esc(n.level || "info")}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">ありません</p>'}
+   <p class="muted" style="font-size:12px">Firestore の notices/{id} に書ける項目：text（文）・active（true で出す）・from・to（YYYY-MM-DD、省略可）・target（all＝全員／participants＝登録した人だけ）・level（info／warn＝赤）。はじめに・ホーム・マイページの上に出ます。</p>
+   <div class="row"><button class="btn" data-seed="notice">見本のお知らせを書き込む（active:false）</button></div>
+   <h3>参加者ごとのメモ（notes）</h3>
+   <p class="muted" style="font-size:12px">参加者の表の「メモ」から書けます（Firestore の notes/{研究用の番号}：text・exclude）。exclude を true にした人は、CSV の exclude 列が 1 になり、分析の本分析から外れます（感度分析には入る）。参加者には見えません。</p></section>`;
+}
+async function seed(kind, u) {
+  const by = u.email, at = F.serverTimestamp();
+  try {
+    if (kind === "config") { if (!confirm("config/app に初期値（版 1）を書き込みます。よろしいですか？")) return; await F.setDoc(F.doc(db, "config", "app"), { ...JSON.parse(JSON.stringify(ST.DEFAULT)), version: 1, updatedAt: at, updatedBy: by }); }
+    if (kind === "plans") {
+      const have = new Set((await F.getDocs(F.collection(db, "plans"))).docs.map((d) => d.id));
+      const add = window.OSHIFIT_PLANS.filter((p) => !have.has(p.id));
+      if (!add.length) return alert("すべての提案が、すでに plans にあります");
+      if (!confirm(`${add.length}件の提案を plans に書き込みます。よろしいですか？`)) return;
+      for (const p of add) await F.setDoc(F.doc(db, "plans", p.id), { title: p.title, how: p.how, axis: p.axis, eff: p.eff, trait: p.trait || "", multi: !!p.multi, active: true, updatedAt: at, updatedBy: by });
+    }
+    if (kind === "notice") await F.setDoc(F.doc(db, "notices", "sample"), { text: "（見本）メンテナンスのため、11月30日の夜はつながりにくくなります。", active: false, from: "", to: "", target: "all", level: "info", updatedAt: at, updatedBy: by });
+    alert("書き込みました。ページを読み込み直すと反映されます。");
+  } catch (e) { alert("書き込めませんでした：" + (e.code || e.message)); }
+}
+async function editNote(pid, u) {
+  const cur = MG.notes[pid] || {};
+  const text = prompt(`${pid} のメモ（研究者だけが見ます。空でもよい）`, cur.text || "");
+  if (text === null) return;
+  const exclude = confirm(`${pid} を分析から除外しますか？\n（OK＝除外する／キャンセル＝除外しない）`);
+  try { await F.setDoc(F.doc(db, "notes", pid), { text: text.trim(), exclude, updatedAt: F.serverTimestamp(), updatedBy: u.email }); MG.notes[pid] = { text: text.trim(), exclude }; alert("保存しました。ページを読み込み直すと表に反映されます。"); }
+  catch (e) { alert("保存できませんでした：" + (e.code || e.message)); }
 }
 
 // ---------- CSV（DATA_SCHEMA_ja.md と同じ列） ----------
@@ -113,19 +184,19 @@ function csv(rows, cols) {
   return "﻿" + [cols.join(","), ...rows.map((r) => cols.map((c) => q(r[c])).join(","))].join("\r\n");
 }
 export function tables(P) {
-  const baseCols = ["pid", "uid", "pilot", "qset", "withdrawn", "withdrawn_at", "created_at", "decided_at", "group", "plans_offered", "plans_chosen", "avatar_source", ...BASE_ITEMS, ...SC,
+  const baseCols = ["pid", "uid", "pilot", "exclude", "note", "cfg_version", "qset", "withdrawn", "withdrawn_at", "created_at", "decided_at", "group", "plans_offered", "plans_chosen", "avatar_source", ...BASE_ITEMS, ...SC,
     ...["wb", "joy", "sleep", "money", "duty", "compare", "burnout", "pss"].map((k) => "pred_B_" + k), "pred_hw", "pred_hwWb"];
   const baseline = P.filter((p) => p.baselineDone).map((p) => {
-    const r = { pid: p.pid, uid: p.uid, pilot: p.pilot, qset: p.qset || "", withdrawn: p.withdrawn ? 1 : 0, withdrawn_at: iso(p.withdrawnAt), created_at: iso(p.createdAt), decided_at: iso(p.decidedAt), group: p.group || "", plans_offered: (p.plansOffered || []).map((x) => x.id).join(";"), plans_chosen: (p.planIds || []).join(";"), avatar_source: p.avatar?.source || "" };
+    const r = { pid: p.pid, uid: p.uid, pilot: p.pilot, exclude: p.note?.exclude ? 1 : 0, note: p.note?.text || "", cfg_version: p.cfgVersion ?? "", qset: p.qset || "", withdrawn: p.withdrawn ? 1 : 0, withdrawn_at: iso(p.withdrawnAt), created_at: iso(p.createdAt), decided_at: iso(p.decidedAt), group: p.group || "", plans_offered: (p.plansOffered || []).map((x) => x.id).join(";"), plans_chosen: (p.planIds || []).join(";"), avatar_source: p.avatar?.source || "" };
     BASE_ITEMS.forEach((id) => (r[id] = p.answers?.[id])); SC.forEach((k) => (r[k] = p.scores?.[k]));
     if (p.pred) { Object.keys(p.pred.B || {}).forEach((k) => (r["pred_B_" + k] = p.pred.B[k])); r.pred_hw = p.pred.hw; r.pred_hwWb = p.pred.hwWb; }
     return r;
   });
   const wkCols = ["pid", "group", "week", "day", "at", "sumYen", "sumMin", "nDaily", ...PLANS.map((x) => "did_" + x), "Q44", "Q45", "Q47", "Q48", "joy", "stress", "happy", "W1", "W2", "W3", "W4", "W5", "burn", "joyN", "dBurn", "dJoy", "dMood", "dExec", "dExecDays", ...PLANS.map((x) => "exec_" + x), "adjBurn", "adjBurnHw", "adjWb", "adjWbHw", "adjN", "adjNWb"];
   const weekly = P.flatMap((p) => p.cks.map((c) => ({ ...c, pid: p.pid, group: p.group, at: iso(c.at) })));
-  const trCols = ["pid", "pilot", "withdrawn", "group", "final_day", "final_at", ...FINAL_ITEMS, ...SC.map((k) => k + "_post"), "n_checkins", "exec_rate", "total_yen", "total_min", "n_daily"];
+  const trCols = ["pid", "pilot", "exclude", "withdrawn", "group", "final_day", "final_at", ...FINAL_ITEMS, ...SC.map((k) => k + "_post"), "n_checkins", "exec_rate", "total_yen", "total_min", "n_daily"];
   const trial = P.filter((p) => p.final).map((p) => {
-    const r = { pid: p.pid, pilot: p.pilot, withdrawn: p.withdrawn ? 1 : 0, group: p.group, final_day: p.final.day, final_at: iso(p.final.at), n_checkins: p.cks.length, total_yen: p.final.totals?.yen, total_min: p.final.totals?.min, n_daily: p.final.totals?.n };
+    const r = { pid: p.pid, pilot: p.pilot, exclude: p.note?.exclude ? 1 : 0, withdrawn: p.withdrawn ? 1 : 0, group: p.group, final_day: p.final.day, final_at: iso(p.final.at), n_checkins: p.cks.length, total_yen: p.final.totals?.yen, total_min: p.final.totals?.min, n_daily: p.final.totals?.n };
     FINAL_ITEMS.forEach((id) => (r[id] = p.final.answers?.[id])); SC.forEach((k) => (r[k + "_post"] = p.final.scores?.[k]));
     if (p.group === "B") { const src = (p.daily || []).length ? p.daily : p.cks; const v = src.flatMap((c) => Object.keys(c).filter((x) => x.startsWith("did_")).map((x) => [1, 0.5, 0][c[x]])).filter((x) => x != null); /* 実行率は毎日のアンケートから（旧版の振り返りしかなければ振り返りから） */ r.exec_rate = v.length ? v.reduce((a, b) => a + b, 0) / v.length : ""; }
     return r;
@@ -168,18 +239,21 @@ function exportFiles(P) {
     "OshiFit 研究版 データの書き出し（分析用）",
     `書き出した日時：${now.toISOString()}（${now.toLocaleString("ja-JP")}）`,
     `参加者：${P.length}人（開始時の質問を終えた人 ${n("baseline")}人）`,
-    `baseline.csv ${n("baseline")}行／weekly.csv ${n("weekly")}行／daily.csv ${n("daily")}行／trial.csv ${n("trial")}行／free.csv ${n("free")}行`,
+    `baseline.csv ${n("baseline")}行／weekly.csv ${n("weekly")}行／daily.csv ${n("daily")}行／trial.csv ${n("trial")}行／free.csv ${n("free")}行。config.json（使った設定）・plans.json（提案の一覧）`,
+    `分析から除外（notes の exclude）：${P.filter((p) => p.note?.exclude).length}人`,
     "列の意味：oshifit-study/DATA_SCHEMA_ja.md",
     "分析：python -m analysis.run --data <この ZIP> --out <結果のフォルダ>（ZIP のまま渡せる）",
     "注意：参加者の実データです。リポジトリにコミットしない。free.csv（自由記述）は個人が特定される内容がないか確認してから使う。",
   ].join("\r\n");
-  return [...files, ["README_export.txt", "\ufeff" + info + "\r\n"]];
+  const cfgOut = { 使った設定_初期値とFirestoreを混ぜたもの: CFG, Firestoreのconfig_app: MG.cfgRaw, 受け付けなかった項目: MG.cfgRejected, 参加者ごとの版: "baseline.csv の cfg_version、各参加者の cfgUsed は Firestore に残る" };
+  return [...files, ["config.json", JSON.stringify(cfgOut, null, 2)], ["plans.json", JSON.stringify(MG.plans, null, 2)], ["README_export.txt", "\ufeff" + info + "\r\n"]];
 }
 function downloadZip(P) {
   const a = document.createElement("a"); a.href = URL.createObjectURL(zipStore(exportFiles(P)));
   a.download = `oshifit_data_${new Date().toISOString().slice(0, 10)}.zip`; document.body.append(a); a.click(); a.remove();
 }
 window.__oshifitZip = async (P) => { const b = await zipStore(exportFiles(P)).arrayBuffer(); let s = ""; new Uint8Array(b).forEach((x) => (s += String.fromCharCode(x))); return btoa(s); };
+window.__oshifitManage = () => manageHTML();   // 試験用（ログインせずに表示を確かめる）
 window.__oshifitTables = (P) => { const t = tables(P); return Object.fromEntries(Object.entries(t).map(([k, [r, c]]) => [k, csv(r, c)])); };
 </script>
 </body></html>

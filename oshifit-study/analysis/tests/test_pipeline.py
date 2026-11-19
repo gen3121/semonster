@@ -198,5 +198,15 @@ def test_personal_shrink_matches_app():
     est, hw, n = shrink([10.0] * 20, su, se, 15.0, 40.0)
     k = se * se / (su * su)
     assert abs(est - (40 + 200 / (20 + k))) < 1e-9 and hw < 15.0
-    src = (Path(__file__).resolve().parents[2] / "public" / "index.html").read_text(encoding="utf-8")
-    assert "PC={burnout:{su:10,se:14},wb:{su:9,se:10}}" in src, "アプリと分析の仮の分散をそろえる"
+    src = (Path(__file__).resolve().parents[2] / "public" / "settings.js").read_text(encoding="utf-8")
+    assert "pc: { burnout: { su: 10, se: 14 }, wb: { su: 9, se: 10 } }" in src, "アプリと分析の仮の分散をそろえる"
+
+
+def test_load_plans_reads_plans_js_and_export(tmp_path):
+    """提案の一覧は plans.js から読む。書き出した plans.json があれば、そちらを優先する。"""
+    from analysis.common import load_plans
+    plans, src = load_plans()
+    assert len(plans) >= 15 and "plans.js" in src and plans["mute"]["axis"] == "compare"
+    (tmp_path / "plans.json").write_text(json.dumps([{"id": "mute", "axis": "compare", "eff": 13}, {"id": "walk", "axis": "wb", "eff": 8}]), encoding="utf-8")
+    plans2, src2 = load_plans(data_dir=tmp_path)
+    assert plans2["mute"]["eff"] == 13 and "walk" in plans2 and "plans.json" in src2
