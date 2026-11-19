@@ -108,7 +108,16 @@ async function answerAll(page, stop) {
 
   // 途中まで答えて、読み込み直すと続きから
   await page.locator("#f-num").fill("21"); await page.locator("#sv-next").click();          // Q1 年齢
-  for (let i = 0; i < 11; i++) { await page.locator("[data-j]").nth(1).click(); await page.waitForTimeout(400); }
+  // 選び直し：待っている間に別の選択肢を押すと、そちらが残る（次へはまだ進まない）
+  const q0 = (await page.locator(".qid").innerText()).trim();
+  await page.locator("[data-j]").nth(0).click(); await page.waitForTimeout(300);
+  await page.locator("[data-j]").nth(2).click(); await page.waitForTimeout(300);
+  assert.equal((await page.locator(".qid").innerText()).trim(), q0, "選んでから少しの間は、次へ進まない");
+  await page.waitForTimeout(800);
+  assert.notEqual((await page.locator(".qid").innerText()).trim(), q0, "少し待つと次へ進む");
+  assert.match(await page.locator("#autosave").innerText(), /自動で保存/);
+  step("最初の質問：選んでから約0.8秒は選び直せる（その後に次へ）。「自動で保存されています」と表示");
+  for (let i = 0; i < 10; i++) { await page.locator("[data-j]").nth(1).click(); await page.waitForTimeout(950); }
   await page.waitForTimeout(2200);                                 // 途中経過は1.5秒まとめて送る
   d = await read((db) => getDoc(doc(db, "participants", uid)));
   const savedN = Object.keys(d.data().answers).length;

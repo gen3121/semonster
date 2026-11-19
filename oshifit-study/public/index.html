@@ -63,6 +63,10 @@ body{margin:0;font:400 15px/1.7 var(--sans);-webkit-font-smoothing:antialiased;p
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--card)}
 .app{max-width:480px;margin:0 auto}
 .app.wide{max-width:1200px}
+/* PC では分析と2つの未来を2列に（スマホは1列のまま、並び順も同じ） */
+.cols,.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+@media (min-width:960px){.app.pc2{max-width:1120px}.app.pc2 .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+ .app.pc2 .top .in,.app.pc2 .dock .in{max-width:1120px}.app.pc2 .col.side{position:sticky;top:calc(76px + env(safe-area-inset-top,0px))}}
 h1,h2,h3{font-family:var(--head);margin:0;text-wrap:balance;letter-spacing:-.01em}
 h1{font-size:clamp(24px,6.4vw,30px);font-weight:800;line-height:1.3}
 h2{font-size:20px;font-weight:700;line-height:1.4}
@@ -1498,7 +1502,8 @@ function finalItems(){const ids=["W1","W2","W3","W4","W5","H1","H2","H3","H4",..
   const L=ids.map(itemOf);if(S.group!=="A")USE.forEach(([id,text])=>L.push({id,text,sec:"OshiFitを使ってみて",lead:"",kind:"list",labels:AGREE5U,vals:AGREE5U.map((_,j)=>j+1)}));
   if(S.group==="B")L.push({id:"how",text:"提案（プランB）を行ってみて、どのように変わりましたか（任意）",sec:"最後に",lead:"",kind:"text",optional:true});return L}
 
-function vSurvey(key,items,store,title,ctx,onDone,stepIdx){
+let ADV=null;const ADV_MS=800;   // 選んでから次の質問へ進むまで（ミリ秒）
+function vSurvey(key,items,store,title,ctx,onDone,stepIdx){clearTimeout(ADV);ADV=null;
   const st=SV[key]||(SV[key]={i:0}); st.i=clamp(st.i,0,items.length-1);
   const it=items[st.i], n=items.length, val=store[it.id], has=val!=null&&val!=="";
   const left=Math.max(1,Math.ceil((n-st.i)*10/60));
@@ -1512,18 +1517,22 @@ function vSurvey(key,items,store,title,ctx,onDone,stepIdx){
   else input=`<textarea class="field" id="f-text" maxlength="400" placeholder="自由にお書きください">${esc(val||"")}</textarea>`;
   const auto=it.kind==="circle"||it.kind==="list";
   app.innerHTML=header(ctx)+`<main class="stack" style="padding-top:14px">${stepIdx!=null?stepper(stepIdx):""}
-   <div class="qprog"><div class="meta"><span>${esc(it.sec)}</span><span class="mono">${st.i+1} / ${n}</span></div><div class="bar"><i style="width:${r0((st.i)/n*100)}%"></i></div><div class="meta"><span>${esc(title)}</span><span>あと約${left}分</span></div></div>
+   <div class="qprog"><div class="meta"><span>${esc(it.sec)}</span><span class="mono">${st.i+1} / ${n}</span></div><div class="bar"><i style="width:${r0((st.i)/n*100)}%"></i></div><div class="meta"><span>${esc(title)}</span><span>あと約${left}分</span></div>${STUDY&&key==="q"?`<p class="xs muted" id="autosave" style="margin:2px 0 0">回答は自動で保存されています。途中でやめても、ログインすれば続きから答えられます。</p>`:""}</div>
    <article class="card qcard ${DIR}">
-     <div class="row" style="justify-content:space-between"><span class="qid">${esc(it.id)}</span><span class="xs muted">${auto?"選ぶと次の質問へ進みます":it.optional?"空欄のままでも進めます":"入力して「次へ」"}</span></div>
+     <div class="row" style="justify-content:space-between"><span class="qid">${esc(it.id)}</span><span class="xs muted">${auto?"選ぶと少しして次へ進みます（その間は選び直せます）":it.optional?"空欄のままでも進めます":"入力して「次へ」"}</span></div>
      <div class="qhead">${it.lead?`<p class="lead">${esc(it.lead)}</p>`:""}<h2 class="qtext">${esc(it.text)}</h2></div><div class="ans">${input}</div>
    </article></main>
    <div class="dock"><div class="in"><button class="btn back" id="sv-prev" ${st.i===0?"disabled":""}>前の質問</button><button class="btn primary" id="sv-next" ${has||it.optional?"":"disabled"}>${st.i===n-1?"回答を終える":"次へ"}</button></div></div>`;
   DIR="in";
   fitCard(key,items);
-  const next=()=>{LOCK=false;if(st.i<n-1){st.i++;DIR="in";KEEP=true;render()}else onDone()};
-  app.querySelectorAll("[data-j]").forEach(b=>b.onclick=()=>{if(LOCK)return;LOCK=true;store[it.id]=it.vals[+b.dataset.j];saveDraft(key);
+  const next=()=>{clearTimeout(ADV);ADV=null;if(st.i<n-1){st.i++;DIR="in";KEEP=true;render()}else onDone()};
+  /* 選ぶと少し（ADV_MS）待ってから次へ。待っている間に別の選択肢を押せば選び直せる（待ち直し）。同じ選択肢をもう一度押すとすぐ次へ */
+  app.querySelectorAll("[data-j]").forEach(b=>b.onclick=()=>{const v=it.vals[+b.dataset.j];
+    if(ADV&&store[it.id]===v)return next();
+    store[it.id]=v;saveDraft(key);
     app.querySelectorAll("[data-j]").forEach(x=>x.setAttribute("aria-checked",String(x===b)));const c=app.querySelector(".chosen");if(c)c.textContent=it.labels[+b.dataset.j]||"";
-    setTimeout(next,300)});
+    const nb=$("#sv-next");if(nb)nb.disabled=false;
+    clearTimeout(ADV);ADV=setTimeout(next,ADV_MS)});
   const num=$("#f-num"); if(num){num.oninput=()=>{const v=parseInt(num.value,10);store[it.id]=isNaN(v)?null:v;saveDraft(key);const lo=it.min??18,hi=it.max??99;$("#sv-next").disabled=!(v>=lo&&v<=hi)};num.focus()}
   const tx=$("#f-text"); if(tx)tx.oninput=()=>{store[it.id]=tx.value;saveDraft(key)};
   $("#sv-prev").onclick=()=>{if(st.i>0){st.i--;DIR="back";KEEP=true;render()}};
@@ -1789,15 +1798,15 @@ function radar(series,labels){const W=320,H=300,cx=160,cy=150,R=100,n=labels.len
   const main=series[series.length-1].v;
   g+=labels.map((l,i)=>{const[x,y]=pt(i,124),a=Math.abs(x-cx)<5?"middle":x>cx?"start":"end";return`<text x="${x}" y="${y-2}" text-anchor="${a}" font-size="11" font-weight="700" fill="var(--fg)">${esc(l)}</text><text x="${x}" y="${y+12}" text-anchor="${a}" font-size="11" font-weight="700" fill="${main[i]>=60?"var(--good)":"var(--bad)"}">${r0(main[i])}</text>`}).join("");
   return`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="5つの要素のレーダーチャート" style="max-width:340px;margin:0 auto;display:block;overflow:visible">${g}</svg>`}
-function vAnalysis(){const sc=ensureBase(),A=S.answers,b=big5(A),g=isGood(sc);
+function vAnalysis(){app.className="app pc2";const sc=ensureBase(),A=S.answers,b=big5(A),g=isGood(sc);
   const goodAx=FACTORS().filter(a=>sc[a.key]>=60).map(a=>a.name),badAx=FACTORS().filter(a=>sc[a.key]<60).map(a=>a.name);
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(2)}
    <div class="row" style="justify-content:space-between;flex-wrap:wrap"><div><p class="eyebrow view-eyebrow">ANALYSIS</p><h2>あなたの推し活の分析</h2></div>${S.filled?'<span class="chip warn">見本の回答で表示中</span>':""}</div>
-   <section class="card"><div class="row" style="flex-wrap:wrap;gap:6px">${goodAx.length?`<span class="chip good wrap">良好：${goodAx.join("・")}</span>`:""}${badAx.length?`<span class="chip bad wrap">見直したい：${badAx.join("・")}</span>`:""}</div>
+   <div class="cols"><div class="col side"><section class="card"><div class="row" style="flex-wrap:wrap;gap:6px">${goodAx.length?`<span class="chip good wrap">良好：${goodAx.join("・")}</span>`:""}${badAx.length?`<span class="chip bad wrap">見直したい：${badAx.join("・")}</span>`:""}</div>
     ${radar([{v:FV(sc),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
     <p class="xs muted">点線は60点。60点以上を青（良好）、60点未満を赤（見直したい）。どの要素も高いほど良い向きです。</p>
     ${outBars([["幸福度（WHO-5）",[sc.wb],true,52,"高いほど良い・線は13点"],["ストレス度（PSS-J）",[pss100(sc)],false,null,"高いほど負担"],["推し活のストレス（推し疲れ）",[sc.burnout],false,null,"高いほど負担"]],["今"])}</section>
-   ${g.ok?`<p class="callout good"><b>群A（今のままで順調）</b>：5つの要素の多くが${CFG.groupA.axisMin}点以上で、WHO-5も${CFG.groupA.who5Min}点以上です。プランの提案はありません。${FINAL_DAY}日目にもう一度だけ回答をお願いします。</p>`:""}
+   ${g.ok?`<p class="callout good"><b>群A（今のままで順調）</b>：5つの要素の多くが${CFG.groupA.axisMin}点以上で、WHO-5も${CFG.groupA.who5Min}点以上です。プランの提案はありません。${FINAL_DAY}日目にもう一度だけ回答をお願いします。</p>`:""}</div><div class="col">
    <section class="axes">${FACTORS().map(a=>{const v=r0(sc[a.key]),ok=v>=60;return`<div class="ax ${ok?"good":"bad"}"><div class="h"><span>${a.name}</span><span class="chip ${ok?"good":"bad"}">${ok?"良好":"見直したい"}</span></div><div class="v">${v}<small> / 100</small></div><div class="track"><i style="width:${v}%"></i></div></div>`}).join("")}</section>
    <section class="axes"><div class="ax ${sc.burnout<50?"good":"bad"}"><div class="h"><span>推し疲れ</span></div><div class="v">${r0(sc.burnout)}<small> / 100</small></div><p class="xs muted">高いほど負担が大きい</p></div>
     <div class="ax ${sc.who5raw>=13?"good":"bad"}"><div class="h"><span>WHO-5（気分）</span></div><div class="v">${sc.who5raw}<small> / 25</small></div><p class="xs muted">13点以上が目安</p></div>
@@ -1805,7 +1814,7 @@ function vAnalysis(){const sc=ensureBase(),A=S.answers,b=big5(A),g=isGood(sc);
     <div class="ax"><div class="h"><span>ストレス（PSS-J）</span></div><div class="v">${sc.pss??"–"}<small> / 56</small></div><p class="xs muted">高いほどストレスが高い</p></div></section>
    <section class="card"><div class="sec"><h3>性格（TIPI-J）</h3><span class="xs muted">良い悪いはありません</span></div>
     ${b?[["外向性","E"],["協調性","A"],["勤勉性","C"],["神経症傾向","N"],["開放性","O"]].map(([n,k])=>`<div class="trait"><span>${n}</span><div class="track"><i style="width:${b[k]}%"></i></div><span class="num" style="text-align:right">${b[k]}</span></div>`).join(""):""}
-    <details><summary>算出の根拠</summary><div class="formula">${SC.axes.map(a=>`<span><b>${a.name}</b>：${esc(a.formula)}</span>`).join("")}<span><b>推し疲れ</b>：${esc(SC.burnout.formula)}</span><span><b>SHS</b>：${esc(SC.shs.formula)}</span><span><b>PSS-J</b>：${esc(SC.pss.formula)}</span></div></details></section></main>
+    <details><summary>算出の根拠</summary><div class="formula">${SC.axes.map(a=>`<span><b>${a.name}</b>：${esc(a.formula)}</span>`).join("")}<span><b>推し疲れ</b>：${esc(SC.burnout.formula)}</span><span><b>SHS</b>：${esc(SC.shs.formula)}</span><span><b>PSS-J</b>：${esc(SC.pss.formula)}</span></div></details></section></main></div></div>
    ${g.ok?dock("an-back","ホームへ","an-go"):dock("an-back","2つの未来を見る","an-go")}`;
   $("#an-back").onclick=()=>go("avatar");$("#an-go").onclick=()=>{if(g.ok){if(STUDY&&S.group)return go("home");S.group="A";S.plan={id:null,ids:[],accepted:false};S.decidedAt=now();if(STUDY)OFStore.decide(S,null,CFG);go("home")}else go("future")};wire()}
 let PI=0;
@@ -1814,15 +1823,15 @@ function pbar(name,a,b,hw,higher){const d=b-a,good=higher?d>=0:d<=0,col=good?"va
   return`<div><div class="h"><span>${name}</span><span class="vals"><span class="muted">${r0(a)}</span> → <b style="color:${col}">${r0(b)}</b></span></div>${row("プランA",a,"var(--faint)",hw)}${row("プランB",b,col,hw)}</div>`}
 let PSEL=new Set();
 function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">群A（今のままで順調）のため、提案はありません。</p><a class="btn" href="#home">ホームへ</a></main>`;wire();return}
-  PI=clamp(PI,0,S.plans.length-1);const sel=S.plans[PI],p=planById(sel.id);
+  app.className="app pc2";PI=clamp(PI,0,S.plans.length-1);const sel=S.plans[PI],p=planById(sel.id);
   const chosen=S.plans.map(x=>x.id).filter(id=>PSEL.has(id)),ids=chosen.length?chosen:[p.id],pr=predictMulti(sc,ids),lab=chosen.length?`選んだ${chosen.length}つ`:`提案${PI+1}だけ`;
   const extra=(p.id==="donate"?DONATE_HTML:"")+(p.id==="event"?ticketHTML(A):"");
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(3)}<div><p class="eyebrow view-eyebrow">TWO FUTURES</p><h2>28日後の2つの未来</h2><p class="small muted">プランA「現在のままの推し活」と、提案を取り入れたプランB「最適化された推し活」を比べます。<b>試したい提案はいくつ選んでもかまいません。</b></p></div>
-   <div class="segs" role="group" aria-label="提案">${S.plans.map((x,i)=>`<button class="seg" data-pi="${i}" aria-pressed="${i===PI}">${PSEL.has(x.id)?"✓ ":""}提案${i+1}</button>`).join("")}</div>
+   <div class="cols"><div class="col"><div class="segs" role="group" aria-label="提案">${S.plans.map((x,i)=>`<button class="seg" data-pi="${i}" aria-pressed="${i===PI}">${PSEL.has(x.id)?"✓ ":""}提案${i+1}</button>`).join("")}</div>
    <section class="card plan"><h3 style="font-size:17px">${esc(planTitle(p))}</h3><p class="small">${esc(planHow(p))}</p>${extra}<p class="why">選んだ理由：${esc(sel.why)}</p>${evidenceHTML(p.id)}
     <label class="pickrow"><input type="checkbox" id="pickThis" ${PSEL.has(p.id)?"checked":""}> この提案を試す</label></section>
    <div class="row" style="justify-content:space-between;flex-wrap:wrap"><span class="small">選んだ提案：<b>${chosen.length}</b>／${S.plans.length}</span><button class="btn sm" id="pickAll">${chosen.length===S.plans.length?"選択をすべて外す":"すべての提案を選ぶ"}</button></div>
-   <section class="futures"><div class="fut"><span class="lab">プランA　現在のままの推し活</span>${avatar(S.avatar,faceOf(sc),116)}</div><div class="fut b"><span class="lab">プランB　最適化された推し活（${lab}）</span>${avatar(S.avatar,faceOf(pr.B,sc),116)}</div></section>
+   <section class="futures"><div class="fut"><span class="lab">プランA　現在のままの推し活</span>${avatar(S.avatar,faceOf(sc),116)}</div><div class="fut b"><span class="lab">プランB　最適化された推し活（${lab}）</span>${avatar(S.avatar,faceOf(pr.B,sc),116)}</div></section></div><div class="col side">
    ${S.plans.length>1?(()=>{const cs=combos(sc,S.plans.map(x=>x.id)),nm=id=>"提案"+(S.plans.findIndex(x=>x.id===id)+1);
      return`<section class="card" id="combos"><div class="sec"><h3>提案の組み合わせ</h3><span class="xs muted">仮の見込み</span></div>
      ${cs.map(o=>`<div class="combo ${o.best?"best":""} ${o.bad?"bad":""}"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><b>${o.ids.map(nm).join(" × ")}</b>
@@ -1835,8 +1844,8 @@ function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.inner
    <section class="card"><div class="sec"><h3>5つの要素の見込み</h3><span class="xs muted">灰色の点線＝A、青＝B</span></div>
     ${radar([{v:FV(pr.A),fill:"var(--faint)",stroke:"var(--faint)",dash:true,op:.05},{v:FV(pr.B),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
     ${outBars([["幸福度（WHO-5）",[sc.wb,pr.B.wb],true,52,`±${pr.hwWb}の幅`],["ストレス度（PSS-J）",[pss100(sc),pss100(pr.B)],false,null,"仮の見込み"],["推し活のストレス（推し疲れ）",[sc.burnout,pr.B.burnout],false,null,`±${pr.hw}の幅`]],["プランA","プランB"])}
-    <p class="xs muted">選んだ提案の想定の効果を足し合わせた仮の見込みです。複数の提案の効果がそのまま足し合わさるかは分かっていないため、選んだ数が多いほど幅を広くしています。</p></section></main>
-   <div class="dock"><div class="in" style="flex-direction:column"><button class="btn primary block" id="pickB" ${chosen.length?"":"disabled"}>${chosen.length?`選んだ${chosen.length}つの提案で、プランB「最適化された推し活」を始める`:"提案を選ぶとプランBで始められます"}</button><button class="btn block" id="pickA">プランA「現在のままの推し活」で続ける</button></div><p class="note">どちらを選んでも、約28日間、4〜5日ごとに6回の振り返りをお願いします</p></div>`;
+    <p class="xs muted">選んだ提案の想定の効果を足し合わせた仮の見込みです。複数の提案の効果がそのまま足し合わさるかは分かっていないため、選んだ数が多いほど幅を広くしています。</p></section></div></div></main>
+   <div class="dock"><div class="in" style="flex-direction:column"><button class="btn primary block" id="pickB" ${chosen.length?"":"disabled"}>${chosen.length?`選んだ${chosen.length}つの提案で、プランB「最適化された推し活」を始める`:"提案を選ぶとプランBで始められます"}</button><button class="btn block" id="pickA">プランA「現在のままの推し活」で続ける</button></div><p class="note">どちらを選んでも、約${FINAL_DAY}日間、${GAP}日ごとに${N_CHECK}回の振り返りをお願いします</p></div>`;
   app.querySelectorAll("[data-pi]").forEach(b=>b.onclick=()=>{PI=+b.dataset.pi;keep(vFuture)});
   $("#pickThis").onchange=e=>{e.target.checked?PSEL.add(p.id):PSEL.delete(p.id);keep(vFuture)};
   app.querySelectorAll("[data-combo]").forEach(b=>b.onclick=()=>{PSEL.clear();b.dataset.combo.split(",").forEach(id=>PSEL.add(id));keep(vFuture)});
@@ -1963,7 +1972,7 @@ function allowed(v){if(!STUDY)return v;
   if(!S.group){if(["avatar","analysis"].includes(v))return v;if(v==="future")return S.avatarDone?v:"avatar";return S.avatarDone?"analysis":"avatar"}
   if(["start","q","avatar","future"].includes(v))return"home";
   return v}
-function render(){document.querySelectorAll(".scrim").forEach(x=>x.remove());const h=location.hash.slice(1);VIEW=VIEWS[h]?h:"start";const ok=allowed(VIEW);if(ok!==VIEW){VIEW=ok;if(location.hash!=="#"+ok){history.replaceState(null,"","#"+ok)}}app.className="app";const y=scrollY,k=KEEP;KEEP=false;if(!k)scrollTo(0,0);VIEWS[VIEW]();showNotices();if(k)scrollTo(0,y)}
+function render(){clearTimeout(ADV);ADV=null;document.querySelectorAll(".scrim").forEach(x=>x.remove());const h=location.hash.slice(1);VIEW=VIEWS[h]?h:"start";const ok=allowed(VIEW);if(ok!==VIEW){VIEW=ok;if(location.hash!=="#"+ok){history.replaceState(null,"","#"+ok)}}app.className="app";const y=scrollY,k=KEEP;KEEP=false;if(!k)scrollTo(0,0);VIEWS[VIEW]();showNotices();if(k)scrollTo(0,y)}
 /* お知らせ（Firestore の notices）：active が true で、期間内（from〜to、YYYY-MM-DD）のものを、はじめに・ホーム・マイページの上に出す */
 function activeNotices(){const t=todayKey();return NOTICES.filter(n=>n&&n.active===true&&typeof n.text==="string"&&n.text.trim()&&(!n.from||n.from<=t)&&(!n.to||t<=n.to)&&(!n.target||n.target==="all"||(n.target==="participants"&&S.consented)))}
 function showNotices(){if(!["start","home","mypage"].includes(VIEW))return;const N=activeNotices(),m=app.querySelector("main");if(!N.length)return;
