@@ -86,6 +86,13 @@ async function answerAll(page, stop) {
   await page.locator("#go").click();
   await page.waitForFunction(() => location.hash === "#signup");
   await page.locator("#su-mail").fill(MAIL); await page.locator("#su-pw").fill(PW);
+  await page.locator("#su-info").click();
+  await page.getByRole("dialog").getByText("参加は自由です").waitFor();
+  await page.screenshot({ path: path.join(OUT, "08_consent_info.png") });
+  await page.locator("#ci-close").click();
+  assert.equal(await page.getByRole("dialog").count(), 0);
+  assert.equal(await page.locator("#su-mail").inputValue(), MAIL, "説明を開いて閉じても、入力した内容は残る");
+  step("登録画面の「研究の説明はこちら」で説明が開き、閉じると入力はそのまま");
   await page.locator("[data-g='男性']").click();
   assert.equal(await page.locator("#su-go").isDisabled(), true, "同意しないと登録できない");
   await page.locator("#agree").check();

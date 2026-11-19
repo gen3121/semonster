@@ -254,6 +254,7 @@ summary{cursor:pointer;font-weight:700;font-size:14px}
 .idbox{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--low);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px}
 .idbox .mono{font-size:20px;font-weight:600;letter-spacing:.04em}
 /* シート・通知 */
+.infolink{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;background:none;border:0;padding:4px 2px;font:inherit;font-size:14px;font-weight:700;color:var(--primary);text-decoration:underline;text-underline-offset:3px;cursor:pointer}.infolink svg{width:16px;height:16px}
 .scrim{position:fixed;inset:0;z-index:40;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center;padding-inline:max(0px,env(safe-area-inset-left,0px)) max(0px,env(safe-area-inset-right,0px))}
 .sheet{width:100%;max-width:480px;max-height:92%;overflow:auto;background:var(--card);border-radius:20px 20px 0 0;padding:14px 20px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-up);animation:up .25s cubic-bezier(.2,.9,.2,1)}
 .sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line2);align-self:center}
@@ -301,7 +302,8 @@ tr:last-child td{border-bottom:0}
 .btn.pill{gap:10px;padding-inline:20px 16px}
 .btn.big{min-height:60px;font-size:17px;padding-inline:28px 22px}
 /* 上の案内 */
-.lnav{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;padding-block:12px}
+.lnav{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;padding-block:12px;transition:background .2s}
+.lnav.scrolled{background:color-mix(in srgb,var(--card) 90%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .lnav .in{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:12px}
 .lnav .logo{margin-right:auto;font-size:22px}
 .pillnav{display:flex;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px;box-shadow:var(--shadow)}
@@ -389,8 +391,8 @@ tr:last-child td{border-bottom:0}
 .totop svg{width:22px;height:22px}
 .totop[hidden]{display:none}
 /* アプリ画面にも同じ言葉づかい：浮いた丸い上部バー・丸いボタン・英字の小見出し */
-.top{background:transparent;border-bottom:0;-webkit-backdrop-filter:none;backdrop-filter:none}
-.top .in{background:color-mix(in srgb,var(--card) 92%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 16px;box-shadow:var(--shadow)}
+.top{background:linear-gradient(var(--bg) calc(100% - 4px),color-mix(in srgb,var(--bg) 0%,transparent));border-bottom:0;-webkit-backdrop-filter:none;backdrop-filter:none}   /* 浮いたバーの上下に、下の文字が透けて重ならないように */
+.top .in{background:var(--card);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 16px;box-shadow:var(--shadow)}
 .card{border-radius:20px}
 .view-eyebrow{margin-bottom:6px}
 .plan{border:1.5px solid var(--fg);border-left:6px solid var(--primary);box-shadow:0 5px 0 var(--fg)}
@@ -1669,7 +1671,7 @@ function vStart(){app.className="app land";
   app.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>to(b.dataset.go));
   app.querySelectorAll(".pin").forEach(p=>{const g=()=>{to("sec-axes");const c=document.getElementById("ax-"+p.dataset.ax);if(c){c.classList.add("flash");setTimeout(()=>c.classList.remove("flash"),1600)}};p.onclick=g;p.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();g()}}});
   $("#totop").onclick=()=>scrollTo({top:0,behavior:"smooth"});
-  const tt=$("#totop");onscroll=()=>{if(tt.isConnected)tt.hidden=scrollY<500};
+  const tt=$("#totop"),ln=document.querySelector(".lnav");onscroll=()=>{if(tt.isConnected)tt.hidden=scrollY<500;if(ln&&ln.isConnected)ln.classList.toggle("scrolled",scrollY>40)};
   wire()}
 
 /* ---------- 新規登録・ログイン（メールアドレスとパスワード。Firebase Authentication） ---------- */
@@ -1684,9 +1686,11 @@ function vSignup(){const opts=QN.sections[0].items.find(i=>i.id==="Q2").opts, lo
     <div class="stack" style="gap:6px"><b class="small">性別（アバターで選べる髪型が変わります）</b><div class="olist" role="radiogroup" aria-label="性別">${opts.map((o,j)=>`<button class="obtn" role="radio" data-g="${esc(o)}" aria-checked="${S.answers.Q2===o}"><span class="dot" aria-hidden="true"></span><span>${j+1}　${esc(o)}</span></button>`).join("")}</div></div>
     <p class="xs muted">メールアドレスはログインのためだけに使い、回答とは別に管理します。研究の結果に名前やメールアドレスが出ることはありません。</p>
     <label class="consent card" for="agree"><input type="checkbox" id="agree">説明を読み、研究への参加に同意します</label>
+    <button type="button" class="infolink" id="su-info">研究の説明はこちら${ARROW}</button>
     ${logged?"":`<div class="row" style="flex-wrap:wrap"><button class="btn sm" id="su-google" disabled>Google で登録</button><button class="btn sm" id="su-ms" disabled>Microsoft で登録</button></div>`}
     <p class="small" id="su-msg" role="alert" style="color:var(--bad)"></p></section></main>
    ${dock("su-back","登録して質問へ","su-go",true)}`;
+  $("#su-info").onclick=()=>consentInfo();
   const ok=()=>{const base=$("#agree").checked&&!!S.answers.Q2;$("#su-go").disabled=!(base&&(logged||($("#su-mail").value.includes("@")&&$("#su-pw").value.length>=8)));["#su-google","#su-ms"].forEach(id=>{if($(id))$(id).disabled=!base})};
   const soc=async kind=>{if(!STUDY){S.consented=true;return go("q")}$("#su-msg").textContent="";
     try{const saved=await OFStore.social(kind);if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers);return render()}await OFStore.begin(S);S.consented=true;go("q")}
@@ -1698,6 +1702,28 @@ function vSignup(){const opts=QN.sections[0].items.find(i=>i.id==="Q2").opts, lo
   $("#su-go").onclick=async()=>{const b=$("#su-go");b.disabled=true;$("#su-msg").textContent="";
     if(STUDY){try{if(!logged)await OFStore.signup($("#su-mail").value.trim(),$("#su-pw").value);await OFStore.begin(S)}catch(e){console.error(e);$("#su-msg").textContent=authMsg(e);b.disabled=false;return}}
     S.consented=true;go("q")};wire()}
+/* 研究の説明（登録画面の「説明はこちら」から開く。入力した内容はそのまま残る）。文はトップページと同じ */
+function consentInfo(){const sc=document.createElement("div");sc.className="scrim";
+  sc.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ci-t"><div class="grab"></div>
+   <h2 id="ci-t">研究の説明</h2>
+   <section class="stack" style="gap:6px"><h3>この研究について</h3>
+    <p class="small">推し活は、毎日を明るくしてくれます。一方で、グッズや遠征のお金、夜ふかし、SNSでのほかの人との比較、「行かなきゃ」という義務感で、知らないうちに疲れてしまうこともあります。</p>
+    <p class="small">OshiFitは、あなたの推し活を、幸福度とストレスを左右する5つの要素で見える化し、「現在のままの推し活」と「最適化された推し活」の2つの未来を並べて見せる、大学の研究アプリです。推し活をやめるためではなく、長く楽しく続けるために使います。</p></section>
+   <section class="stack" style="gap:6px"><h3>参加すると、すること</h3>
+    <ul class="facts"><li>最初に約${BASE_ITEMS.length}の質問に答え（約${Math.max(8,Math.round(BASE_ITEMS.length*10/60))}分）、アバターを作ります。6つの軸の結果と、2つの未来を見て、どちらで続けるかを選びます</li>
+     <li>約${FINAL_DAY}日間、毎日のアンケート（約1分）に答えます</li><li>${GAP}日ごとに${N_CHECK}回の振り返り（各約1分）があります。3回目だけ、最近2週間の気分（WHO-5）も答えます</li>
+     <li>${FINAL_DAY}日目以降に、最後の調査に答えます</li></ul></section>
+   <section class="stack" style="gap:6px"><h3>データの扱い</h3>
+    <ul class="facts"><li>アバターは写真を使わず、顔の形や髪型を自分で選んで作ります</li><li>メールアドレスはログインのためだけに使い、回答とは別に管理します。名前は集めません</li>
+     <li>回答は研究用の番号で、研究用のサーバーに保存します。研究の目的以外には使いません</li><li>研究の結果に名前やメールアドレスが出ることはありません</li></ul></section>
+   <section class="stack" style="gap:6px"><h3>参加は自由です</h3>
+    <p class="small">参加するかどうかは自由です。途中で答えるのをやめても、成績などの不利益はありません。それまでの回答は研究に使います。</p></section>
+   <section class="stack" style="gap:6px"><h3>問い合わせ先</h3>
+    <p class="small">大阪工業大学大学院 情報科学研究科　今井 元（指導教員：大井 翔）<br><span class="mono">m1m02530106@oit.ac.jp</span><br>倫理審査で承認された研究です。</p></section>
+   <button class="btn primary block" id="ci-close">読みました（登録に戻る）</button></div>`;
+  document.body.appendChild(sc);const close=()=>{sc.remove();const b=$("#su-info");if(b)b.focus()};
+  sc.onclick=e=>{if(e.target===sc)close()};$("#ci-close").onclick=close;
+  sc.addEventListener("keydown",e=>{if(e.key==="Escape")close()});$("#ci-close").focus()}
 function vLogin(){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">LOGIN</p><h2>ログイン</h2><p class="small muted">登録したメールアドレスとパスワードで、続きから答えられます。</p></div>
    <section class="card"><label class="stack" style="gap:4px"><b class="small">メールアドレス</b><input class="field" id="li-mail" type="email" autocomplete="email" inputmode="email"></label>
     <label class="stack" style="gap:4px"><b class="small">パスワード</b><input class="field" id="li-pw" type="password" autocomplete="current-password"></label>
