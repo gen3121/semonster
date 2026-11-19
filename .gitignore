@@ -1,3 +1,5 @@
 
 # Claude Code のその PC だけの設定（impeccable のフックなど）。共有しない
 .claude/settings.local.json
+# 論文の確認用 PDF（Overleaf で作る。コミットしない）
+oshifit-thesis/OshiFit_修士論文_*.pdf
