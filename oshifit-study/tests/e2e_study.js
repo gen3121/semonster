@@ -222,7 +222,15 @@ async function answerAll(page, stop) {
   assert.equal(csv.baseline.split("\r\n").length, 2);
   if (group === "B") assert.equal(csv.weekly.split("\r\n").length, 2);
   if (csv.daily) { const dh = csv.daily.replace(/^\uFEFF/, "").split("\r\n"); assert.ok(dh[0].split(",").includes("yen")); if (group === "B") assert.equal(dh.length, 2); }
+  const zb64 = await ap.evaluate(({ raw, uid }) => {
+    const rev = (o) => JSON.parse(JSON.stringify(o), (k, v) => (v && v.__ts ? { toMillis: () => v.__ts } : v));
+    return window.__oshifitZip([{ uid, ...rev(raw.p), cks: raw.cks.map(rev), daily: raw.daily.map(rev), pilot: 0 }]);
+  }, { raw, uid });
+  const zbuf = Buffer.from(zb64, "base64"); assert.equal(zbuf.readUInt32LE(0), 0x04034b50, "ZIP の形");
+  fs.writeFileSync(path.join(OUT, "export_test.zip"), zbuf);
+  for (const f of ["baseline.csv", "weekly.csv", "daily.csv", "trial.csv", "free.csv", "README_export.txt"]) assert.ok(zbuf.includes(Buffer.from(f)), "ZIP に " + f);
   await ap.close();
+  step("開発者ページの「分析用にまとめて書き出す（ZIP）」で、5つの CSV と書き出しの記録が1つのファイルになる");
   step("開発者ページの CSV（baseline / weekly）が DATA_SCHEMA の列で書き出せる");
 
   // ---------- 「参加をやめる」の欄はない（同意書で参加の同意を得るため、2026-11-17 に削除）

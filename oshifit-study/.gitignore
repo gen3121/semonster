@@ -7,3 +7,4 @@ tests/shots/
 data/
 *.csv
 serviceAccount*.json
+oshifit_data_*.zip

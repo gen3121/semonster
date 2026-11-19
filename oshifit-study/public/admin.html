@@ -97,12 +97,13 @@ function render(u, P) {
    <section class="card"><h2>確認が必要（${al.length}件）</h2>${al.length ? al.map(([c, t]) => `<div class="alert ${c}">${esc(t)}</div>`).join("") : '<p class="muted">ありません</p>'}
     <p class="muted" style="font-size:12px">連絡先は集めていないため、相談先の表示はアプリが自動で行います。</p></section>
    <section class="card"><div class="row" style="justify-content:space-between"><h2>参加者（${P.length}人）</h2><div class="row">
-     <button class="btn" data-csv="baseline">開始時（baseline.csv）</button><button class="btn" data-csv="weekly">振り返りごと（weekly.csv）</button><button class="btn" data-csv="trial">最後の調査まで（trial.csv）</button><button class="btn" data-csv="daily">毎日（daily.csv）</button><button class="btn" data-csv="free">自由記述（free.csv）</button></div></div>
+     <button class="btn primary" id="zip-all">分析用にまとめて書き出す（ZIP）</button><button class="btn" data-csv="baseline">開始時（baseline.csv）</button><button class="btn" data-csv="weekly">振り返りごと（weekly.csv）</button><button class="btn" data-csv="trial">最後の調査まで（trial.csv）</button><button class="btn" data-csv="daily">毎日（daily.csv）</button><button class="btn" data-csv="free">自由記述（free.csv）</button></div></div>
     <div class="tablewrap"><table><thead><tr><th>参加ID</th><th>開始日</th><th>群</th><th>提案</th><th>振り返り</th><th>開始からの日数</th><th>WHO-5 開始→最後</th><th>プレ実験</th></tr></thead><tbody>
     ${P.map((p) => { const dec = ms(p.decidedAt); return `<tr><td class="mono">${esc(p.pid)}</td><td>${d(p.createdAt)}</td><td>${p.group ? "群" + p.group : "未決定"}${p.withdrawn ? "（やめた）" : ""}</td><td>${esc((p.planIds || []).join("・") || "–")}</td><td>${p.group === "A" ? "–" : p.cks.length + " / 6"}</td><td>${dec ? Math.floor((Date.now() - dec) / DAY) + "日目" : "–"}</td><td>${p.scores?.who5raw ?? "–"} → ${p.final?.scores?.who5raw ?? "–"}</td><td>${p.pilot ? "はい" : ""}</td></tr>`; }).join("")}
     </tbody></table></div></section>`;
   $("#out").onclick = () => A.signOut(auth);
   el.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => download(b.dataset.csv, P)));
+  $("#zip-all").onclick = () => downloadZip(P);
 }
 
 // ---------- CSV（DATA_SCHEMA_ja.md と同じ列） ----------
@@ -139,6 +140,46 @@ function download(name, P) {
   const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv(rows, cols)], { type: "text/csv" }));
   a.download = `${name}_${new Date().toISOString().slice(0, 10)}.csv`; document.body.append(a); a.click(); a.remove();
 }
+// ---------- 分析用にまとめて書き出す（ZIP）：5つの CSV と書き出しの記録を1つのファイルに。
+// そのまま python -m analysis.run --data <この ZIP> に渡せる（展開しなくてよい）。ZIP は無圧縮（store）で、外部のライブラリを使わない
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = (u8) => { let c = 0xffffffff; for (const b of u8) c = CRC[(c ^ b) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+function zipStore(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  const dt = new Date(), dosT = (dt.getHours() << 11) | (dt.getMinutes() << 5) | (dt.getSeconds() >> 1), dosD = ((dt.getFullYear() - 1980) << 9) | ((dt.getMonth() + 1) << 5) | dt.getDate();
+  for (const [name, text] of files) {
+    const nm = enc.encode(name), data = enc.encode(text), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint16(10, dosT, true); h.setUint16(12, dosD, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, nm.length, true); h.setUint16(28, 0, true);
+    parts.push(new Uint8Array(h.buffer), nm, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true);
+    c.setUint16(12, dosT, true); c.setUint16(14, dosD, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, nm.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), nm); off += 30 + nm.length + data.length;
+  }
+  const size = central.reduce((a, b) => a + b.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, size, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type: "application/zip" });
+}
+function exportFiles(P) {
+  const t = tables(P), now = new Date();
+  const files = ["baseline", "weekly", "daily", "trial", "free"].map((k) => [`${k}.csv`, csv(...t[k])]);
+  const n = (k) => t[k][0].length;
+  const info = [
+    "OshiFit 研究版 データの書き出し（分析用）",
+    `書き出した日時：${now.toISOString()}（${now.toLocaleString("ja-JP")}）`,
+    `参加者：${P.length}人（開始時の質問を終えた人 ${n("baseline")}人）`,
+    `baseline.csv ${n("baseline")}行／weekly.csv ${n("weekly")}行／daily.csv ${n("daily")}行／trial.csv ${n("trial")}行／free.csv ${n("free")}行`,
+    "列の意味：oshifit-study/DATA_SCHEMA_ja.md",
+    "分析：python -m analysis.run --data <この ZIP> --out <結果のフォルダ>（ZIP のまま渡せる）",
+    "注意：参加者の実データです。リポジトリにコミットしない。free.csv（自由記述）は個人が特定される内容がないか確認してから使う。",
+  ].join("\r\n");
+  return [...files, ["README_export.txt", "\ufeff" + info + "\r\n"]];
+}
+function downloadZip(P) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(zipStore(exportFiles(P)));
+  a.download = `oshifit_data_${new Date().toISOString().slice(0, 10)}.zip`; document.body.append(a); a.click(); a.remove();
+}
+window.__oshifitZip = async (P) => { const b = await zipStore(exportFiles(P)).arrayBuffer(); let s = ""; new Uint8Array(b).forEach((x) => (s += String.fromCharCode(x))); return btoa(s); };
 window.__oshifitTables = (P) => { const t = tables(P); return Object.fromEntries(Object.entries(t).map(([k, [r, c]]) => [k, csv(r, c)])); };
 </script>
 </body></html>

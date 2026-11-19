@@ -7,6 +7,7 @@
   8d 個人補正の当てはまり：アプリの「本人の記録で直した見込み」を同じ式で計算し直し、最後の調査の値と比べる
       （平均絶対誤差・80%区間に入った割合）。あわせて、アプリの仮の分散（σu・σe）を混合モデルで推定し直す
   8e 一人ひとりの変化：信頼できる変化の指標 RCI（Jacobson & Truax 1991）。WHO-5 と PSS-J
+  8f 提案の数と変化（群B）：選んだ提案の数ごとに、変化（開始時の値で調整）を比べる。アプリの仮定「2つめ0.8倍・3つめ0.6倍」を確かめる
 群は本人の選択なので、どれも「関連」として読む。"""
 from __future__ import annotations
 
@@ -198,6 +199,33 @@ def rci(ctx, main):
     return pd.DataFrame(out)
 
 
+def n_plans_effect(main):
+    """群B：選んだ提案の数（1〜3）ごとの変化。変化 ~ C(提案の数) + 開始時の値（頑健SE HC3）。
+    アプリの仮定では、提案1つの改善を1とすると、2つで1.8、3つで2.4（足し合わせ・逓減）。"""
+    d0 = main[main["group"] == "B"].copy()
+    d0["n_plans"] = d0["plans_chosen"].fillna("").astype(str).map(lambda x: len([p for p in x.split(";") if p]))
+    out = []
+    for v, good in [("burnout", "下がるほど良い"), ("wb", "上がるほど良い")]:
+        d = d0[["n_plans", v, "d_" + v]].dropna()
+        d = d[d["n_plans"] > 0]
+        row = {"結果": f"{v} の変化（{good}）", "n": len(d), **{f"n_{k}つ": int((d["n_plans"] == k).sum()) for k in (1, 2, 3)}}
+        if len(d) < MIN_PIDS or d["n_plans"].nunique() < 2:
+            row["注"] = "人数が足りない、または提案の数がばらつかない"
+            out.append(row)
+            continue
+        r = smf.ols(f"d_{v} ~ C(n_plans) + {v}", data=d.astype(float)).fit(cov_type="HC3")
+        base = d[d["n_plans"] == 1]["d_" + v].mean()
+        for k in (2, 3):
+            t = f"C(n_plans)[T.{float(k)}]"
+            if t in r.params:
+                ci = r.conf_int().loc[t]
+                row[f"{k}つ−1つ"] = float(r.params[t]); row[f"{k}つ−1つ_CI"] = f"{ci[0]:.2f}〜{ci[1]:.2f}"
+        row["1つの平均変化"] = float(base) if len(d[d["n_plans"] == 1]) else np.nan
+        row["注"] = "仮定どおりなら、2つ・3つの変化は1つの1.8倍・2.4倍（向きは同じ）"
+        out.append(row)
+    return pd.DataFrame(out)
+
+
 def run(ctx: Ctx):
     ctx.md("## 手順8 毎日の記録と個人補正", "")
     p = ctx.data_dir / "daily.csv"
@@ -247,3 +275,9 @@ def run(ctx: Ctx):
     ctx.md("### 8e 一人ひとりの変化（RCI）", "",
            "RCI ＝ 変化 ÷（開始時SD × √2 × √(1−α)）。|RCI| > 1.96 を「信頼できる変化」とする（Jacobson & Truax, 1991）。", "",
            *md_table(rc, 2), "")
+
+    npf = n_plans_effect(main)
+    ctx.save_csv("s8f_n_plans.csv", npf)
+    ctx.md("### 8f 提案の数と変化（群B）", "",
+           "アプリは「2つめの提案は0.8倍、3つめは0.6倍」と仮定している（続けにくさ）。選んだ提案の数ごとの変化を比べ、この仮定を確かめる。"
+           "本人が数を選んでいるので、数の違いには人の違いも混ざる（関連として読む）。", "", *md_table(npf, 2), "")

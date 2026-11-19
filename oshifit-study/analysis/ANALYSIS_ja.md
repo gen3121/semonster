@@ -17,6 +17,9 @@ cd oshifit-study
 python -m venv .venv && . .venv/bin/activate      # Windows は .venv\Scripts\activate
 pip install -r analysis/requirements.txt
 
+# 開発者ページの「分析用にまとめて書き出す（ZIP）」で保存したファイルを、そのまま渡せる（展開しなくてよい）
+python -m analysis.run --data ~/oshifit_data/oshifit_data_2027-01-10.zip --out ~/oshifit_results/2027-01-10
+
 # 実データ（フォルダはリポジトリの外）
 python -m analysis.run --data ~/oshifit_data/2027-01-10 --out ~/oshifit_results/2027-01-10
 # 同じこと：python analysis/run.py --data ... --out ...
@@ -49,7 +52,7 @@ python -m pytest analysis/tests -q
 | 5 幸福度の根拠 | WHO-5 が意味のある大きさで上がった人は B に多いか。変化はいつ起きたか。提案を多く実行した人ほど変化したか | WHO-5 が10点以上（0〜100）上がったかの IPW 重み付きロジスティック回帰。線形混合モデル（WHO-5 の3時点：開始時0日・3回目の振り返りの日・最後の調査の日、日数 × 群、人ごとのランダム切片、基準は群C）。用量反応（群B：変化 ~ 実行率 + 開始時、HC3）。媒介（群B：実行率 → 推し疲れの変化 → WHO-5 の変化、パーセンタイル法ブートストラップ） | `s5_improved_logit.json`、`s5_mixed_who5.json`、`s5_dose_response.csv`、`s5_mediation.json`、`s5_who5_trajectory.png` |
 | 6 今回追加（探索） | 性格によって結びつきが違うか。変化を予測する特徴はどれか | 交互作用（変化 ~ 群B × 性格、群B内で 実行率 × 性格、HC3、20本を Holm 補正）。LASSO の安定性選択（B∪C、50%の部分標本 × 200回、全体の LassoCV で選んだ α を固定、選択確率 ≥ 0.6 を「安定」） | `s6_interactions.csv`、`s6_stability_selection.csv` |
 | 7 研究終了後 | 提案ごとの改善の見込み（eff）と見込みの幅（±15・±12）を実測でどう直すか | 縮約（正規分布どうしの精度重み付き平均）：事前＝PLANS の eff（SD 8）、観測＝群Bでその提案を選んだ人のその軸の前後差（SE＝SD/√n、下限 1 点）。参考に提案間のばらつき τ をモーメント法で推定した版も出す。見込みの誤差（観測 − 見込み）の絶対値の80パーセンタイルを新しい半幅の候補にし、今の区間に入った割合も出す | `plan_effects_updated.json`、`s7_plan_effects.csv`、`prediction_interval_updated.json` |
-| 8 毎日の記録と個人補正（2026-11-17 追加） | 毎日の気分・推し疲れはどう動いたか。提案を行った日は気分が高いか。実行は続いたか。本人の記録で直した見込みは当たったか。一人ひとりに信頼できる変化があったか | 8a 線形混合モデル（気分・負担4項目 ~ 日数 × 群、人ごとのランダム切片と傾き。収束しなければ切片だけ）。8b 個人内・個人間に分けた混合モデル（その日の実行の、本人の平均からのずれと本人の平均）。8c 実行（一部も含む）のロジスティック混合モデル（変分ベイズ）と GEE（交換可能相関、頑健SE）。8d アプリと同じ式で個人補正を計算し直し、最後の調査と比べる（平均絶対誤差・80%区間の包含率）。補正の分散 σu・σe を混合モデルで推定。8e RCI（WHO-5・PSS-J、α は逆転をそろえて計算） | `s8a_daily_trend.json`、`s8b_within_between.json`、`s8c_exec_logit.json`、`s8d_prediction_accuracy.csv`、`s8_personal_prediction.csv`、`personal_correction_params.json`、`s8e_rci.csv` |
+| 8 毎日の記録と個人補正（2026-11-17 追加） | 毎日の気分・推し疲れはどう動いたか。提案を行った日は気分が高いか。実行は続いたか。本人の記録で直した見込みは当たったか。一人ひとりに信頼できる変化があったか | 8a 線形混合モデル（気分・負担4項目 ~ 日数 × 群、人ごとのランダム切片と傾き。収束しなければ切片だけ）。8b 個人内・個人間に分けた混合モデル（その日の実行の、本人の平均からのずれと本人の平均）。8c 実行（一部も含む）のロジスティック混合モデル（変分ベイズ）と GEE（交換可能相関、頑健SE）。8d アプリと同じ式で個人補正を計算し直し、最後の調査と比べる（平均絶対誤差・80%区間の包含率）。補正の分散 σu・σe を混合モデルで推定。8e RCI（WHO-5・PSS-J、α は逆転をそろえて計算） | `s8a_daily_trend.json`、`s8b_within_between.json`、`s8c_exec_logit.json`、`s8d_prediction_accuracy.csv`、`s8_personal_prediction.csv`、`personal_correction_params.json`、`s8e_rci.csv`、`s8f_n_plans.csv`（提案の数ごとの変化。2つめ0.8倍・3つめ0.6倍の仮定を確かめる） |
 
 最後に全体をまとめた `分析レポート.md` を出力フォルダに書く。
 

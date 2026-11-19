@@ -29,7 +29,7 @@ REPORT = "分析レポート.md"
 
 def main(argv=None) -> Ctx:
     ap = argparse.ArgumentParser(description="OshiFit 研究版の分析（手順0〜8）")
-    ap.add_argument("--data", required=True, help="baseline.csv などがあるフォルダ")
+    ap.add_argument("--data", required=True, help="baseline.csv などがあるフォルダ、または開発者ページで書き出した ZIP")
     ap.add_argument("--out", required=True, help="結果を書き出すフォルダ（実データを含むのでリポジトリの外に置く）")
     ap.add_argument("--seed", type=int, default=20261112)
     ap.add_argument("--boot", type=int, default=2000, help="媒介分析・α のブートストラップ回数")
@@ -41,6 +41,17 @@ def main(argv=None) -> Ctx:
     a = ap.parse_args(argv)
 
     data, out = Path(a.data), Path(a.out)
+    if data.suffix.lower() == ".zip":   # 開発者ページの「分析用にまとめて書き出す（ZIP）」をそのまま使う
+        import tempfile, zipfile
+        tmp = Path(tempfile.mkdtemp(prefix="oshifit_data_"))
+        with zipfile.ZipFile(data) as z:
+            for m in z.namelist():
+                if "/" in m or "\\" in m or m.startswith("."):
+                    raise SystemExit(f"ZIP の中に想定外のファイルがあります：{m}")
+                if m.endswith((".csv", ".txt")):
+                    z.extract(m, tmp)
+        print(f"ZIP を {tmp} に展開した（分析が終わったら消してよい）")
+        data = tmp
     out.mkdir(parents=True, exist_ok=True)
     ctx = Ctx(data_dir=data, out_dir=out, scheme=Scheme(), seed=a.seed, n_boot=a.boot,
               n_boot_cluster=a.boot_cluster, n_stab=a.stab, prior_sd=a.prior_sd,
