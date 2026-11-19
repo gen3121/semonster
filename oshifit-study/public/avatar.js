@@ -79,6 +79,51 @@
     return pts.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${fill}"/><path d="M${x - r * 0.5} ${y + r * 0.1}Q${x} ${y - r * 0.7} ${x + r * 0.5} ${y + r * 0.1}" stroke="${line}" stroke-width="1.1" fill="none" opacity=".7"/>`).join("");
   }
   const arc = (cx, cy, rx, ry, a0, a1, n) => Array.from({ length: n }, (_, i) => { const a = (a0 + ((a1 - a0) * i) / (n - 1)) * Math.PI / 180; return [Math.round((cx + rx * Math.cos(a)) * 10) / 10, Math.round((cy + ry * Math.sin(a)) * 10) / 10]; });
+  // 細部（毛流れ）：前髪の毛先の位置。つむじ（65,26）から毛先へ細い線を引き、layer は毛先をとがらせる（男性の短い髪型など）
+  const TIPS = {
+    short: { t: [[44, 44], [53, 44], [62, 42], [72, 41], [82, 43], [89, 47]], layer: 1 },
+    vshort: { t: [[46, 42], [56, 39], [66, 38], [76, 39], [85, 42]], layer: 1 },
+    side: { t: [[42, 47], [50, 46], [58, 42], [68, 39], [80, 39], [89, 43]], layer: 1 },
+    mash: { t: [[40, 54], [47, 51], [55, 50], [63, 50], [71, 50], [79, 50], [87, 51], [92, 54]], layer: 1 },
+    wolf: { t: [[42, 51], [50, 47], [58, 47], [66, 46], [73, 42], [82, 44], [90, 49]], layer: 1 },
+    center: { t: [[39, 56], [44, 51], [86, 51], [91, 56]], layer: 1 },   // 分け目の近くは毛先を作らない
+    twoblock: { t: [[44, 46], [52, 46], [60, 48], [68, 48], [76, 45], [85, 44]], layer: 1 },
+    upbang: { t: [[42, 46], [50, 38], [58, 35], [72, 35], [82, 39], [89, 46]] },
+    mlong: { t: [[44, 46], [54, 43], [66, 41], [77, 42], [87, 47]] },
+    sbob: { t: [[42, 50], [50, 46], [58, 44], [67, 42], [76, 43], [86, 47]] },
+    bob: { t: [[40, 53], [48, 48], [56, 48], [64, 50], [72, 47], [80, 44], [88, 49]] },
+    flip: { t: [[40, 53], [48, 48], [56, 48], [64, 50], [72, 47], [80, 44], [88, 49]] },
+    long: { t: [[42, 50], [50, 42], [60, 38], [70, 38], [80, 42], [88, 50]] },
+    wave: { t: [[40, 54], [48, 48], [56, 50], [64, 47], [70, 41], [80, 45], [90, 52]] },
+    mwave: { t: [[40, 54], [48, 48], [56, 49], [62, 47], [70, 42], [80, 45], [90, 52]] },
+    semi: { t: [[40, 52], [48, 46], [56, 48], [64, 47], [72, 42], [82, 45], [90, 51]] },
+    hime: { t: [[40, 50], [48, 50], [56, 50], [65, 50], [74, 50], [82, 50], [90, 50]] },
+    pony: { t: [[42, 50], [50, 46], [60, 43], [70, 42], [80, 44], [88, 48]] },
+    twin: { t: [[40, 52], [48, 47], [56, 48], [64, 46], [70, 43], [80, 46], [90, 51]] },
+    bun: { t: [[42, 48], [52, 44], [62, 42], [72, 42], [82, 44], [89, 48]] },
+    halfup: { t: [[42, 50], [50, 46], [60, 43], [70, 42], [80, 44], [88, 49]] },
+    braid: { t: [[42, 50], [50, 46], [60, 43], [70, 42], [80, 44], [88, 49]] },
+  };
+  function detail(k, c) {
+    const T = TIPS[k];
+    if (!T) return "";
+    const dk = shade(c, 0.66), hl = shade(c, 1.25);
+    const lines = T.t.map(([x, y], i) => i % 2 ? "" : `<path d="M${65 + (x - 65) * 0.25} 28Q${65 + (x - 65) * 0.7} ${(28 + y) / 2 - 4} ${x} ${y - 1}" stroke="${dk}" stroke-width=".9" fill="none" opacity=".55" stroke-linecap="round"/>`).join("");
+    const tufts = T.layer ? T.t.map(([x, y]) => { const o = x < 65 ? -1 : 1; return `<path d="M${x - 2.6} ${y - 1.5}L${x + o * 0.8} ${y + 3.6}L${x + 2.6} ${y - 1.5}Z" fill="${c}"/>`; }).join("") : "";
+    const shine = `<path d="M47 33Q56 28 64 30" stroke="${hl}" stroke-width="2.2" fill="none" opacity=".5" stroke-linecap="round"/><path d="M70 30Q76 30 82 34" stroke="${hl}" stroke-width="1.4" fill="none" opacity=".4" stroke-linecap="round"/>`;
+    return tufts + lines + shine;
+  }
+  // 後ろ髪の毛流れと毛先（長い髪）：[毛先の高さ, 毛先をとがらせるか]
+  const BACKTIPS = { long: [128, 1], hime: [126, 1], semi: [108, 1], halfup: [112, 1], wave: [124, 0], mwave: [108, 0], bob: [92, 0], sbob: [84, 0], flip: [92, 0], wolf: [94, 0], center: [76, 0], mlong: [80, 0] };
+  function backDetail(k, c) {
+    const B = BACKTIPS[k];
+    if (!B) return "";
+    const [by, sharp] = B, dk = shade(c, 0.6);
+    const xs = [[32, 35], [36, 38], [94, 92], [98, 95]];
+    const lines = xs.map(([x0, x1]) => `<path d="M${x0} 66Q${x0 + (x0 < 65 ? -1 : 1)} ${(66 + by) / 2} ${x1} ${by - 5}" stroke="${dk}" stroke-width=".9" fill="none" opacity=".5"/>`).join("");
+    const tips = sharp ? [31, 36, 41, 89, 94, 99].map((x) => `<path d="M${x - 2.5} ${by - 3}L${x} ${by + 3}L${x + 2.5} ${by - 3}Z" fill="${shade(c, 0.82)}"/>`).join("") : "";
+    return lines + tips;
+  }
   // 前髪・頭頂部（顔の上に描く）
   function hairFront(k, c) {
     const hl = shade(c, 1.12), cap = (y = 48) => `M35 ${y}Q35 26 65 25Q95 26 95 ${y}`;
@@ -118,7 +163,7 @@
       skin: `<ellipse cx="56" cy="40" rx="7" ry="3.5" fill="#fff" opacity=".35" transform="rotate(-18 56 40)"/>`,   // スキンヘッド：髪なし、頭のつやだけ
       buzz: `<path d="M38 52Q37 30 65 29Q93 30 92 52Q90 44 84 41Q75 37 65 37Q55 37 46 41Q40 44 38 52Z" fill="${c}" opacity=".85"/>`,   // 頭の形に沿わせる（両端が浮かない）
     }[k] || "";
-    return top + (["buzz", "spiky", "gorin", "skin", "spiral", "center", "upbang", "twoblock", "mohican"].includes(k) ? "" : `<path d="M50 30Q60 27 70 29" stroke="${hl}" stroke-width="2" fill="none" opacity=".55" stroke-linecap="round"/>`);
+    return top + (["buzz", "spiky", "gorin", "skin", "spiral", "center", "upbang", "twoblock", "mohican"].includes(k) || TIPS[k] ? "" : `<path d="M50 30Q60 27 70 29" stroke="${hl}" stroke-width="2" fill="none" opacity=".55" stroke-linecap="round"/>`);
   }
   // おくれ毛：耳の前から頬に沿って下ろす細い毛
   function strands(t, c) {
@@ -207,12 +252,12 @@
     const bags = fat > 0.02 ? `<path d="M47 73Q54 77 61 73" stroke="${shade(sk, 0.72)}" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="${(Math.min(fat, 1) * 0.9).toFixed(2)}"/><path d="M69 73Q76 77 83 73" stroke="${shade(sk, 0.72)}" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="${(Math.min(fat, 1) * 0.9).toFixed(2)}"/>` : "";
     const mth = fx ? (() => { const s = Math.max(0, Math.min(1, fx.smile)), y = 84 + (s - 0.45) * 16; return s >= 0.62 ? `<path d="M56 82Q65 ${y + 6} 74 82Q65 85 56 82Z" fill="#b5525e"/>` : `<path d="M58 84Q65 ${y.toFixed(1)} 72 84" fill="none" stroke="#b5525e" stroke-width="2.2" stroke-linecap="round"/>`; })() : mouth(av.mouth, mood);
     return `<svg width="${size}" height="${H}" viewBox="0 0 130 140" role="img" aria-label="あなたのアバター">
-${hairBack(av.hair, hc)}
+${hairBack(av.hair, hc)}${backDetail(av.hair, hc)}
 <path d="M58 88L72 88L73 104L57 104Z" fill="${shade(sk, 0.9)}"/>
 <path d="M16 140Q18 104 50 100Q57 106 65 106Q73 106 80 100Q112 104 114 140Z" fill="${sh}"/><path d="M50 100Q57 107 65 107Q73 107 80 100L76 99Q70 103 65 103Q60 103 54 99Z" fill="${shade(sh, 0.8)}"/>
 <ellipse cx="36" cy="67" rx="4.5" ry="7" fill="${shade(sk, 0.95)}"/><ellipse cx="94" cy="67" rx="4.5" ry="7" fill="${shade(sk, 0.95)}"/>
 <path d="${facePath(av.face)}" fill="${sk}"/>
-${hairFront(av.hair, hc)}${strands(av.strand || 0, hc)}
+${hairFront(av.hair, hc)}${detail(av.hair, hc)}${strands(av.strand || 0, hc)}
 ${brows(av.brow, shade(hc, 0.85), mood)}${eyes(av.eye, EYE_COLOR[av.eyeColor] || EYE_COLOR[0], mood, sk)}${bags}${nose(av.nose, sk)}${cheek}${mth}${beard(av.beard, hc)}${glasses(av.glasses)}
 </svg>`;
   }
