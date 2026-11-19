@@ -1702,6 +1702,19 @@ function vSignup(){const opts=QN.sections[0].items.find(i=>i.id==="Q2").opts, lo
   $("#su-go").onclick=async()=>{const b=$("#su-go");b.disabled=true;$("#su-msg").textContent="";
     if(STUDY){try{if(!logged)await OFStore.signup($("#su-mail").value.trim(),$("#su-pw").value);await OFStore.begin(S)}catch(e){console.error(e);$("#su-msg").textContent=authMsg(e);b.disabled=false;return}}
     S.consented=true;go("q")};wire()}
+/* 相談先（ホーム・結果・マイページから開く）。番号は厚生労働省のページで確認（2026-11-19）。受付時間は地域や日によって変わる */
+const HELP=[["こころの健康相談統一ダイヤル","0570-064-556","かけた所の都道府県・政令指定都市の、心の健康の電話相談につながります（受付時間は地域で違います。通話料がかかります）"],
+  ["よりそいホットライン","0120-279-338","24時間、無料。暮らしの困りごとや気持ちのつらさを相談できます（岩手・宮城・福島からは 0120-279-226）"],
+  ["#いのちSOS","0120-061-338","24時間、無料。死にたい気持ちや、生きるのがつらいときに相談できます"]];
+function helpHTML(){return`<p class="small">一人で抱えずに、話してみてください。振り返りや毎日のアンケートは休んでかまいません。</p>
+  <ul class="facts">${HELP.map(([n,t,d])=>`<li><b>${n}</b>　<a href="tel:${t.replace(/-/g,"")}" class="mono" style="color:var(--primary);font-weight:700">${t}</a><br><span class="xs muted">${d}</span></li>`).join("")}
+   <li><b>大阪工業大学 学生相談室</b><br><span class="xs muted">大学の学生の方は、学生相談室でも相談できます（予約の方法は大学のポータルで確認してください）</span></li>
+   <li><b>厚生労働省「まもろうよ こころ」</b>　<a href="https://www.mhlw.go.jp/mamorouyokokoro/" target="_blank" rel="noopener" style="color:var(--primary)">相談窓口の一覧</a><br><span class="xs muted">電話のほか、SNS やチャットで相談できる窓口も載っています</span></li></ul>
+  <p class="xs muted">命に危険があるときは、迷わず 119番（救急）に電話してください。電話番号を押すと電話がかけられます。</p>`}
+function helpSheet(){const sc=document.createElement("div");sc.className="scrim";
+  sc.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="hp-t"><div class="grab"></div><h2 id="hp-t">相談先</h2>${helpHTML()}<button class="btn primary block" id="hp-close">閉じる</button></div>`;
+  document.body.appendChild(sc);const close=()=>sc.remove();sc.onclick=e=>{if(e.target===sc)close()};$("#hp-close").onclick=close;sc.addEventListener("keydown",e=>{if(e.key==="Escape")close()});$("#hp-close").focus()}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-help]");if(b){e.preventDefault();helpSheet()}});
 /* 研究の説明（登録画面の「説明はこちら」から開く。入力した内容はそのまま残る）。文はトップページと同じ */
 function consentInfo(){const sc=document.createElement("div");sc.className="scrim";
   sc.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="ci-t"><div class="grab"></div>
@@ -1859,7 +1872,7 @@ function vHome(){if(!S.group)ensureGroup();const sc=S.sc,g=grp(),ps=planIds().ma
    ${predCard()}
    <section class="card"><div class="sec"><h3>回答の予定をカレンダーに入れる</h3></div><p class="small muted">毎日のアンケートの時刻（通知つき）と、振り返り・最後の調査の日を、カレンダーに追加できます。ファイルは端末の中で作られ、どこにも送信されません。</p>
     <label class="row small">毎日の通知の時刻 <input class="field" id="ics-time" type="time" value="21:00" style="width:auto"></label><button class="btn" id="ics">カレンダーに追加（.ics）</button></section>
-   <p class="xs muted">つらい状態が続くときは、振り返りを休んでかまいません。<a href="#mypage" style="color:var(--primary)">相談先を見る</a></p></main>${tabbar("home")}`;
+   <p class="xs muted">つらい状態が続くときは、振り返りを休んでかまいません。<button type="button" class="infolink" data-help style="display:inline;padding:0;font-size:inherit">相談先を見る</button></p></main>${tabbar("home")}`;
   $("#ics").onclick=()=>{const d0=S.decidedAt||now(),f=t=>new Date(t).toISOString().slice(0,10).replace(/-/g,""),ev=[];
     if(g!=="A")for(let i=1;i<=N_CHECK;i++)ev.push([d0+GAP*i*DAY,`OshiFit ${i}回目の振り返り（約2分）`]);
     ev.push([d0+FINAL_DAY*DAY,"OshiFit 最後の調査"]);
@@ -1892,7 +1905,7 @@ function vResult(){if(STUDY&&!S.final)return go("home");if(!S.final){ensureGroup
     ${outBars([["幸福度（WHO-5）",[a.wb,b.wb],true,52,"高いほど良い"],["ストレス度（PSS-J）",[pss100(a),pss100(b)],false,null,"高いほど負担"],["推し活のストレス（推し疲れ）",[a.burnout,b.burnout],false,null,"高いほど負担"]],["開始時","最後"])}</section>
    <section class="delta">${tile("WHO-5（100点換算）",dw,"点",true)}${tile("推し疲れ",db,"点",false)}${tile("ストレス（PSS-J）",dp,"点",false)}</section>
    ${S.final.tot?(()=>{const t=S.final.tot,days=Math.max(1,dayNo()||FINAL_DAY);return`<section class="card"><div class="sec"><h3>28日間の推し活の記録</h3></div><p class="small">記録した日：<b>${t.n}</b>日　お金：<b>${t.yen.toLocaleString("ja-JP")}</b>円　時間：<b>${f1(t.min/60)}</b>時間</p><p class="xs muted">記録した日の平均から、30日あたりにすると お金 約${Math.round(t.n?t.yen/t.n*30:0).toLocaleString("ja-JP")}円・時間 約${f1(t.n?t.min/t.n*30/60:0)}時間（開始時の回答：${esc(S.answers.Q6||"–")}）。記録しなかった日は、記録した日と同じくらいと見なした目安です。</p></section>`})():""}
-   ${b.who5raw<=7?`<p class="callout bad">最近、つらい気持ちが続いていませんか。一人で抱えずに、大学の学生相談室や厚生労働省「まもろうよ こころ」の相談窓口を利用してください。</p>`:""}<p class="callout ${dw>=10?"good":""}">${dw>=10?"幸福度は、意味のある変化とされる大きさ（10点以上）で上がりました。":dw<=-10?"幸福度は10点以上下がりました。つらい状態が続くときは、相談先を利用してください。":"幸福度の変化は10点未満でした。"}</p>
+   ${b.who5raw<=7?`<p class="callout bad">最近、つらい気持ちが続いていませんか。一人で抱えずに、相談してみてください。<button type="button" class="infolink" data-help style="display:inline;padding:0;font-size:inherit">相談先を見る</button></p>`:""}<p class="callout ${dw>=10?"good":""}">${dw>=10?"幸福度は、意味のある変化とされる大きさ（10点以上）で上がりました。":dw<=-10?"幸福度は10点以上下がりました。つらい状態が続くときは、相談先を利用してください。":"幸福度の変化は10点未満でした。"}</p>
    <section class="card"><h3>ご協力ありがとうございました</h3><p class="small muted">${grp()==="B"?"プランB「最適化された推し活」に取り組んだ、約28日間の変化です。":grp()==="A"?"順調な推し活を続けられたかを、開始時と比べて示しています。":"プランA「現在のままの推し活」で続けた、約28日間の変化です。"}研究の結果は全員分を集計し、OshiFitの提案の改善に使います。</p></section></main>${tabbar("home")}`;wire()}
 function vMypage(){if(!S.group)ensureGroup();const g=grp(),ps=planIds().map(planById),p=ps[0]||null;
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">MY PAGE</p><h2>マイページ</h2></div>
@@ -1907,7 +1920,7 @@ function vMypage(){if(!S.group)ensureGroup();const g=grp(),ps=planIds().map(plan
     <div class="kv"><span>最後の調査</span><b>${S.final?"回答済み":"28日目以降"}</b></div></div></section>
    <section class="card"><div class="sec"><h3>データの扱い</h3></div><ul class="facts">
     <li>アバターに写真は使いません</li><li>メールアドレスはログインのためだけに使い、回答は研究用の番号で、研究用のサーバーに保存します</li><li>研究の目的以外には使いません</li></ul></section>
-   <section class="card"><div class="sec"><h3>つらいとき</h3></div><p class="small muted">振り返りは休んでかまいません。一人で抱えずに、大学の学生相談室や、厚生労働省「まもろうよ こころ」の相談窓口を利用してください。</p></section>
+   <section class="card" id="help"><div class="sec"><h3>つらいとき（相談先）</h3></div>${helpHTML()}</section>
    <section class="card"><div class="sec"><h3>問い合わせ先</h3></div><div class="idbox"><span class="small" id="mail" style="font-weight:600;word-break:break-all">m1m02530106@oit.ac.jp</span><button class="btn sm" id="copymail">コピー</button></div><p class="xs muted">問い合わせのときは、研究用の番号も書いてください。</p></section></main>${tabbar("mypage")}`;
   if($("#logout"))$("#logout").onclick=async()=>{await OFStore.logout();S=blank();SV={};go("start")};
   $("#copymail").onclick=()=>{(navigator.clipboard?navigator.clipboard.writeText($("#mail").textContent):Promise.reject()).then(()=>toast("メールアドレスをコピーしました")).catch(()=>{const r=document.createRange();r.selectNodeContents($("#mail"));const s=getSelection();s.removeAllRanges();s.addRange(r);toast("選択しました。コピーしてください")})};

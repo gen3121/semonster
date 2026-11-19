@@ -197,6 +197,12 @@ async function answerAll(page, stop) {
     await page.locator("#daily-card").getByText("今日は回答済み").waitFor();
     assert.match(await page.locator("#stats").innerText(), /1,500円/);
     step("毎日のアンケート（気分・お金・時間など）→ daily/{日付} に保存。ホームに合計が出る");
+    await page.getByRole("button", { name: "相談先を見る" }).click();
+    await page.getByRole("dialog").getByText("0120-279-338").waitFor();
+    assert.equal(await page.evaluate(() => location.hash), "#home", "相談先はホームのまま開く（マイページに移らない）");
+    await page.waitForTimeout(400); await page.screenshot({ path: path.join(OUT, "09_help.png") });
+    await page.locator("#hp-close").click(); assert.equal(await page.getByRole("dialog").count(), 0);
+    step("ホームの「相談先を見る」で、その場で相談先（電話番号など）が開く");
     // 振り返り：4日たつまで押せない
     await page.goto(BASE + "#checkin");
     await page.getByText("日後からできます").waitFor();
