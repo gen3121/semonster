@@ -6,9 +6,9 @@ test("index.html の OSHIFIT_Q と questionnaire.json が一致する", () => {
   const file = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "public", "questionnaire.json"), "utf8"));
   assert.deepEqual(emb, file);
   const n = file.sections.filter((s) => s.id !== "free").reduce((a, s) => a + s.items.length, 0);
-  assert.equal(n, 85, "全項目は85（67＋SHS 4＋PSS-J 14）。短縮版で省くのは short_omit");
+  assert.equal(n, 86, "全項目は86（67＋SHS 4＋PSS-J 14＋推しの名前 Q4b）。短縮版で省くのは short_omit");
   const omit = new Set(file.short_omit);
   const used = JSON.stringify(file.scoring);
   for (const id of omit) assert.ok(!used.includes(`"${id}"`), id + " は採点に使っていない");
-  assert.equal(n - omit.size - 1, 67, "短縮版で答えるのは67項目（性別は登録画面）");
+  assert.equal(n - omit.size - 1, 68, "短縮版で答えるのは68項目（必須67＋任意の推しの名前。性別は登録画面）");
 });

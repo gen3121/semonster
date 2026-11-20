@@ -406,6 +406,7 @@ tr:last-child td{border-bottom:0}
 
 <script src="config.js"></script>
 <script src="store.js"></script>
+<script src="ai.js"></script>
 <script src="avatar.js"></script>
 <script src="settings.js"></script>
 <script src="plans.js"></script>
@@ -479,6 +480,15 @@ tr:last-child td{border-bottom:0}
       "スポーツ選手",
       "その他"
      ]
+    },
+    {
+     "id": "Q4b",
+     "type": "text",
+     "short": true,
+     "optional": true,
+     "text": "主たる推しの名前・チーム名など（任意）",
+     "ph": "例：阪神タイガース",
+     "note": "提案の文をあなたの推しに合わせるために使います。この回答と各軸の点数を AI（Google の Gemini）に送って文を作ります。あなたの名前やメールアドレスは送りません。"
     },
     {
      "id": "Q5",
@@ -1225,8 +1235,9 @@ function plansFor(sc,A){const b=big5(A);
 /* 予算プランは、本人の金額の区分（Q6）から上限の目安（区分の約8割）を出す */
 const SPEND_CAP={"5,000円未満":3000,"5,000円〜1万円未満":6000,"1万円〜3万円未満":15000,"3万円〜5万円未満":30000,"5万円以上":45000};
 const yen=n=>n.toLocaleString("ja-JP")+"円";
-function planTitle(p){const c=SPEND_CAP[S.answers.Q6];return p.id==="budget"&&c?`推し活の予算を「月${yen(c)}まで」にする`:p.title}
-function planHow(p){const c=SPEND_CAP[S.answers.Q6];return p.id==="budget"&&c?`今は「${S.answers.Q6}」。その約8割の${yen(c)}を月の上限にし、先に予算を決めてから使う。超えそうなら翌月に回す。金額は目安なので、自分で決め直してもよい`:p.how}
+const aiOf=p=>{const o=(S.plans||[]).find(x=>x.id===p.id);return o&&o.ai||null};
+function planTitle(p){const a=aiOf(p);if(a)return a.title;const c=SPEND_CAP[S.answers.Q6];return p.id==="budget"&&c?`推し活の予算を「月${yen(c)}まで」にする`:p.title}
+function planHow(p){const a=aiOf(p);if(a)return a.how;const c=SPEND_CAP[S.answers.Q6];return p.id==="budget"&&c?`今は「${S.answers.Q6}」。その約8割の${yen(c)}を月の上限にし、先に予算を決めてから使う。超えそうなら翌月に回す。金額は目安なので、自分で決め直してもよい`:p.how}
 const DONATE_HTML=`<div class="note"><b>寄付先の例（2026年11月時点・送る前に各団体の受付条件を確認）</b><br>
 本・CD・DVD・ゲーム：チャリボン（買取金額をNPOなどへ寄付、1箱から送料無料）／ブックオフ「キモチと。」（宅配買取の金額を約100団体へ寄付）<br>
 ぬいぐるみ・おもちゃ・文具：国際子供友好協会（途上国の子どもへ手渡し）／ワールドギフト（寄付金が必要、途上国へ）／もったいないジャパン（国内外の福祉団体へ）<br>
@@ -1372,14 +1383,27 @@ const allIt=QN.sections.flatMap(s=>s.items.map(i=>({...i,sec:s})));
 function midVal(it){const s=it.sec;if(it.type==="number")return 21;if(it.type==="choice")return it.opts[Math.min(2,it.opts.length-1)];if(it.type==="text")return null;if(it.id==="Q42")return 2;
   const L=it.scale||s.scale,b=s.base??1;return b+Math.floor(L.length/2)}
 function fillBase(){let n=0;allIt.forEach(it=>{if(S.answers[it.id]==null&&it.type!=="text"){const v=midVal(it);if(v!=null){S.answers[it.id]=v;n++}}});if(n)S.filled=true;S.avatar=S.avatar||defAv();return n}
-function ensureBase(){if(!STUDY)fillBase();S.sc=scores(S.answers);if(!S.plans)S.plans=plansFor(S.sc,S.answers);return S.sc}
+/* 提案文を推しに合わせる（ai.js）。型はそのまま、題名とやり方だけ AI の文にする。群が決まった後は変えない */
+let AI_RUN=null;
+function aiStart(){if(AI_RUN||!window.OFAI||!OFAI.enabled()||S.group||!S.plans||!S.plans.length||S.plans.some(x=>x.ai||x.aiTried))return;
+  const sc=S.sc,A=S.answers,cap=SPEND_CAP[A.Q6];
+  const ctx={genre:A.Q4,oshi:String(A.Q4b||"").trim().slice(0,40),multi:A.Q5b,spend:A.Q6,
+    axes:SC.axes.map(a=>`${a.name} ${r0(sc[a.key])}`).join("、"),
+    plans:S.plans.map(x=>{const p=planById(x.id);return{id:p.id,title:p.id==="budget"&&cap?`推し活の予算を「月${yen(cap)}まで」にする`:p.title,how:p.how,axisName:AXNAME[p.axis]||p.axis,score:r0(sc[p.axis]),cap:p.id==="budget"&&cap?yen(cap):null}})};
+  const ids=ctx.plans.map(p=>p.id).join(),at=now();
+  AI_RUN=OFAI.tailor(ctx,30000).then(r=>{AI_RUN=null;
+    if(S.group||!S.plans||S.plans.map(x=>x.id).join()!==ids)return;   // 待っている間に群が決まった・提案が変わった
+    S.plans=S.plans.map(x=>r&&r.byId[x.id]?{...x,ai:{...r.byId[x.id],model:r.model,v:r.version,at}}:{...x,aiTried:true});
+    if(STUDY&&OFStore.offer)OFStore.offer(S);
+    if(location.hash==="#future"&&!S.group)render()});}
+function ensureBase(){if(!STUDY)fillBase();S.sc=scores(S.answers);if(!S.plans)S.plans=plansFor(S.sc,S.answers);aiStart();return S.sc}
 function ensureGroup(){ensureBase();if(!S.group&&!STUDY){S.group="B";S.plan={id:S.plans[0].id,ids:S.plans.slice(0,2).map(x=>x.id),accepted:true};S.decidedAt=now()-12*DAY}}
 
 /* ---------- 質問を1問ずつ（選ぶと次へ） ---------- */
 function mkItem(it,s){const base={id:it.id,text:it.text,sec:s.title,lead:s.lead};
   if(it.type==="number")return{...base,kind:"number"};
   if(it.type==="choice")return{...base,kind:"list",labels:it.opts,vals:it.opts};
-  if(it.type==="text")return{...base,kind:"text",optional:!!it.optional};
+  if(it.type==="text")return{...base,kind:"text",optional:!!it.optional,short:!!it.short,ph:it.ph,note:it.note};
   const L=it.scale||s.scale,b=s.base??1;return{...base,kind:L.length===7?"circle":"list",labels:L,vals:L.map((_,j)=>b+j)}}
 /* 質問の数を減らす（config.js の OSHIFIT_QSET="short"）。採点・提案・分析に使わない項目を省き、性別（Q2）は新規登録で聞く */
 const OMIT=new Set(["Q2",...((window.OSHIFIT_QSET||"short")==="short"?(QN.short_omit||[]):[])]);
@@ -1514,7 +1538,7 @@ function vSurvey(key,items,store,title,ctx,onDone,stepIdx){clearTimeout(ADV);ADV
      <p class="chosen" aria-live="polite">${has?esc(it.labels[it.vals.indexOf(val)]||`${it.vals.indexOf(val)+1}`):""}</p>`}
   else if(it.kind==="list"){input=`<div class="olist" role="radiogroup" aria-label="${esc(it.text)}">${it.labels.map((l,j)=>`<button class="obtn" role="radio" data-j="${j}" aria-checked="${val===it.vals[j]}"><span class="dot" aria-hidden="true"></span><span>${esc(l)}</span></button>`).join("")}</div>`}
   else if(it.kind==="number"){input=`<input class="field" id="f-num" type="number" inputmode="numeric" min="${it.min??18}" max="${it.max??99}" value="${has?val:""}" placeholder="${it.ph||"例：21"}">${it.unit?`<p class="xs muted">単位：${esc(it.unit)}</p>`:""}`}
-  else input=`<textarea class="field" id="f-text" maxlength="400" placeholder="自由にお書きください">${esc(val||"")}</textarea>`;
+  else input=(it.short?`<input class="field" id="f-text" type="text" maxlength="40" autocomplete="off" placeholder="${esc(it.ph||"")}" value="${esc(val||"")}">`:`<textarea class="field" id="f-text" maxlength="400" placeholder="自由にお書きください">${esc(val||"")}</textarea>`)+(it.note?`<p class="xs muted" style="margin-top:8px">${esc(it.note)}</p>`:"");
   const auto=it.kind==="circle"||it.kind==="list";
   app.innerHTML=header(ctx)+`<main class="stack" style="padding-top:14px">${stepIdx!=null?stepper(stepIdx):""}
    <div class="qprog"><div class="meta"><span>${esc(it.sec)}</span><span class="mono">${st.i+1} / ${n}</span></div><div class="bar"><i style="width:${r0((st.i)/n*100)}%"></i></div><div class="meta"><span>${esc(title)}</span><span>あと約${left}分</span></div>${STUDY&&key==="q"?`<p class="xs muted" id="autosave" style="margin:2px 0 0">回答は自動で保存されています。途中でやめても、ログインすれば続きから答えられます。</p>`:""}</div>
@@ -1761,7 +1785,7 @@ function vLogin(){app.innerHTML=header()+`<main class="stack" style="padding-top
     catch(e){console.error(e);msg(authMsg(e),true);b.disabled=false}};wire()}
 
 function vQ(){if(!SV.q&&STUDY){const i=BASE_ITEMS.findIndex(it=>S.answers[it.id]==null&&!it.optional);SV.q={i:i<0?BASE_ITEMS.length-1:i}} // 途中から再開
-  vSurvey("q",BASE_ITEMS,S.answers,"質問に答える",null,()=>{S.sc=scores(S.answers);S.plans=null;S.baselineDone=true;if(STUDY)OFStore.baseline(S);toast("質問はこれで終わりです");go("avatar")},0)}
+  vSurvey("q",BASE_ITEMS,S.answers,"質問に答える",null,()=>{S.sc=scores(S.answers);S.plans=null;S.baselineDone=true;if(STUDY)OFStore.baseline(S);if(!isGood(S.sc).ok)ensureBase();toast("質問はこれで終わりです");go("avatar")},0)}
 let AVTAB="hair";
 function vAvatar(){const A=window.OFAvatar,gender=S.answers.Q2;
   if(!S.avatar||S.avatar.v!==2)S.avatar=A.defaults(gender);const av=S.avatar;av.gender=gender||null;
@@ -1822,13 +1846,17 @@ function pbar(name,a,b,hw,higher){const d=b-a,good=higher?d>=0:d<=0,col=good?"va
   const row=(lab,v,c,w)=>`<div class="pb"><span>${lab}</span><div class="pt">${w?`<span class="rg" style="left:${clamp(v-w,0,100)}%;width:${clamp(v+w,0,100)-clamp(v-w,0,100)}%;background:${c}"></span>`:""}<span class="pm" style="left:calc(${clamp(v,0,100)}% - 1.5px);background:${c}"></span></div></div>`;
   return`<div><div class="h"><span>${name}</span><span class="vals"><span class="muted">${r0(a)}</span> → <b style="color:${col}">${r0(b)}</b></span></div>${row("プランA",a,"var(--faint)",hw)}${row("プランB",b,col,hw)}</div>`}
 let PSEL=new Set();
+/* AI の文のときは、そのことと、もとの型（根拠はこの型のもの）を示す（D4） */
+function aiNote(p){const a=aiOf(p),base=planById(p.id);
+  if(a)return`<p class="xs muted aimark">あなたの推しに合わせて、AI（Google の Gemini）が書いた文です。もとの提案：「${esc(base.title)}」。下の根拠は、もとの提案のものです。</p>`;
+  if(AI_RUN&&!S.group)return`<p class="xs muted aimark" aria-live="polite">あなたの推しに合わせた文を作っています…</p>`;return""}
 function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">群A（今のままで順調）のため、提案はありません。</p><a class="btn" href="#home">ホームへ</a></main>`;wire();return}
   app.className="app pc2";PI=clamp(PI,0,S.plans.length-1);const sel=S.plans[PI],p=planById(sel.id);
   const chosen=S.plans.map(x=>x.id).filter(id=>PSEL.has(id)),ids=chosen.length?chosen:[p.id],pr=predictMulti(sc,ids),lab=chosen.length?`選んだ${chosen.length}つ`:`提案${PI+1}だけ`;
   const extra=(p.id==="donate"?DONATE_HTML:"")+(p.id==="event"?ticketHTML(A):"");
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(3)}<div><p class="eyebrow view-eyebrow">TWO FUTURES</p><h2>28日後の2つの未来</h2><p class="small muted">プランA「現在のままの推し活」と、提案を取り入れたプランB「最適化された推し活」を比べます。<b>試したい提案はいくつ選んでもかまいません。</b></p></div>
    <div class="cols"><div class="col"><div class="segs" role="group" aria-label="提案">${S.plans.map((x,i)=>`<button class="seg" data-pi="${i}" aria-pressed="${i===PI}">${PSEL.has(x.id)?"✓ ":""}提案${i+1}</button>`).join("")}</div>
-   <section class="card plan"><h3 style="font-size:17px">${esc(planTitle(p))}</h3><p class="small">${esc(planHow(p))}</p>${extra}<p class="why">選んだ理由：${esc(sel.why)}</p>${evidenceHTML(p.id)}
+   <section class="card plan"><h3 style="font-size:17px">${esc(planTitle(p))}</h3><p class="small">${esc(planHow(p))}</p>${aiNote(p)}${extra}<p class="why">選んだ理由：${esc(sel.why)}</p>${evidenceHTML(p.id)}
     <label class="pickrow"><input type="checkbox" id="pickThis" ${PSEL.has(p.id)?"checked":""}> この提案を試す</label></section>
    <div class="row" style="justify-content:space-between;flex-wrap:wrap"><span class="small">選んだ提案：<b>${chosen.length}</b>／${S.plans.length}</span><button class="btn sm" id="pickAll">${chosen.length===S.plans.length?"選択をすべて外す":"すべての提案を選ぶ"}</button></div>
    <section class="futures"><div class="fut"><span class="lab">プランA　現在のままの推し活</span>${avatar(S.avatar,faceOf(sc),116)}</div><div class="fut b"><span class="lab">プランB　最適化された推し活（${lab}）</span>${avatar(S.avatar,faceOf(pr.B,sc),116)}</div></section></div><div class="col side">

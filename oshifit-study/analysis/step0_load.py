@@ -63,7 +63,7 @@ def run(ctx: Ctx):
     trial = read_csv(d / "trial.csv") if (d / "trial.csv").exists() else pd.DataFrame(columns=["pid"])
     free_n = len(read_csv(d / "free.csv")) if (d / "free.csv").exists() else 0
 
-    num_items = [c for c in S.all_items if c not in ("Q2", "Q3", "Q4", "Q5", "Q5b", "Q6", "Q62")]
+    num_items = [c for c in S.all_items if c not in ("Q2", "Q3", "Q4", "Q4b", "Q5", "Q5b", "Q6", "Q62")]
     base = to_num(base, num_items + ["pilot"] + SCORE_KEYS + [c for c in base.columns if c.startswith("pred_")])
     trial = to_num(trial, [c for c in trial.columns if c not in ("pid", "group", "final_at")])
     weekly = to_num(weekly, [c for c in weekly.columns if c not in ("pid", "group", "at")])

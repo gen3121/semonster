@@ -38,7 +38,7 @@ const ST = window.OSHIFIT_SETTINGS;
 let CFG = ST.apply({}).cfg, MG = { proto: null, ops: null, history: [], events: [], cfgRejected: [], plans: ST.mergePlans(window.OSHIFIT_PLANS, []).plans, planDocs: new Set(), planRejected: [], notices: [], notes: {} };
 const SC = ["wb", "joy", "sleep", "money", "duty", "compare", "burnout", "who5raw", "shs", "pss"];
 const items = (ids) => QN.sections.filter((s) => ids.includes(s.id)).flatMap((s) => s.items.map((i) => i.id));
-const BASE_ITEMS = QN.sections.flatMap((s) => s.items.map((i) => i.id)).filter((id) => id !== "Q62");
+const BASE_ITEMS = QN.sections.flatMap((s) => s.items.map((i) => i.id)).filter((id) => id !== "Q62" && id !== "Q4b"); // 自由記述は free.csv
 const FINAL_ITEMS = [...items(["who5", "shs", "pss"]), "Q29", "Q30", "Q31", "Q32", "Q33", "Q34", "Q39", "Q44", "Q45", "Q46", "Q47", "Q48", "Q49", "Q50", "Q51", "J1", "J2", "K1", "K2", "K3", "K4", "K5"];
 
 const ERR = { "auth/operation-not-allowed": "このログイン方法が Firebase で有効になっていません（Authentication →「ログイン方法」で有効にしてください）", "auth/popup-blocked": "ポップアップが止められました。このサイトのポップアップを許可してください", "auth/popup-closed-by-user": "ログインの画面が閉じられました", "auth/unauthorized-domain": "このドメインが Firebase の「承認済みドメイン」にありません", "auth/account-exists-with-different-credential": "このメールアドレスは別のログイン方法で登録済みです", "auth/invalid-action-code": "ログイン用のリンクが古いか、使用済みです。もう一度送ってください" };
@@ -339,7 +339,7 @@ export function tables(P) {
   const baseCols = ["pid", "uid", "pilot", "exclude", "note", "cfg_version", "qset", "withdrawn", "withdrawn_at", "created_at", "decided_at", "group", "plans_offered", "plans_chosen", "avatar_source", ...BASE_ITEMS, ...SC,
     ...["wb", "joy", "sleep", "money", "duty", "compare", "burnout", "pss"].map((k) => "pred_B_" + k), "pred_hw", "pred_hwWb"];
   const baseline = P.filter((p) => p.baselineDone).map((p) => {
-    const r = { pid: p.pid, uid: p.uid, pilot: p.pilot, exclude: p.note?.exclude ? 1 : 0, note: p.note?.text || "", cfg_version: p.cfgVersion ?? "", qset: p.qset || "", withdrawn: p.withdrawn ? 1 : 0, withdrawn_at: iso(p.withdrawnAt), created_at: iso(p.createdAt), decided_at: iso(p.decidedAt), group: p.group || "", plans_offered: (p.plansOffered || []).map((x) => x.id).join(";"), plans_chosen: (p.planIds || []).join(";"), avatar_source: p.avatar?.source || "" };
+    const r = { pid: p.pid, uid: p.uid, pilot: p.pilot, exclude: p.note?.exclude ? 1 : 0, note: p.note?.text || "", cfg_version: p.cfgVersion ?? "", qset: p.qset || "", withdrawn: p.withdrawn ? 1 : 0, withdrawn_at: iso(p.withdrawnAt), created_at: iso(p.createdAt), decided_at: iso(p.decidedAt), group: p.group || "", plans_offered: (p.plansOffered || []).map((x) => x.id).join(";"), plans_ai: (p.plansOffered || []).map((x) => (x.ai ? 1 : 0)).join(";"), ai_model: ((p.plansOffered || []).find((x) => x.ai) || {}).ai?.model || "", plans_chosen: (p.planIds || []).join(";"), avatar_source: p.avatar?.source || "" };
     BASE_ITEMS.forEach((id) => (r[id] = p.answers?.[id])); SC.forEach((k) => (r[k] = p.scores?.[k]));
     if (p.pred) { Object.keys(p.pred.B || {}).forEach((k) => (r["pred_B_" + k] = p.pred.B[k])); r.pred_hw = p.pred.hw; r.pred_hwWb = p.pred.hwWb; }
     return r;
@@ -355,7 +355,7 @@ export function tables(P) {
   });
   const dCols = ["pid", "group", "date", "day", "at", "mood", "yen", "minutes", "joy", "Q44", "Q45", "Q47", "Q48", ...PLANS.map((x) => "did_" + x)];
   const daily = P.flatMap((p) => (p.daily || []).map((c) => ({ ...c, pid: p.pid, group: p.group, at: iso(c.at) })));
-  const free = P.flatMap((p) => [p.answers?.Q62 ? { pid: p.pid, where: "baseline_Q62", text: p.answers.Q62 } : null, p.final?.answers?.how ? { pid: p.pid, where: "final_how", text: p.final.answers.how } : null].filter(Boolean));
+  const free = P.flatMap((p) => [p.answers?.Q4b ? { pid: p.pid, where: "baseline_Q4b", text: p.answers.Q4b } : null, ...(p.plansOffered || []).filter((x) => x.ai).map((x) => ({ pid: p.pid, where: "ai_plan_" + x.id, text: x.ai.title + "／" + x.ai.how })), p.answers?.Q62 ? { pid: p.pid, where: "baseline_Q62", text: p.answers.Q62 } : null, p.final?.answers?.how ? { pid: p.pid, where: "final_how", text: p.final.answers.how } : null].filter(Boolean));
   return { daily: [daily, dCols], baseline: [baseline, baseCols], weekly: [weekly, wkCols], trial: [trial, trCols], free: [free, ["pid", "where", "text"]] };
 }
 function download(name, P) {

@@ -30,6 +30,8 @@ async function setup(ctx) {
   await ctx.route("https://fonts.googleapis.com/**", (r) => r.fulfill({ body: "", contentType: "text/css" }));
   await ctx.route("**/config.js", (r) => r.fulfill({ body: TEST_CONFIG, contentType: "text/javascript" }));
   // 端末の時計だけを進める（振り返りの4日ルールの確認用）。サーバーの時刻は進まない
+  // 提案文の AI（ai.js）は外部に送らず、決まった文を返す見本に置き換える。送る文はあとで確かめる
+  await ctx.addInitScript(() => { window.OSHIFIT_AI_MOCK = async (prompt, ids) => { window.__aiPrompt = prompt; await new Promise((r) => setTimeout(r, 300)); return JSON.stringify({ items: ids.map((id) => ({ id, title: "阪神の試合の日の" + id + "をする", how: "甲子園の中継を見る日は、" + id + "のやり方で整える" })).concat([{ id: ids[0], title: "重複", how: "重複" }, { id: "x", title: "https://bad", how: "x" }]) }); }; });
   await ctx.addInitScript(() => { const off = +(localStorage.getItem("__e2e_offset") || 0); const real = Date.now.bind(Date); Date.now = () => real() + off; });
 }
 
@@ -39,6 +41,7 @@ async function answerAll(page, stop) {
     const num = page.locator("#f-num");
     if (await num.count()) { await num.fill("21"); await page.locator("#sv-next").click(); continue; }
     const tx = page.locator("#f-text");
+    if (await tx.count() && (await page.locator(".qid").innerText().catch(() => "")).trim() === "Q4b") { await tx.fill("阪神タイガース"); }
     if (await tx.count()) { await page.locator("#sv-next").click({ timeout: 3000 }).catch(() => {}); continue; }   // 押す前に画面が変わることがある
     if (!(await page.locator(".qid").count())) { await page.waitForTimeout(200); continue; }   // 画面の切り替え中
     const id = (await page.locator(".qid").innerText()).trim();
@@ -117,7 +120,7 @@ async function answerAll(page, stop) {
   assert.notEqual((await page.locator(".qid").innerText()).trim(), q0, "少し待つと次へ進む");
   assert.match(await page.locator("#autosave").innerText(), /自動で保存/);
   step("最初の質問：選んでから約0.8秒は選び直せる（その後に次へ）。「自動で保存されています」と表示");
-  for (let i = 0; i < 10; i++) { await page.locator("[data-j]").nth(1).click(); await page.waitForTimeout(950); }
+  for (let i = 0; i < 10; i++) { if (await page.locator("#f-text").count()) { await page.locator("#f-text").fill("阪神タイガース"); await page.locator("#sv-next").click(); await page.waitForTimeout(300); continue; } await page.locator("[data-j]").nth(1).click(); await page.waitForTimeout(950); }   // Q4b（推しの名前）は入力して次へ
   await page.waitForTimeout(2200);                                 // 途中経過は1.5秒まとめて送る
   d = await read((db) => getDoc(doc(db, "participants", uid)));
   const savedN = Object.keys(d.data().answers).length;
@@ -138,7 +141,7 @@ async function answerAll(page, stop) {
   await answerAll(page, async () => (await page.locator("#av-go").count()) > 0);
   for (let i = 0; i < 25; i++) { d = await read((db) => getDoc(doc(db, "participants", uid))); if (d.data().baselineDone) break; await page.waitForTimeout(200); }
   assert.equal(d.data().baselineDone, true);
-  const keys = Object.keys(d.data().answers).filter((k) => k !== "Q62");
+  const keys = Object.keys(d.data().answers).filter((k) => k !== "Q62" && k !== "Q4b");
   assert.equal(keys.length, 68, "短縮版：67項目＋性別が保存される");
   assert.ok(!keys.includes("Q35") && !keys.includes("Q55"), "省いた項目は聞かない");
   assert.ok(d.data().scores && d.data().scores.pss != null && d.data().scores.wb != null);
@@ -167,6 +170,11 @@ async function answerAll(page, stop) {
       assert.equal(await page.locator("#combos .chip.good").count(), 1, "おすすめの組み合わせは1つ");
       await page.screenshot({ path: path.join(OUT, "03_combos.png"), fullPage: true });
     }
+    await page.waitForFunction(() => document.querySelector(".aimark") && /AI/.test(document.querySelector(".aimark").textContent), null, { timeout: 8000 });
+    assert.match(await page.locator(".card.plan h3").innerText(), /^阪神の試合の日の/, "提案の題名が推しに合わせた文になる");
+    const pr = await page.evaluate(() => window.__aiPrompt);
+    assert.ok(pr.includes("阪神タイガース") && pr.includes("推しのジャンル"), "推しの名前とジャンルを送る");
+    assert.ok(!pr.includes("@") && !pr.includes("Q62"), "メールアドレスや自由記述は送らない");
     await page.locator("#pickThis").check();
     await page.locator("#pickB").click();
     group = "B";
@@ -179,7 +187,9 @@ async function answerAll(page, stop) {
   assert.equal(p.avatar.hair, "spiky"); assert.equal(p.avatar.hairColor, 30); assert.equal(p.avatar.shirt, 5); assert.equal(p.avatar.beard, 1); assert.equal(p.avatarDone, true);
   assert.equal(JSON.stringify(p.avatar).includes("data:"), false, "写真は保存しない");
   assert.ok(p.decidedAt && p.decidedAt.toMillis(), "決めた時刻（サーバー）");
-  if (group === "B") { assert.ok(p.planIds.length >= 1); assert.ok(p.pred && p.pred.B && p.pred.hw); assert.ok(p.plansOffered.length >= 1); }
+  if (group === "B") { assert.ok(p.planIds.length >= 1); assert.ok(p.pred && p.pred.B && p.pred.hw); assert.ok(p.plansOffered.length >= 1);
+    assert.ok(p.plansOffered.every((x) => x.ai && x.ai.title.startsWith("阪神の試合の日の") && x.ai.model === "mock"), "推しに合わせた文と型を、提示した提案として残す");
+    assert.equal(p.answers.Q4b, "阪神タイガース"); }
   step(`群${group}に決まり、群・提案・見込み・時刻が保存される`);
   { const pd = await read((db) => getDoc(doc(db, "participants", uid))); assert.equal(pd.data().cfgVersion, 3, "使った設定の版が残る"); assert.equal(pd.data().cfgUsed.groupA.axisMin, 60, "型の違う値は初期値"); }
   step("群を決めたときの実験の条件（study/protocol の版と値）が、参加者の記録に残る");

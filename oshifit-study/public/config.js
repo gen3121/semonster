@@ -19,5 +19,10 @@ window.OSHIFIT_FIREBASE = {
 // Microsoft でのログインに使う Azure のテナント（大阪工業大学）。Azure のアプリが「この組織ディレクトリのみ」のときに必要。
 // 学外の人の Microsoft アカウントも使えるようにするなら、Azure のアプリを「任意の組織ディレクトリと個人の Microsoft アカウント」にして、ここを null にする
 window.OSHIFIT_MS_TENANT = "636389c0-b95c-4828-b98f-f9fcb8d9383a";
+// 提案文を推しに合わせる AI（ai.js）。Firebase AI Logic の Gemini Developer API（無料枠・Spark プランのまま）
+//   設定：Firebase コンソール →「AI Logic」→「使ってみる」→「Gemini Developer API」を選ぶ
+//   appCheckKey：reCAPTCHA v3 のサイトキー（公開してよい値）。App Check に登録すると、このサイト以外から無料枠を使われない
+//   使えないとき（設定前・上限・時間切れ）は、承認済みの固定の文を出す。enabled:false で AI を使わない
+window.OSHIFIT_AI = { enabled: true, model: "gemini-4-hydrogen", appCheckKey: "" };
 // テスト用：エミュレーターにつなぐ（本番では null のまま）
 window.OSHIFIT_EMULATOR = null; // 例 { auth: "http://127.0.0.1:9099", firestore: ["127.0.0.1", 8080] }

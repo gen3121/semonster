@@ -12,7 +12,7 @@ participants/{uid}                 … 参加者1人（uid は Firebase Authenti
   createdAt      サーバー時刻（同意して始めた時）
   answers        開始時の回答（Q2 性別は新規登録の画面で聞く。短縮版では questionnaire.json の short_omit の17項目は空） {Q1: 21, Q2: "女性", …, W1: 3, H1: 5, P1: 2, Q62: "自由記述"}
   scores         開始時の得点 {wb, joy, sleep, money, duty, compare, burnout, who5raw, shs, pss}
-  plansOffered   [{id, why}]（示した提案、最大3つ）
+  plansOffered   [{id, why, ai?, aiTried?}]（示した提案、最大3つ）。ai＝推しに合わせて AI が書いた文 {title, how, model, v, at}（表示した文）。aiTried:true＝AI が使えず固定の文を出した
   group          "A" | "B" | "C"（一度決めたら変えられない）
   planIds        群B：選んだ提案の id の配列。群C：示した提案の先頭1つ。群A：[]
   decidedAt      サーバー時刻（群が決まった時）。「開始からの日数」の起点
@@ -66,7 +66,7 @@ pilots/{pid}                       … プレ実験の参加ID（研究者が入
 
 ### baseline.csv（1行1人）
 `pid, uid, pilot(0/1), exclude(0/1：notes で除外), note（研究者のメモ）, cfg_version, qset, withdrawn(0/1), withdrawn_at, created_at, decided_at, group, plans_offered(;区切り), plans_chosen(;区切り), avatar_source,`
-開始時の全項目 `Q1 … Q61, W1 … W5, H1 … H4, P1 … P14`（Q62 の自由記述は free.csv に分ける）、
+開始時の全項目 `Q1 … Q61, W1 … W5, H1 … H4, P1 … P14`（Q4b 推しの名前と Q62 の自由記述は free.csv に分ける）、
 得点 `wb, joy, sleep, money, duty, compare, burnout, who5raw, shs, pss`、
 見込み `pred_B_wb, pred_B_joy, pred_B_sleep, pred_B_money, pred_B_duty, pred_B_compare, pred_B_burnout, pred_B_pss, pred_hw, pred_hwWb`
 
@@ -87,7 +87,7 @@ weekly.csv には `sumYen, sumMin, nDaily, adjBurn, adjBurnHw, adjWb, adjWbHw, a
 書き出したときの実験の条件（今の値・版・固定中か）、変更の記録と固定の記録、運用の基準、受け付けなかった項目と、提案の一覧（初期値と plans を混ぜたもの）。分析の手順7は plans.json があればそれを使う。
 
 ### free.csv（自由記述。個人が特定される内容がないか確認してから使う）
-`pid, where(baseline_Q62 / final_how), text`
+`pid, where(baseline_Q4b / ai_plan_{提案id} / baseline_Q62 / final_how), text`（ai_plan は「題名／やり方」）。trial.csv に plans_ai（提案ごとに AI の文なら1）と ai_model
 
 ## 尺度と得点（questionnaire.json の scoring と同じ）
 - 気持ちと生活・したくなるとき：7件法（1〜7）。5つの要素は (平均−1)÷6×100、負担の軸（sleep, money, duty, compare）は 100 から引いて「高いほど良い」にそろえる
