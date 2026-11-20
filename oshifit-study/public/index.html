@@ -493,7 +493,7 @@ tr:last-child td{border-bottom:0}
      "optional": true,
      "text": "主たる推しの名前・チーム名など（任意）",
      "ph": "例：阪神タイガース",
-     "note": "提案の文をあなたの推しに合わせるために使います。この回答と各軸の点数を AI（Google の Gemini）に送って文を作ります。あなたの名前やメールアドレスは送りません。"
+     "note": "提案の文をあなたの推しに合わせるために使います。この回答と、性格・推し活の中身の割合・各軸の点数を AI（Google の Gemini）に送って文を作ります。あなたの名前やメールアドレスは送りません。"
     },
     {
      "id": "Q5",
@@ -1393,11 +1393,14 @@ function fillBase(){let n=0;allIt.forEach(it=>{if(S.answers[it.id]==null&&it.typ
 let AI_RUN=null;
 function aiStart(){if(AI_RUN||!window.OFAI||!OFAI.enabled()||S.group||!S.plans||!S.plans.length||S.plans.some(x=>x.ai||x.aiTried))return;
   const sc=S.sc,A=S.answers,cap=SPEND_CAP[A.Q6];
-  const ctx={genre:A.Q4,oshi:String(A.Q4b||"").trim().slice(0,40),multi:A.Q5b,spend:A.Q6,
+  const b5=big5(A),lv=v=>v>=65?"高い":v<=35?"低い":"ふつう",freqSec=QN.sections.find(s=>s.id==="freq"),FL=freqSec.scale;
+  const ctx={genre:A.Q4,oshi:String(A.Q4b||"").trim().slice(0,40),multi:A.Q5b,spend:A.Q6,money:r0(sc.money),
     axes:SC.axes.map(a=>`${a.name} ${r0(sc[a.key])}`).join("、"),
+    traits:b5?[["外向性","E"],["協調性","A"],["勤勉性","C"],["情緒の揺れやすさ","N"],["開放性","O"]].map(([n,k])=>`${n} ${b5[k]}（${lv(b5[k])}）`).join("、"):"",
+    acts:freqSec.items.filter(i=>A[i.id]>=3).sort((x,y)=>A[y.id]-A[x.id]).map(i=>`${i.text}（${FL[A[i.id]-1]}）`).join("／"),
     plans:S.plans.map(x=>{const p=planById(x.id);return{id:p.id,title:p.id==="budget"&&cap?`推し活の予算を「月${yen(cap)}まで」にする`:p.title,how:p.how,axisName:AXNAME[p.axis]||p.axis,score:r0(sc[p.axis]),cap:p.id==="budget"&&cap?yen(cap):null}})};
   const ids=ctx.plans.map(p=>p.id).join(),at=now();
-  AI_RUN=OFAI.tailor(ctx,30000).then(r=>{AI_RUN=null;
+  AI_RUN=OFAI.tailor(ctx,45000).then(r=>{AI_RUN=null;
     if(S.group||!S.plans||S.plans.map(x=>x.id).join()!==ids)return;   // 待っている間に群が決まった・提案が変わった
     S.plans=S.plans.map(x=>r&&r.byId[x.id]?{...x,ai:{...r.byId[x.id],model:r.model,v:r.version,at}}:{...x,aiTried:true});
     if(STUDY&&OFStore.offer)OFStore.offer(S);
@@ -1867,7 +1870,7 @@ function pbar(name,a,b,hw,higher){const d=b-a,good=higher?d>=0:d<=0,col=good?"va
 let PSEL=new Set();
 /* AI の文のときは、そのことと、もとの型（根拠はこの型のもの）を示す（D4） */
 function aiNote(p){const a=aiOf(p),base=planById(p.id);
-  if(a)return`<p class="xs muted aimark">あなたの推しに合わせて、AI（Google の Gemini）が書いた文です。もとの提案：「${esc(base.title)}」。下の根拠は、もとの提案のものです。</p>`;
+  if(a)return`${a.fit?`<p class="small"><b>あなたに合う理由：</b>${esc(a.fit)}</p>`:""}<p class="xs muted aimark">あなたの推しと性格に合わせて、AI（Google の Gemini）が書いた文です。もとの提案：「${esc(base.title)}」。下の根拠は、もとの提案のものです。</p>`;
   if(AI_RUN&&!S.group)return`<p class="xs muted aimark" aria-live="polite">あなたの推しに合わせた文を作っています…</p>`;return""}
 function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">群A（今のままで順調）のため、提案はありません。</p><a class="btn" href="#home">ホームへ</a></main>`;wire();return}
   app.className="app pc2";PI=clamp(PI,0,S.plans.length-1);const sel=S.plans[PI],p=planById(sel.id);
