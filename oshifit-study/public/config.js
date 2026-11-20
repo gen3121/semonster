@@ -25,7 +25,7 @@ window.OSHIFIT_MS_TENANT = "636389c0-b95c-4828-b98f-f9fcb8d9383a";
 //   backend:"google"＝Gemini Developer API（AI Studio。プロジェクトが有料枠のときは前払いのクレジットが要る）
 //   appCheckKey：reCAPTCHA v3 のサイトキー（公開してよい値）。App Check に登録すると、このサイト以外から無料枠を使われない
 //   使えないとき（設定前・上限・時間切れ）は、承認済みの固定の文を出す。enabled:false で AI を使わない
-window.OSHIFIT_AI = { enabled: true, backend: "agent", location: "global", model: "gemini-4-hydrogen", fallbackModels: ["gemini-3.8-flash"], appCheckKey: "" };
+window.OSHIFIT_AI = { enabled: true, backend: "agent", location: "global", model: "gemini-3.8-flash", fallbackModels: ["gemini-4-hydrogen"], appCheckKey: "" };
 // 参加の受付の最終日（日本時間でこの日の終わりまで）。過ぎると新規登録の画面に「受付は終了しました」と出る（登録済みの人は続けられる）
 //   AI の提案文（App Check）が 2027-01-21 から使えなくなるため、全員が同じ条件になるようにここで区切る
 window.OSHIFIT_SIGNUP_UNTIL = "2027-01-20";
