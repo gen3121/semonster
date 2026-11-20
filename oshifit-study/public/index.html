@@ -1391,7 +1391,7 @@ function midVal(it){const s=it.sec;if(it.type==="number")return 21;if(it.type===
 function fillBase(){let n=0;allIt.forEach(it=>{if(S.answers[it.id]==null&&it.type!=="text"){const v=midVal(it);if(v!=null){S.answers[it.id]=v;n++}}});if(n)S.filled=true;S.avatar=S.avatar||defAv();return n}
 /* 提案文を推しに合わせる（ai.js）。型はそのまま、題名とやり方だけ AI の文にする。群が決まった後は変えない */
 let AI_RUN=null;
-function aiStart(){if(AI_RUN||!window.OFAI||!OFAI.enabled()||S.group||!S.plans||!S.plans.length||S.plans.some(x=>x.ai||x.aiTried))return;
+function aiStart(){if(AI_RUN||!window.OFAI||!OFAI.enabled()||(STUDY&&S.group)||!S.plans||!S.plans.length||S.plans.some(x=>x.ai||x.aiTried))return;
   const sc=S.sc,A=S.answers,cap=SPEND_CAP[A.Q6];
   const b5=big5(A),lv=v=>v>=65?"高い":v<=35?"低い":"ふつう",freqSec=QN.sections.find(s=>s.id==="freq"),FL=freqSec.scale;
   const ctx={genre:A.Q4,oshi:String(A.Q4b||"").trim().slice(0,40),multi:A.Q5b,spend:A.Q6,money:r0(sc.money),
@@ -1401,10 +1401,10 @@ function aiStart(){if(AI_RUN||!window.OFAI||!OFAI.enabled()||S.group||!S.plans||
     plans:S.plans.map(x=>{const p=planById(x.id);return{id:p.id,title:p.id==="budget"&&cap?`推し活の予算を「月${yen(cap)}まで」にする`:p.title,how:p.how,axisName:AXNAME[p.axis]||p.axis,score:r0(sc[p.axis]),cap:p.id==="budget"&&cap?yen(cap):null}})};
   const ids=ctx.plans.map(p=>p.id).join(),at=now();
   AI_RUN=OFAI.tailor(ctx,45000).then(r=>{AI_RUN=null;
-    if(S.group||!S.plans||S.plans.map(x=>x.id).join()!==ids)return;   // 待っている間に群が決まった・提案が変わった
+    if((STUDY&&S.group)||!S.plans||S.plans.map(x=>x.id).join()!==ids)return;   // 待っている間に群が決まった・提案が変わった（編集者用は群があっても入れる）
     S.plans=S.plans.map(x=>r&&r.byId[x.id]?{...x,ai:{...r.byId[x.id],model:r.model,v:r.version,at}}:{...x,aiTried:true});
     if(STUDY&&OFStore.offer)OFStore.offer(S);
-    if(location.hash==="#future"&&!S.group)render()});}
+    if(location.hash==="#future"&&!(STUDY&&S.group))render()});}
 function ensureBase(){if(!STUDY)fillBase();S.sc=scores(S.answers);if(!S.plans)S.plans=plansFor(S.sc,S.answers);aiStart();return S.sc}
 function ensureGroup(){ensureBase();if(!S.group&&!STUDY){S.group="B";S.plan={id:S.plans[0].id,ids:S.plans.slice(0,2).map(x=>x.id),accepted:true};S.decidedAt=now()-12*DAY}}
 
@@ -1871,7 +1871,9 @@ let PSEL=new Set();
 /* AI の文のときは、そのことと、もとの型（根拠はこの型のもの）を示す（D4） */
 function aiNote(p){const a=aiOf(p),base=planById(p.id);
   if(a)return`${a.fit?`<p class="small"><b>あなたに合う理由：</b>${esc(a.fit)}</p>`:""}<p class="xs muted aimark">あなたの推しと性格に合わせて、AI（Google の Gemini）が書いた文です。もとの提案：「${esc(base.title)}」。下の根拠は、もとの提案のものです。</p>`;
-  if(AI_RUN&&!S.group)return`<p class="xs muted aimark" aria-live="polite">あなたの推しに合わせた文を作っています…</p>`;return""}
+  if(AI_RUN&&!(STUDY&&S.group))return`<p class="xs muted aimark" aria-live="polite">あなたの推しと性格に合わせた文を作っています…</p>`;
+  const o=(S.plans||[]).find(x=>x.id===p.id);
+  if(o&&o.aiTried)return`<p class="xs muted aimark">いまは推しに合わせた文を作れなかったため、もとの提案の文を表示しています。</p>`;return""}
 function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><p class="callout good">群A（今のままで順調）のため、提案はありません。</p><a class="btn" href="#home">ホームへ</a></main>`;wire();return}
   app.className="app pc2";PI=clamp(PI,0,S.plans.length-1);const sel=S.plans[PI],p=planById(sel.id);
   const chosen=S.plans.map(x=>x.id).filter(id=>PSEL.has(id)),ids=chosen.length?chosen:[p.id],pr=predictMulti(sc,ids),lab=chosen.length?`選んだ${chosen.length}つ`:`提案${PI+1}だけ`;

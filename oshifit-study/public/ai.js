@@ -12,8 +12,8 @@
   let ready = null;
 
   const conf = () => window.OSHIFIT_AI || {};
-  // 研究版だけで使う。編集者用・展示用（保存しない版）は外部に何も送らない
-  const enabled = () => window.OSHIFIT_MODE === "study" && !!(window.OSHIFIT_AI_MOCK || (conf().enabled && window.OSHIFIT_FIREBASE && !window.OSHIFIT_EMULATOR));
+  // 研究版と編集者用（保存しない版）で使う。どちらも送るのは点数・性格・推し活の中身・推しの名前などだけ（保存はしない）
+  const enabled = () => ["study", "demo"].includes(window.OSHIFIT_MODE) && !!(window.OSHIFIT_AI_MOCK || (conf().enabled && window.OSHIFIT_FIREBASE && !window.OSHIFIT_EMULATOR));
 
   async function load(ids) {
     const [app, ai, ac] = await Promise.all([import(CDN("app")), import(CDN("ai")), conf().appCheckKey ? import(CDN("app-check")) : null]);
