@@ -1753,6 +1753,15 @@ function helpHTML(){return`<p class="small">一人で抱えずに、話してみ
    <li><b>大阪工業大学 学生相談室</b><br><span class="xs muted">大学の学生の方は、学生相談室でも相談できます（予約の方法は大学のポータルで確認してください）</span></li>
    <li><b>厚生労働省「まもろうよ こころ」</b>　<a href="https://www.mhlw.go.jp/mamorouyokokoro/" target="_blank" rel="noopener" style="color:var(--primary)">相談窓口の一覧</a><br><span class="xs muted">電話のほか、SNS やチャットで相談できる窓口も載っています</span></li></ul>
   <p class="xs muted">命に危険があるときは、迷わず 119番（救急）に電話してください。電話番号を押すと電話がかけられます。</p>`}
+/* 群を決める前の確認（決めた後は、プラン・提案・開始時の回答を変えられない） */
+function confirmLock(title,what,onOk){const sc=document.createElement("div");sc.className="scrim";
+  sc.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="lk-t"><div class="grab"></div><h2 id="lk-t">${esc(title)}</h2>
+   <p class="small">${esc(what)}</p>
+   <div class="callout bad"><b>決めた後は、変えられません</b><ul class="small" style="margin:6px 0 0;padding-left:1.2em"><li>選んだプランと提案は、あとから変えられません</li><li>最初の質問の回答も、直せなくなります</li><li>アバター・分析・2つの未来の画面には戻れなくなります</li></ul></div>
+   <p class="small muted">約${FINAL_DAY}日間、毎日のアンケートをお願いします。迷うときは「戻って考え直す」を押して、もう一度見比べてください。</p>
+   <button class="btn primary block" id="lk-ok">この内容で始める</button><button class="btn block" id="lk-no">戻って考え直す</button></div>`;
+  document.body.appendChild(sc);const close=()=>sc.remove();sc.onclick=e=>{if(e.target===sc)close()};sc.addEventListener("keydown",e=>{if(e.key==="Escape")close()});
+  $("#lk-no").onclick=close;$("#lk-ok").onclick=()=>{close();onOk()};$("#lk-no").focus()}
 function helpSheet(){const sc=document.createElement("div");sc.className="scrim";
   sc.innerHTML=`<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="hp-t"><div class="grab"></div><h2 id="hp-t">相談先</h2>${helpHTML()}<button class="btn primary block" id="hp-close">閉じる</button></div>`;
   document.body.appendChild(sc);const close=()=>sc.remove();sc.onclick=e=>{if(e.target===sc)close()};$("#hp-close").onclick=close;sc.addEventListener("keydown",e=>{if(e.key==="Escape")close()});$("#hp-close").focus()}
@@ -1849,8 +1858,8 @@ function vAnalysis(){app.className="app pc2";const sc=ensureBase(),A=S.answers,b
    <section class="card"><div class="sec"><h3>性格（TIPI-J）</h3><span class="xs muted">良い悪いはありません</span></div>
     ${b?[["外向性","E"],["協調性","A"],["勤勉性","C"],["神経症傾向","N"],["開放性","O"]].map(([n,k])=>`<div class="trait"><span>${n}</span><div class="track"><i style="width:${b[k]}%"></i></div><span class="num" style="text-align:right">${b[k]}</span></div>`).join(""):""}
     <details><summary>算出の根拠</summary><div class="formula">${SC.axes.map(a=>`<span><b>${a.name}</b>：${esc(a.formula)}</span>`).join("")}<span><b>推し疲れ</b>：${esc(SC.burnout.formula)}</span><span><b>SHS</b>：${esc(SC.shs.formula)}</span><span><b>PSS-J</b>：${esc(SC.pss.formula)}</span></div></details></section></main></div></div>
-   ${g.ok?dock("an-back","ホームへ","an-go"):dock("an-back","2つの未来を見る","an-go")}`;
-  $("#an-back").onclick=()=>go("avatar");$("#an-go").onclick=()=>{if(g.ok){if(STUDY&&S.group)return go("home");S.group="A";S.plan={id:null,ids:[],accepted:false};S.decidedAt=now();if(STUDY)OFStore.decide(S,null,CFG);go("home")}else go("future")};wire()}
+   ${g.ok?dock("an-back","ホームへ","an-go",false,"",S.group?"戻る":"アバターに戻る"):dock("an-back","2つの未来を見る","an-go",false,"",S.group?"戻る":"アバターに戻る")}`;
+  $("#an-back").onclick=()=>go("avatar");$("#an-go").onclick=()=>{if(g.ok){if(STUDY&&S.group)return go("home");confirmLock("今のままの推し活で始めますか？","今の推し活は順調なので、提案はありません。今のままの推し活を続けながら、毎日のアンケートと最後の調査に答えてください。",()=>{S.group="A";S.plan={id:null,ids:[],accepted:false};S.decidedAt=now();if(STUDY)OFStore.decide(S,null,CFG);go("home")})}else go("future")};wire()}
 let PI=0;
 function pbar(name,a,b,hw,higher){const d=b-a,good=higher?d>=0:d<=0,col=good?"var(--good)":"var(--bad)";
   const row=(lab,v,c,w)=>`<div class="pb"><span>${lab}</span><div class="pt">${w?`<span class="rg" style="left:${clamp(v-w,0,100)}%;width:${clamp(v+w,0,100)-clamp(v-w,0,100)}%;background:${c}"></span>`:""}<span class="pm" style="left:calc(${clamp(v,0,100)}% - 1.5px);background:${c}"></span></div></div>`;
@@ -1883,14 +1892,16 @@ function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.inner
     ${radar([{v:FV(pr.A),fill:"var(--faint)",stroke:"var(--faint)",dash:true,op:.05},{v:FV(pr.B),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
     ${outBars([["幸福度（WHO-5）",[sc.wb,pr.B.wb],true,52,`±${pr.hwWb}の幅`],["ストレス度（PSS-J）",[pss100(sc),pss100(pr.B)],false,null,"仮の見込み"],["推し活のストレス（推し疲れ）",[sc.burnout,pr.B.burnout],false,null,`±${pr.hw}の幅`]],["プランA","プランB"])}
     <p class="xs muted">選んだ提案の想定の効果を足し合わせた仮の見込みです。複数の提案の効果がそのまま足し合わさるかは分かっていないため、選んだ数が多いほど幅を広くしています。</p></section></div></div></main>
-   <div class="dock"><div class="in" style="flex-direction:column"><button class="btn primary block" id="pickB" ${chosen.length?"":"disabled"}>${chosen.length?`選んだ${chosen.length}つの提案で、プランB「最適化された推し活」を始める`:"提案を選ぶとプランBで始められます"}</button><button class="btn block" id="pickA">プランA「現在のままの推し活」で続ける</button></div><p class="note">どちらを選んでも、約${FINAL_DAY}日間、${GAP}日ごとに${N_CHECK}回の振り返りをお願いします</p></div>`;
+   <div class="dock"><div class="in" style="flex-direction:column"><button class="btn primary block" id="pickB" ${chosen.length?"":"disabled"}>${chosen.length?`選んだ${chosen.length}つの提案で、プランB「最適化された推し活」を始める`:"提案を選ぶとプランBで始められます"}</button><button class="btn block" id="pickA">プランA「現在のままの推し活」で続ける</button><button class="btn sm" id="fu-back" style="align-self:center;border:0;background:none;box-shadow:none;text-decoration:underline;min-height:32px;padding:2px 10px">← 分析に戻る</button></div><p class="note">どちらを選んでも、約${FINAL_DAY}日間、${GAP}日ごとに${N_CHECK}回の振り返りをお願いします</p></div>`;
   app.querySelectorAll("[data-pi]").forEach(b=>b.onclick=()=>{PI=+b.dataset.pi;keep(vFuture)});
   $("#pickThis").onchange=e=>{e.target.checked?PSEL.add(p.id):PSEL.delete(p.id);keep(vFuture)};
   app.querySelectorAll("[data-combo]").forEach(b=>b.onclick=()=>{PSEL.clear();b.dataset.combo.split(",").forEach(id=>PSEL.add(id));keep(vFuture)});
   $("#pickAll").onclick=()=>{if(chosen.length===S.plans.length)PSEL.clear();else S.plans.forEach(x=>PSEL.add(x.id));keep(vFuture)};
   const pick=g=>{if(g==="B"&&!chosen.length)return;if(STUDY&&S.group)return go("home"); // 選んだ群は変えられない
    S.group=g;S.plan={id:g==="B"?chosen[0]:p.id,ids:g==="B"?chosen:[],accepted:g==="B"};S.decidedAt=now();S.weekly=[];S.final=null;S.fin={};SV.final=null;if(STUDY){const pr2=predictMulti(sc,g==="B"?chosen:[p.id]);S.pred={A:pr2.A,B:pr2.B,hw:pr2.hw,hwWb:pr2.hwWb};OFStore.decide(S,S.pred,CFG)}toast(g==="B"?`プランB「最適化された推し活」（${chosen.length}つの提案）で始めます`:"プランA「現在のままの推し活」で続けます");go("home")};
-  $("#pickB").onclick=()=>pick("B");$("#pickA").onclick=()=>pick("C");wire()}
+  const ask=g=>{if(g==="B"&&!chosen.length)return;if(STUDY&&S.group)return go("home");
+   confirmLock(g==="B"?"プランBで始めますか？":"プランAで続けますか？",g==="B"?`選んだ${chosen.length}つの提案（${chosen.map(id=>"「"+planTitle(planById(id))+"」").join("")}）で、プランB「最適化された推し活」を始めます。`:"提案は取り入れず、プランA「現在のままの推し活」を続けます。",()=>pick(g))};
+  $("#pickB").onclick=()=>ask("B");$("#pickA").onclick=()=>ask("C");$("#fu-back").onclick=()=>go("analysis");wire()}
 let N_CHECK=6,GAP=4,FINAL_DAY=28;   // 初期値。CFG で上書き
 function dayNo(){return S.decidedAt?Math.floor((now()-S.decidedAt)/DAY):0}
 function nextNo(){return S.weekly.length+1}

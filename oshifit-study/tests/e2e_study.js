@@ -192,9 +192,20 @@ async function answerAll(page, stop) {
     assert.ok(pr.includes("阪神タイガース") && pr.includes("推しのジャンル"), "推しの名前とジャンルを送る");
     assert.ok(!pr.includes("@") && !pr.includes("Q62"), "メールアドレスや自由記述は送らない");
     await page.locator("#pickThis").check();
+    // 分析に戻って、また2つの未来へ（群が決まる前は行き来できる）
+    await page.locator("#fu-back").click(); await page.locator("#an-go").waitFor();
+    assert.equal((await page.locator("#an-back").innerText()).trim(), "アバターに戻る");
+    await page.locator("#an-go").click(); await page.locator("#pickB").waitFor();
+    if (!(await page.locator("#pickThis").isChecked())) await page.locator("#pickThis").check();
     await page.locator("#pickB").click();
+    // 確認のシート：「戻って考え直す」で閉じる → もう一度押して「この内容で始める」
+    await page.locator("#lk-no").click(); assert.equal(await page.locator(".sheet").count(), 0);
+    await page.locator("#pickB").click();
+    assert.match(await page.locator(".sheet").innerText(), /変えられません/);
+    await page.locator("#lk-ok").click();
+    step("2つの未来から分析に戻れる。プランを選ぶと「決めた後は変えられない」確認が出て、考え直すこともできる");
     group = "B";
-  } else group = "A";
+  } else { await page.locator("#lk-ok").click({ timeout: 4000 }); group = "A"; }   // 群A：確認のシートで始める
   await page.waitForFunction(() => location.hash === "#home");
   for (let i = 0; i < 25; i++) { d = await read((db) => getDoc(doc(db, "participants", uid))); if (d.data().group) break; await page.waitForTimeout(200); }
   const p = d.data();
