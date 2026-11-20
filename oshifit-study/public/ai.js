@@ -1,4 +1,4 @@
-// OshiFit の提案文を、本人の推しに合わせて AI（Google の Gemini、Firebase AI Logic の無料枠）で書く。
+// OshiFit の提案文を、本人の推しに合わせて AI（Google の Gemini、Firebase AI Logic）で書く。
 // ・提案の「型」（15種類のどれを出すか）は今までどおりアプリの式で決める。AI は、その型の狙いを保ったまま、
 //   推しのジャンル・推しの名前に合わせた具体的な題名とやり方を書くだけ（効果の値・根拠・分析は型のものを使う）
 // ・送るのは 6つの軸の点数・推しのジャンル・推しの名前・推しの数・使うお金の範囲だけ。氏名・メール・自由記述は送らない
@@ -20,7 +20,10 @@
     const a = app.getApps().find((x) => x.name === "oshifit-ai") || app.initializeApp(window.OSHIFIT_FIREBASE, "oshifit-ai");
     // AI Logic は App Check で守る（他人に無料枠を使われないため）。reCAPTCHA v3 のサイトキーは config.js
     if (ac) ac.initializeAppCheck(a, { provider: new ac.ReCaptchaV3Provider(conf().appCheckKey), isTokenAutoRefreshEnabled: true });
-    const g = ai.getAI(a, { backend: new ai.GoogleAIBackend() });
+    // backend："agent"＝Google Cloud の Vertex AI（Agent Platform）。Blaze のお支払い（無料トライアルのクレジットを含む）で払う。送った内容は学習に使われない
+    //          "google"＝Gemini Developer API（AI Studio の無料枠・前払い）
+    const be = conf().backend === "google" ? new ai.GoogleAIBackend() : new ai.AgentPlatformBackend(conf().location || "global");
+    const g = ai.getAI(a, { backend: be });
     const S = ai.Schema;
     const schema = S.object({
       properties: {
