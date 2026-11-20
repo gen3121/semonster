@@ -126,3 +126,4 @@ He et al. (2020) PLoS ONE ／ Levenson et al. (2017) Sleep ／ 厚生労働省 (
 - 2026-11-20：AI Logic の App Check は今は「未適用」。2027-01-21 から自動で適用され、ウェブでは reCAPTCHA Enterprise（Fraud Defense、お支払いの登録が必要）が要る。reCAPTCHA Classic は Firebase に登録できなかった。AI の文は開始時に1回だけ作るので、2027-01-21 より前に開始した参加者には影響なし。それ以降に開始した人は固定の文になる（trial.csv の plans_ai で分かる）。
 - 2026-11-20：募集（受付）は 2026-11-23〜2027-01-20 と決定（今井）。アプリは OSHIFIT_SIGNUP_UNTIL と Firestore のルールで 2027-01-20 の日本時間の終わりまでに新規登録を区切る。募集文・論文第5章に記入。
 - 2026-11-20：AI の提案文は Gemini Developer API（前払いクレジット0で 429）から Vertex AI（Agent Platform API、Blaze・無料トライアルのクレジット）経由に変更。実際に1回試し、約10秒・約2円で推しに合った文が返ることを確認。論文のデータの扱いを「学習に使われない」に修正。
+- 2026-11-20：oshifit-34941 を有料の請求先アカウント「Oshifitシステム」につないだ後、Gemini（Vertex AI）は8回中7回成功、アプリの仕組み（頼み直しつき）で3回とも推しに合った提案文が返った（8〜28秒）。
