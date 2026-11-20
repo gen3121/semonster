@@ -148,6 +148,22 @@ async function answerAll(page, stop) {
   assert.equal(d.data().answers.Q42, 2);
   step("短縮版の67項目＋性別と、得点（PSS-J・WHO-5 など）が保存される");
 
+  // アバターの画面から質問に戻って、答えを直せる（群が決まる前だけ）
+  assert.equal((await page.locator("#av-back").innerText()).trim(), "質問に戻る");
+  await page.locator("#av-back").click();
+  await page.locator(".qid").waitFor();
+  const lastId = await page.locator(".qid").getAttribute("data-qid");
+  await page.locator("#sv-prev").click(); await page.waitForTimeout(300);
+  const prevId = await page.locator(".qid").getAttribute("data-qid");
+  const prevVal = d.data().answers[prevId];
+  await page.locator("[data-j]").nth(0).click();                                  // 答えを変える → 自動で最後の質問へ
+  await page.waitForFunction((id) => document.querySelector(".qid")?.dataset.qid === id, lastId);
+  await page.locator("#sv-next").click();                                          // 回答を終える
+  await page.locator("#av-go").waitFor();
+  for (let i = 0; i < 25; i++) { d = await read((db) => getDoc(doc(db, "participants", uid))); if (d.data().baselineDone && d.data().answers[prevId] !== prevVal) break; await page.waitForTimeout(200); }
+  assert.equal(d.data().baselineDone, true); assert.notEqual(d.data().answers[prevId], prevVal, "直した答えが保存される");
+  step(`アバターの画面から「質問に戻る」で質問に戻り、答えを直せる（${prevId}）。終えるとアバターの画面に戻る`);
+
   // ---------- アバター → 分析 → 2つの未来 → プランB
   const hairNames = await page.locator(".avopt span").allInnerTexts();
   assert.ok(hairNames.includes("ショート") && hairNames.includes("ツンツン") && !hairNames.includes("ツインテール"), "男性向けの髪型が並ぶ");

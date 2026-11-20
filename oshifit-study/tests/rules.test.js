@@ -43,12 +43,18 @@ test("群は一度決めたら変えられない。決めた時刻はサーバ�
   await assertFails(updateDoc(r, { pred: { hw: 1 } }));
   await assertFails(updateDoc(r, { group: "Z" }));
 });
-test("開始時の質問を終えたら、回答は書き換えられない", async () => {
+test("群が決まるまでは開始時の回答を見直せる。群が決まったら回答と示した提案は書き換えられない", async () => {
   const r = doc(me(), "participants", "u1");
   await setDoc(r, base);
   await assertSucceeds(updateDoc(r, { answers: { Q1: 21 } }));          // 途中は書き換えてよい
   await assertSucceeds(updateDoc(r, { answers: { Q1: 22 }, baselineDone: true, baselineAt: serverTimestamp() }));
-  await assertFails(updateDoc(r, { answers: { Q1: 30 } }));
+  await assertSucceeds(updateDoc(r, { plansOffered: [{ id: "sns23" }] }));
+  await assertSucceeds(updateDoc(r, { baselineDone: false }));           // アバターの画面から質問に戻る
+  await assertSucceeds(updateDoc(r, { answers: { Q1: 30 }, baselineDone: true, baselineAt: serverTimestamp(), plansOffered: [{ id: "mute" }] }));
+  await updateDoc(r, { group: "B", planIds: ["mute"], decidedAt: serverTimestamp() });
+  await assertFails(updateDoc(r, { answers: { Q1: 31 } }));
+  await assertFails(updateDoc(r, { baselineDone: false }));
+  await assertFails(updateDoc(r, { plansOffered: [{ id: "sns23" }] }));
 });
 test("振り返りは群B・Cだけ、1〜6回目を一度だけ。書き換え不可", async () => {
   const r = doc(me(), "participants", "u1");

@@ -81,6 +81,8 @@
   // 質問の途中経過（数秒まとめて送る）。開始時の質問が終わるまでだけ
   function draft(S) { clearTimeout(debounceT); debounceT = setTimeout(() => upd({ answers: { ...S.answers }, draftAt: fb.fs.serverTimestamp() }), 1500); }
   function baseline(S) { clearTimeout(debounceT); return upd({ answers: { ...S.answers }, scores: S.sc, baselineDone: true, baselineAt: fb.fs.serverTimestamp() }); }
+  // アバターの画面から質問に戻る（群が決まる前だけ。ルールで確かめる）
+  function reopen() { return upd({ baselineDone: false }); }
   // 推しに合わせた提案文（ai.js）ができたら、群を決める前に提示した提案として残す（ルールで一度だけ）
   function offer(S) { if (S.group || !S.plans) return Promise.resolve(); return upd({ plansOffered: S.plans }); }
   function avatar(S) { return upd({ avatar: { ...S.avatar }, avatarDone: true }); }
@@ -107,5 +109,5 @@
     const [c, p, n] = await Promise.all([fs.getDoc(fs.doc(db, "study", "protocol")), fs.getDocs(fs.collection(db, "plans")), fs.getDocs(fs.collection(db, "notices"))]);
     return { protocol: c.exists() ? c.data() : null, plans: p.docs.map((d) => ({ ...d.data(), id: d.id })), notices: n.docs.map((d) => ({ ...d.data(), id: d.id })) };
   }
-  window.OFStore = { settings, init, signup, login, social, logout, resetPassword, begin, draft, baseline, offer, avatar, decide, checkin, final, daily, get failed() { return failed; }, get uid() { return uid; }, get email() { return email; } };
+  window.OFStore = { settings, init, signup, login, social, logout, resetPassword, begin, draft, baseline, reopen, offer, avatar, decide, checkin, final, daily, get failed() { return failed; }, get uid() { return uid; }, get email() { return email; } };
 })();

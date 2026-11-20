@@ -28,9 +28,9 @@ service cloud.firestore {
         && (!('withdrawn' in request.resource.data) || request.resource.data.withdrawn == true)
         && unchanged('pid') && unchanged('mode') && unchanged('createdAt') && unchanged('consentedAt')
         // 選んだ群・提案・見込み・決めた時刻は変えられない
-        && unchanged('group') && unchanged('planIds') && unchanged('decidedAt') && unchanged('pred') && unchanged('plansOffered') && unchanged('cfgVersion') && unchanged('cfgUsed')
-        // 開始時の質問を終えたら、回答は変えられない。最後の調査も一度だけ
-        && (!(resource.data.get('baselineDone', false) == true) || (unchanged('answers') && unchanged('baselineAt')))
+        && unchanged('group') && unchanged('planIds') && unchanged('decidedAt') && unchanged('pred') && unchanged('cfgVersion') && unchanged('cfgUsed')
+        // 群が決まるまでは、開始時の回答を見直せる（アバターの画面から質問に戻れる）。群が決まったら、回答・示した提案は変えられない。最後の調査も一度だけ
+        && (!('group' in resource.data) || (unchanged('answers') && unchanged('baselineAt') && unchanged('baselineDone') && unchanged('plansOffered')))
         && unchanged('final')
         && (!('group' in request.resource.data) || request.resource.data.group in ['A', 'B', 'C'])
         && (('group' in resource.data) || !('group' in request.resource.data) || request.resource.data.decidedAt == request.time)
