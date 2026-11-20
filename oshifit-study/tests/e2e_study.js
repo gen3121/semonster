@@ -41,15 +41,15 @@ async function answerAll(page, stop) {
     const num = page.locator("#f-num");
     if (await num.count()) { await num.fill("21"); await page.locator("#sv-next").click(); continue; }
     const tx = page.locator("#f-text");
-    if (await tx.count() && (await page.locator(".qid").innerText().catch(() => "")).trim() === "Q4b") { await tx.fill("阪神タイガース"); }
+    if (await tx.count() && (await page.locator(".qid").getAttribute("data-qid").catch(() => "")).trim() === "Q4b") { await tx.fill("阪神タイガース"); }
     if (await tx.count()) { await page.locator("#sv-next").click({ timeout: 3000 }).catch(() => {}); continue; }   // 押す前に画面が変わることがある
     if (!(await page.locator(".qid").count())) { await page.waitForTimeout(200); continue; }   // 画面の切り替え中
-    const id = (await page.locator(".qid").innerText()).trim();
+    const id = (await page.locator(".qid").getAttribute("data-qid")).trim();
     const opts = page.locator("[data-j]");
     const n = await opts.count();
     const pick = id === "Q42" ? 1 : n === 7 ? 4 : Math.min(2, n - 1);        // Q42 は注意確認（2を選ぶ）
     await opts.nth(pick).click();
-    await page.waitForFunction((prev) => { const q = document.querySelector(".qid"); return !q || q.textContent.trim() !== prev; }, id, { timeout: 5000 }).catch(() => {});
+    await page.waitForFunction((prev) => { const q = document.querySelector(".qid"); return !q || q.dataset.qid !== prev; }, id, { timeout: 5000 }).catch(() => {});
   }
   throw new Error("終わらない");
 }
@@ -106,18 +106,18 @@ async function answerAll(page, stop) {
   assert.ok(uid, "メールアドレスで登録した");
   let d = await read((db) => getDoc(doc(db, "participants", uid)));
   assert.equal(d.data().mode, "study"); assert.equal(d.data().answers.Q2, "男性"); assert.equal(d.data().email, undefined, "メールは Firestore に入れない");
-  assert.equal(await page.locator(".qid").innerText(), "Q1");
+  assert.equal(await page.locator(".qid").getAttribute("data-qid"), "Q1");
   step("新規登録（メール・パスワード・性別・同意）→ participants/{uid} が作られ、質問へ進む（性別は質問で聞き直さない）");
 
   // 途中まで答えて、読み込み直すと続きから
   await page.locator("#f-num").fill("21"); await page.locator("#sv-next").click();          // Q1 年齢
   // 選び直し：待っている間に別の選択肢を押すと、そちらが残る（次へはまだ進まない）
-  const q0 = (await page.locator(".qid").innerText()).trim();
+  const q0 = (await page.locator(".qid").getAttribute("data-qid")).trim();
   await page.locator("[data-j]").nth(0).click(); await page.waitForTimeout(300);
   await page.locator("[data-j]").nth(2).click(); await page.waitForTimeout(300);
-  assert.equal((await page.locator(".qid").innerText()).trim(), q0, "選んでから少しの間は、次へ進まない");
+  assert.equal((await page.locator(".qid").getAttribute("data-qid")).trim(), q0, "選んでから少しの間は、次へ進まない");
   await page.waitForTimeout(800);
-  assert.notEqual((await page.locator(".qid").innerText()).trim(), q0, "少し待つと次へ進む");
+  assert.notEqual((await page.locator(".qid").getAttribute("data-qid")).trim(), q0, "少し待つと次へ進む");
   assert.match(await page.locator("#autosave").innerText(), /自動で保存/);
   step("最初の質問：選んでから約0.8秒は選び直せる（その後に次へ）。「自動で保存されています」と表示");
   for (let i = 0; i < 10; i++) { if (await page.locator("#f-text").count()) { await page.locator("#f-text").fill("阪神タイガース"); await page.locator("#sv-next").click(); await page.waitForTimeout(300); continue; } await page.locator("[data-j]").nth(1).click(); await page.waitForTimeout(950); }   // Q4b（推しの名前）は入力して次へ
@@ -134,7 +134,7 @@ async function answerAll(page, stop) {
   await page.getByText("メールアドレスかパスワードが違います").waitFor();
   await page.locator("#li-pw").fill(PW); await page.locator("#li-go").click();
   await page.locator(".qid").waitFor({ timeout: 15000 });
-  const resumeAt = (await page.locator(".qid").innerText()).trim();
+  const resumeAt = (await page.locator(".qid").getAttribute("data-qid")).trim();
   assert.notEqual(resumeAt, "Q1", "ログインし直すと続きの質問から");
   step(`ログアウト → ログイン（パスワード違いは断る）で、続き（${resumeAt}）から再開できる`);
 
@@ -205,7 +205,7 @@ async function answerAll(page, stop) {
     await page.locator(".qid").waitFor();
     for (let i = 0; i < 40; i++) {
       if ((await page.evaluate(() => location.hash)) === "#home") break;
-      const id = (await page.locator(".qid").innerText().catch(() => "")).trim();
+      const id = (await page.locator(".qid").getAttribute("data-qid").catch(() => "")).trim();
       if (await page.locator("#f-num").count()) { await page.locator("#f-num").fill(id === "yen" ? "1500" : "90"); await page.locator("#sv-next").click(); continue; }
       if (await page.locator("[data-j]").count()) { await page.locator("[data-j]").nth(id === "mood" ? 4 : id.startsWith("did_") ? 0 : 3).click(); await page.waitForTimeout(350); continue; }
       await page.waitForTimeout(200);
