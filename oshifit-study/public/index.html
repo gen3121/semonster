@@ -411,6 +411,7 @@ tr:last-child td{border-bottom:0}
 
 <script src="config.js"></script>
 <script src="store.js"></script>
+<script src="ai_prompt.js"></script>
 <script src="ai.js"></script>
 <script src="avatar.js"></script>
 <script src="settings.js"></script>
@@ -493,7 +494,7 @@ tr:last-child td{border-bottom:0}
      "optional": true,
      "text": "主たる推しの名前・チーム名など（任意）",
      "ph": "例：阪神タイガース",
-     "note": "提案の文をあなたの推しに合わせるために使います。この回答と、性格・推し活の中身の割合・各軸の点数を AI（Google の Gemini）に送って文を作ります。あなたの名前やメールアドレスは送りません。"
+     "note": "提案の文をあなたの推しに合わせるために使います。この回答と、性格・推し活の中身の割合・各軸の点数を AI（OpenAI の ChatGPT、または Google の Gemini）に送って文を作ります。あなたの名前やメールアドレスは送りません。"
     },
     {
      "id": "Q5",
@@ -1870,7 +1871,7 @@ function pbar(name,a,b,hw,higher){const d=b-a,good=higher?d>=0:d<=0,col=good?"va
 let PSEL=new Set();
 /* AI の文のときは、そのことと、もとの型（根拠はこの型のもの）を示す（D4） */
 function aiNote(p){const a=aiOf(p),base=planById(p.id);
-  if(a)return`${a.fit?`<p class="small"><b>あなたに合う理由：</b>${esc(a.fit)}</p>`:""}<p class="xs muted aimark">あなたの推しと性格に合わせて、AI（Google の Gemini）が書いた文です。もとの提案：「${esc(base.title)}」。下の根拠は、もとの提案のものです。</p>`;
+  if(a)return`${a.fit?`<p class="small"><b>あなたに合う理由：</b>${esc(a.fit)}</p>`:""}<p class="xs muted aimark">あなたの推しと性格に合わせて、AI（${/^gpt|openai/i.test(a.model||"")?"OpenAI の ChatGPT":"Google の Gemini"}）が書いた文です。もとの提案：「${esc(base.title)}」。下の根拠は、もとの提案のものです。</p>`;
   if(AI_RUN&&!(STUDY&&S.group))return`<p class="xs muted aimark" aria-live="polite">あなたの推しと性格に合わせた文を作っています…</p>`;
   const o=(S.plans||[]).find(x=>x.id===p.id);
   if(o&&o.aiTried)return`<p class="xs muted aimark">いまは推しに合わせた文を作れなかったため、もとの提案の文を表示しています。</p>`;return""}

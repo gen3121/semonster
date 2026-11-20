@@ -95,8 +95,9 @@ OshiFit は、推し活（ファン活動）を性格と行動から分析し、
 - 変更したら、`README_ja.md` の変更の記録に「日時・変更・影響する画面」を追記する
 - 公開（`firebase deploy`）は今井が確認してから。デプロイコマンド：
   ```
-  npx firebase-tools deploy --only "hosting,firestore:rules"
+  npx firebase-tools deploy --only "hosting,firestore:rules,functions"
   ```
+  提案文の ChatGPT（functions/）を初めて出すときは、先に `cd functions && npm install` と、鍵の登録 `npx firebase-tools functions:secrets:set OPENAI_API_KEY`（鍵は聞かれたときに貼る。チャットやリポジトリには書かない）
   PowerShell ではカンマを含む引数を引用符で囲む
 - 参加者の実データ（Firestore の中身や書き出した CSV）をリポジトリにコミットしない。サービスアカウントの秘密鍵も同様
 - 論文で引用する文献は実在を確認したものだけ使う

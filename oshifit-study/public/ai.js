@@ -1,4 +1,6 @@
-// OshiFit の提案文を、本人の推しに合わせて AI（Google の Gemini、Firebase AI Logic）で書く。
+// OshiFit の提案文を、本人の推しと性格に合わせて AI で書く。
+// ・まず ChatGPT（研究室の OpenAI の鍵。サーバーの処理 functions/index.js を Hosting の /api/proposal から呼ぶ）、
+//   だめなら Google の Gemini（Firebase AI Logic）で頼む。順番は config.js の OSHIFIT_AI.providers
 // ・提案の「型」（15種類のどれを出すか）は今までどおりアプリの式で決める。AI は、その型の狙いを保ったまま、
 //   推しのジャンル・推しの名前に合わせた具体的な題名とやり方を書くだけ（効果の値・根拠・分析は型のものを使う）
 // ・送るのは 6つの軸の点数・性格（TIPI-J の5因子）・推し活の中身の割合・推しのジャンル・推しの名前・推しの数・使うお金の範囲だけ。氏名・メール・自由記述は送らない
@@ -8,7 +10,7 @@
   "use strict";
   const V = "13.2.0";
   const CDN = (m) => `https://www.gstatic.com/firebasejs/${V}/firebase-${m}.js`;
-  const PROMPT_VERSION = "ai-v2";   // v2：性格・推し活の中身・お金の余裕を使い、型のやり方に縛られない代わりの楽しみ方を出す
+  const P = window.OFAI_PROMPT, prompt = P.prompt, clean = P.clean, PROMPT_VERSION = P.PROMPT_VERSION;   // ai_prompt.js
   let ready = null;
 
   const conf = () => window.OSHIFIT_AI || {};
@@ -37,60 +39,6 @@
     return names.map((name) => ({ name, m: ai.getGenerativeModel(g, { model: name, generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0.7 } }) }));
   }
 
-  function prompt(ctx) {
-    const plans = ctx.plans.map((p, i) =>
-      `提案${i + 1}（id: ${p.id}）\n- 改善を狙う軸：${p.axisName}（今 ${p.score}点）\n- 型の題名：${p.title}\n- 型のやり方：${p.how}` +
-      (p.cap ? `\n- 本人の月の推し活費の目安上限：${p.cap}` : "")).join("\n\n");
-    const moneyOk = ctx.money == null || ctx.money >= 50;
-    return `あなたは、推し活（ファン活動）を無理なく、もっと楽しく続けるための提案を書く担当です。
-次の人だけに向けた、この人にしか当てはまらない提案を、下の${ctx.plans.length}つの型それぞれについて1つずつ書いてください。
-
-【この人】
-- 推しのジャンル：${ctx.genre || "不明"}
-- 推しの名前・チーム名：${ctx.oshi || "（未回答）"}
-- 推しの数：${ctx.multi || "不明"}
-- この1か月の推し活費：${ctx.spend || "不明"}
-- 性格（TIPI-J、0〜100、50がふつう）：${ctx.traits || "不明"}
-- 推し活の中身（本人の推し活全体の中での割合が大きいもの）：${ctx.acts || "不明"}
-- 推し活の状態（0〜100点、高いほど良い）：${ctx.axes}
-
-【提案の型】
-${plans}
-
-【考え方】
-- 型の「改善を狙う軸」は変えない。やり方は型の文に縛られなくてよい。同じ狙いを、この人の性格・推し活の中身・推しの実際の楽しみ方に合った、別の具体的な形に置き換えてよい（代わりの楽しみ方を出す）。
-- 性格の使い方の例：
-  外向性が高い人には、一人で画面を見るより、人と一緒に楽しむ形（現地での応援、パブリックビューイング、スポーツバーやファン同士での観戦・鑑賞会、ファンの集まり）。
-  外向性が低い人には、一人で落ち着いて深く楽しむ形（決めた時間にまとめて見る、感想をノートに書く）。
-  勤勉性が高い人には計画や記録の形、低い人には通知やアプリの設定で自動にする形。
-  開放性が高い人には新しい楽しみ方（近場の聖地めぐり、創作、別の角度からの楽しみ方）。
-  情緒の揺れやすさが高い人には、比較や不安を減らす工夫（ミュート、見る時間を決める、結果を先に確認してから見る）。
-  協調性が高い人には、仲間と一緒に決める・一緒に守る形。
-- 推しに固有の言葉（チーム名・球場・応援・配信の形式・ライブの名前など）を使って、その人の場面が目に浮かぶように書く。
-- 場所や店、イベントは、確かめられない店名・住所・日程・値段を書かない。代わりに探し方を書く（例：「『阪神 パブリックビューイング』で検索する」「球団の公式サイトのファン向けイベントを見る」）。
-- お金：${moneyOk ? "お金の軸は大きく困っていないので、月の推し活費の範囲の中で、ほかの支出と置き換える形なら、現地での応援やイベント参加などお金のかかる提案もよい（例：グッズを1つ減らして、その分で月1回は現地で応援する）。" : "お金の軸が低いので、新しくお金のかかる提案はしない。"}
-
-【守ること】
-- 推し活をやめさせない。量を減らすだけの提案より、楽しみ方を整える・置き換える提案にする。今週から始められる小さな一歩にする。
-- 転売・高額取引・借金・無理な節約、食事や睡眠を削ることをすすめない。医療・診断の言葉、効果の断定をしない。
-- やさしい日本語。title は30字以内で「〜する」「〜にする」などで終える。how は140字以内で、いつ・どこで・何を・どうするかを書く。fit は50字以内で、なぜこの人に合うのかを、性格や推し活の中身にふれて書く（例：「人と盛り上がるのが好きなあなたは、一人で見るより〜」）。
-- id は提案の型の id をそのまま使い、${ctx.plans.length}つの型すべてに1つずつ書く。3つの提案は、互いに違う場面・違う形にする。`;
-  }
-
-  // 返ってきた文を確かめる。だめなものは捨てる（その提案は固定の文になる）
-  const BAD = /https?:|www\.|転売|診断|治療|必ず治|絶対に/;
-  function clean(items, ids) {
-    const out = {};
-    for (const it of items || []) {
-      if (!it || !ids.includes(it.id) || out[it.id]) continue;
-      const t = String(it.title || "").replace(/\s+/g, " ").trim(), h = String(it.how || "").replace(/\s+/g, " ").trim();
-      const f = String(it.fit || "").replace(/\s+/g, " ").trim();
-      if (!t || !h || t.length > 40 || h.length > 200 || BAD.test(t + h + f)) continue;
-      out[it.id] = f && f.length <= 90 ? { title: t, how: h, fit: f } : { title: t, how: h };
-    }
-    return out;
-  }
-
   // ctx: { plans:[{id,title,how,axisName,score,cap}], genre, oshi, multi, spend, axes }
   // 戻り値：{ byId:{id:{title,how}}, model, version } または null
   async function tailor(ctx, timeoutMs) {
@@ -100,6 +48,19 @@ ${plans}
       let text, used = "mock";
       if (window.OSHIFIT_AI_MOCK) text = await window.OSHIFIT_AI_MOCK(prompt(ctx), ids);
       else {
+        // ChatGPT：材料（ctx）だけを送り、サーバーがプロンプトを組み立てて頼む
+        if ((conf().providers || ["openai", "gemini"]).includes("openai")) {
+          try {
+            const r = await fetch(conf().proposalUrl || "/api/proposal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ctx }) });
+            const j = await r.json().catch(() => ({}));
+            if (r.ok && j.byId) {
+              const byId = clean(Object.entries(j.byId).map(([id, v]) => ({ id, ...v })), ids);
+              if (Object.keys(byId).length) return { byId, model: j.model || "openai", version: PROMPT_VERSION };
+            }
+            console.warn("[OshiFit AI] ChatGPT が使えませんでした", r.status, j.error || "");
+          } catch (e) { console.warn("[OshiFit AI] ChatGPT につながりません", e && e.message); }
+          if (!(conf().providers || ["openai", "gemini"]).includes("gemini")) throw new Error("ChatGPT が使えません");
+        }
         const models = await load(ids);
         // 混雑（429）や一時的な拒否（403）は、モデルを替えながら少し待って3回まで頼む（全体の時間切れの中で）
         for (let k = 0; ; k++) {

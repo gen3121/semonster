@@ -19,6 +19,13 @@
     ],
     "rewrites": [
       {
+        "source": "/api/proposal",
+        "function": {
+          "functionId": "proposal",
+          "region": "asia-northeast1"
+        }
+      },
+      {
         "source": "/editor",
         "destination": "/index.html"
       }
@@ -47,6 +54,18 @@
     "ui": {
       "enabled": false
     },
-    "singleProjectMode": true
-  }
+    "singleProjectMode": true,
+    "functions": {
+      "port": 5001
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "predeploy": [
+        "node -e \"require('fs').copyFileSync('public/ai_prompt.js','functions/ai_prompt.js')\""
+      ]
+    }
+  ]
 }

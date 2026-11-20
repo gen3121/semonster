@@ -131,3 +131,4 @@ python -m pytest analysis/tests -q                   # 15件
 | 2026-11-20 | AI の提案文：Google が混雑（429）や一時的な拒否（403）を返したときは、モデルを替えながら（gemini-4-hydrogen → gemini-3.8-flash）3回まで頼み直す。それでもだめなら固定の文。記録の ai.model に実際に使ったモデル名が残る | 2つの未来（提案文） |
 | 2026-11-20 | AI の提案文のモデルの順番を入れ替え：先に gemini-3.8-flash（届きやすく約8秒）、断られたら gemini-4-hydrogen | 2つの未来（提案文） |
 | 2026-11-20 | 編集者用の版（/editor）でも AI の提案文を作る（保存はしない）。AI が使えなかったときは「推しに合わせた文を作れなかったため、もとの提案の文を表示しています」と出す。展示用のテストは保存の Firebase に通信しないことを確かめる（AI は対象外） | 2つの未来（研究版・編集者用） |
+| 2026-11-20 | 提案文は、まず ChatGPT（研究室の OpenAI の鍵）で頼み、だめなら Gemini。Firebase Functions（第2世代・東京、functions/index.js）を Hosting の /api/proposal から呼ぶ。鍵は Secret Manager（OPENAI_API_KEY）。アプリは材料だけを送り、プロンプトはサーバーで組み立てる（public/ai_prompt.js を共有。公開の前に functions/ に写す）。1日300回まで。テスト：tests/functions_check.js（偽の OpenAI） | 2つの未来（提案文）・firebase.json・functions/ |
