@@ -145,9 +145,14 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,te
 .qcard.back{animation:slideback .28s cubic-bezier(.16,1,.3,1)}
 @keyframes slidein{from{opacity:.35}to{opacity:1}}
 @keyframes slideback{from{opacity:.35}to{opacity:1}}
-.qid{font:600 12px var(--mono);color:var(--primary);background:var(--good-bg);border-radius:6px;padding:1px 8px}
+.qid{white-space:nowrap;flex:none;font:600 12px var(--mono);color:var(--primary);background:var(--good-bg);border-radius:6px;padding:1px 8px}
 .qtext{font:700 18px/1.55 var(--head);letter-spacing:-.01em}
 .lead{font-size:12px;line-height:1.6;color:var(--muted)}
+/* 質問のまとまりの説明（答え方が変わるので目立たせる）。まとまりの最初の質問では「ここから」の印と色の帯を付ける */
+.qhead .qlead{font-size:13px;line-height:1.65;color:var(--ink,inherit);background:color-mix(in srgb,var(--primary) 7%,transparent);border-left:4px solid var(--primary);border-radius:8px;padding:8px 10px;margin:0}
+.qhead .secnew{align-self:flex-start;font-size:12px;font-weight:700;color:var(--primary);background:color-mix(in srgb,var(--primary) 12%,transparent);border-radius:999px;padding:3px 10px;margin:0}
+.qhead.isnew .qlead{background:color-mix(in srgb,var(--primary) 14%,transparent);font-weight:700}
+@media (prefers-reduced-motion:no-preference){.qhead.isnew .qlead{animation:secin .6s ease-out}@keyframes secin{from{box-shadow:0 0 0 4px color-mix(in srgb,var(--primary) 35%,transparent)}to{box-shadow:0 0 0 0 transparent}}}
 .circles{position:relative;display:flex;justify-content:space-between;align-items:center;padding:14px 2px}
 .circles::before{content:"";position:absolute;left:16px;right:16px;top:50%;height:2px;background:var(--line);transform:translateY(-50%)}
 .cbtn{position:relative;z-index:1;appearance:none;border-radius:50%;border:2px solid var(--line2);background:var(--card);cursor:pointer;display:grid;place-items:center;font:700 13px var(--sans);color:var(--muted);transition:transform .15s,background .15s,border-color .15s;padding:0}
@@ -1361,9 +1366,10 @@ let EDIT=!STUDY, VIEW="start", SV={}, LOCK=false, DIR="in", KEEP=false;
 /* 質問文の欄を、同じ節（同じ選び方）でいちばん長い質問文に合わせた高さで固定する。選択肢が毎回同じ高さから始まるので、
    同じ選び方の質問が続くとき「どちらでもない」などが前の質問と同じ場所に来る（答えても画面は上に戻らない） */
 const QH={};
+let AVTAB_SX=0;   // アバターの部品タブの横スクロールの位置（画面を描き直しても戻らないように）
 function fitCard(key,items){const h=app.querySelector(".qhead");if(!h)return;const it0=items[SV[key].i],w=h.clientWidth;const k=key+":"+it0.sec+":"+w;
   if(!QH[k]){const m=document.createElement("div");m.className="qhead";m.style.cssText=`position:absolute;visibility:hidden;left:-9999px;width:${w}px;min-height:0`;document.body.appendChild(m);let mx=0;
-    items.filter(it=>it.sec===it0.sec).forEach(it=>{m.innerHTML=`${it.lead?`<p class="lead">${esc(it.lead)}</p>`:""}<h2 class="qtext">${esc(it.text)}</h2>`;mx=Math.max(mx,m.offsetHeight)});m.remove();QH[k]=Math.min(mx,Math.round(innerHeight*.35))}
+    items.filter(it=>it.sec===it0.sec).forEach(it=>{m.innerHTML=`<p class="secnew">ここから質問が変わります：${esc(it.sec)}</p>${it.lead?`<p class="qlead">${esc(it.lead)}</p>`:""}<h2 class="qtext">${esc(it.text)}</h2>`;mx=Math.max(mx,m.offsetHeight)});m.remove();QH[k]=Math.min(mx,Math.round(innerHeight*.35))}
   h.style.minHeight=QH[k]+"px"}
 addEventListener("resize",()=>{if(SV[VIEW])render()});
 function toast(t){document.querySelectorAll(".toast").forEach(x=>x.remove());const d=document.createElement("div");d.className="toast";d.setAttribute("role","status");d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),2400)}
@@ -1529,7 +1535,7 @@ function finalItems(){const ids=["W1","W2","W3","W4","W5","H1","H2","H3","H4",..
 let ADV=null;const ADV_MS=800;   // 選んでから次の質問へ進むまで（ミリ秒）
 function vSurvey(key,items,store,title,ctx,onDone,stepIdx){clearTimeout(ADV);ADV=null;
   const st=SV[key]||(SV[key]={i:0}); st.i=clamp(st.i,0,items.length-1);
-  const it=items[st.i], n=items.length, val=store[it.id], has=val!=null&&val!=="";
+  const it=items[st.i], n=items.length, newSec=st.i===0||items[st.i-1].sec!==it.sec, val=store[it.id], has=val!=null&&val!=="";
   const left=Math.max(1,Math.ceil((n-st.i)*10/60));
   let input="";
   if(it.kind==="circle"){const sz=[44,38,32,28,32,38,44];
@@ -1544,7 +1550,7 @@ function vSurvey(key,items,store,title,ctx,onDone,stepIdx){clearTimeout(ADV);ADV
    <div class="qprog"><div class="meta"><span>${esc(it.sec)}</span><span class="mono">${st.i+1} / ${n}</span></div><div class="bar"><i style="width:${r0((st.i)/n*100)}%"></i></div><div class="meta"><span>${esc(title)}</span><span>あと約${left}分</span></div>${STUDY&&key==="q"?`<p class="xs muted" id="autosave" style="margin:2px 0 0">回答は自動で保存されています。途中でやめても、ログインすれば続きから答えられます。</p>`:""}</div>
    <article class="card qcard ${DIR}">
      <div class="row" style="justify-content:space-between"><span class="qid" data-qid="${esc(it.id)}">問${st.i+1}${STUDY?"":`・${esc(it.id)}`}</span><span class="xs muted">${auto?"選ぶと自動で次の質問へ進みます（約1秒は選び直せます）":it.optional?"空欄のままでも進めます":"入力して「次へ」"}</span></div>
-     <div class="qhead">${it.lead?`<p class="lead">${esc(it.lead)}</p>`:""}<h2 class="qtext">${esc(it.text)}</h2></div><div class="ans">${input}</div>
+     <div class="qhead${newSec?" isnew":""}">${newSec&&st.i>0?`<p class="secnew">ここから質問が変わります：${esc(it.sec)}</p>`:""}${it.lead?`<p class="qlead">${esc(it.lead)}</p>`:""}<h2 class="qtext">${esc(it.text)}</h2></div><div class="ans">${input}</div>
    </article></main>
    <div class="dock"><div class="in"><button class="btn back" id="sv-prev" ${st.i===0?"disabled":""}>前の質問</button>${auto?(has?`<button class="btn primary" id="sv-next">回答を変えずに次へ</button>`:""):`<button class="btn primary" id="sv-next" ${has||it.optional?"":"disabled"}>${st.i===n-1?"回答を終える":"次へ"}</button>`}</div></div>`;
   DIR="in";
@@ -1805,6 +1811,7 @@ function vAvatar(){const A=window.OFAvatar,gender=S.answers.Q2;
    <section class="card avstage"><div class="avprev">${A.render(av,"neutral",150)}</div><button class="btn sm" id="av-rand">おまかせ</button></section>
    <section class="card" style="gap:10px"><div class="avtabs" role="tablist">${TABS.map(([k,l])=>`<button class="avtab" role="tab" data-tab="${k}" aria-selected="${AVTAB===k}">${l}</button>`).join("")}</div>${grid}</section></main>
    ${dock("av-back","結果を見る","av-go")}`;
+  {const t=app.querySelector(".avtabs");if(t){t.scrollLeft=AVTAB_SX;const a=t.querySelector('[aria-selected="true"]');if(a&&(a.offsetLeft<t.scrollLeft||a.offsetLeft+a.offsetWidth>t.scrollLeft+t.clientWidth))t.scrollLeft=Math.max(0,a.offsetLeft-24);AVTAB_SX=t.scrollLeft;t.addEventListener("scroll",()=>{AVTAB_SX=t.scrollLeft},{passive:true})}}
   app.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{AVTAB=b.dataset.tab;keep(vAvatar)});
   app.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{const k=b.dataset.k;av[k]=k==="hair"?b.dataset.v:+b.dataset.v;keep(vAvatar)});
   $("#av-rand").onclick=()=>{const r=n=>Math.floor(Math.random()*n);Object.assign(av,{face:r(A.FACE.length),skin:r(A.SKIN.length),hair:styles[r(styles.length)][0],hairColor:r(18),brow:r(A.BROW.length),eye:r(A.EYE.length),eyeColor:r(3),nose:r(A.NOSE.length-1),mouth:r(A.MOUTH.length),shirt:r(36)});keep(vAvatar)};
