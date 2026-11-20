@@ -32,10 +32,9 @@
         }),
       },
     });
-    return ai.getGenerativeModel(g, {
-      model: conf().model || "gemini-4-hydrogen",
-      generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0.7 },
-    });
+    // 1つめのモデルが断られたとき（混雑・お支払いの条件）は、次のモデルで頼み直す
+    const names = [conf().model || "gemini-4-hydrogen", ...(conf().fallbackModels || ["gemini-3.8-flash"])];
+    return names.map((name) => ({ name, m: ai.getGenerativeModel(g, { model: name, generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0.7 } }) }));
   }
 
   function prompt(ctx) {
@@ -98,15 +97,19 @@ ${plans}
     if (!enabled() || !ctx || !ctx.plans || !ctx.plans.length) return null;
     const ids = ctx.plans.map((p) => p.id);
     const run = async () => {
-      let text;
+      let text, used = "mock";
       if (window.OSHIFIT_AI_MOCK) text = await window.OSHIFIT_AI_MOCK(prompt(ctx), ids);
       else {
-        const model = await load(ids);
-        const r = await model.generateContent(prompt(ctx));
-        text = r.response.text();
+        const models = await load(ids);
+        // 混雑（429）や一時的な拒否（403）は、モデルを替えながら少し待って3回まで頼む（全体の時間切れの中で）
+        for (let k = 0; ; k++) {
+          const md = models[k % models.length];
+          try { const r = await md.m.generateContent(prompt(ctx)); text = r.response.text(); used = md.name; break; }
+          catch (e) { if (k >= 2) throw e; await new Promise((res) => setTimeout(res, k ? 3000 : 1000)); }
+        }
       }
       const byId = clean((JSON.parse(text) || {}).items, ids);
-      return Object.keys(byId).length ? { byId, model: window.OSHIFIT_AI_MOCK ? "mock" : conf().model || "gemini-4-hydrogen", version: PROMPT_VERSION } : null;
+      return Object.keys(byId).length ? { byId, model: used, version: PROMPT_VERSION } : null;
     };
     let timer;
     try {
