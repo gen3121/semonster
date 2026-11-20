@@ -1543,10 +1543,10 @@ function vSurvey(key,items,store,title,ctx,onDone,stepIdx){clearTimeout(ADV);ADV
   app.innerHTML=header(ctx)+`<main class="stack" style="padding-top:14px">${stepIdx!=null?stepper(stepIdx):""}
    <div class="qprog"><div class="meta"><span>${esc(it.sec)}</span><span class="mono">${st.i+1} / ${n}</span></div><div class="bar"><i style="width:${r0((st.i)/n*100)}%"></i></div><div class="meta"><span>${esc(title)}</span><span>あと約${left}分</span></div>${STUDY&&key==="q"?`<p class="xs muted" id="autosave" style="margin:2px 0 0">回答は自動で保存されています。途中でやめても、ログインすれば続きから答えられます。</p>`:""}</div>
    <article class="card qcard ${DIR}">
-     <div class="row" style="justify-content:space-between"><span class="qid">${esc(it.id)}</span><span class="xs muted">${auto?"選ぶと少しして次へ進みます（その間は選び直せます）":it.optional?"空欄のままでも進めます":"入力して「次へ」"}</span></div>
+     <div class="row" style="justify-content:space-between"><span class="qid">${esc(it.id)}</span><span class="xs muted">${auto?"選ぶと自動で次の質問へ進みます（約1秒は選び直せます）":it.optional?"空欄のままでも進めます":"入力して「次へ」"}</span></div>
      <div class="qhead">${it.lead?`<p class="lead">${esc(it.lead)}</p>`:""}<h2 class="qtext">${esc(it.text)}</h2></div><div class="ans">${input}</div>
    </article></main>
-   <div class="dock"><div class="in"><button class="btn back" id="sv-prev" ${st.i===0?"disabled":""}>前の質問</button><button class="btn primary" id="sv-next" ${has||it.optional?"":"disabled"}>${st.i===n-1?"回答を終える":"次へ"}</button></div></div>`;
+   <div class="dock"><div class="in"><button class="btn back" id="sv-prev" ${st.i===0?"disabled":""}>前の質問</button>${auto?(has?`<button class="btn primary" id="sv-next">回答を変えずに次へ</button>`:""):`<button class="btn primary" id="sv-next" ${has||it.optional?"":"disabled"}>${st.i===n-1?"回答を終える":"次へ"}</button>`}</div></div>`;
   DIR="in";
   fitCard(key,items);
   const next=()=>{clearTimeout(ADV);ADV=null;if(st.i<n-1){st.i++;DIR="in";KEEP=true;render()}else onDone()};
@@ -1560,7 +1560,7 @@ function vSurvey(key,items,store,title,ctx,onDone,stepIdx){clearTimeout(ADV);ADV
   const num=$("#f-num"); if(num){num.oninput=()=>{const v=parseInt(num.value,10);store[it.id]=isNaN(v)?null:v;saveDraft(key);const lo=it.min??18,hi=it.max??99;$("#sv-next").disabled=!(v>=lo&&v<=hi)};num.focus()}
   const tx=$("#f-text"); if(tx)tx.oninput=()=>{store[it.id]=tx.value;saveDraft(key)};
   $("#sv-prev").onclick=()=>{if(st.i>0){st.i--;DIR="back";KEEP=true;render()}};
-  $("#sv-next").onclick=next;
+  if($("#sv-next"))$("#sv-next").onclick=next;
   wire();}
 
 /* ---------- 画面 ---------- */
