@@ -1710,7 +1710,10 @@ function vStart(){app.className="app land";
 /* ---------- 新規登録・ログイン（メールアドレスとパスワード。Firebase Authentication） ---------- */
 const AUTH_ERR={"auth/email-already-in-use":"このメールアドレスは登録済みです。「ログイン」から入ってください。","auth/invalid-email":"メールアドレスの形が正しくありません。","auth/weak-password":"パスワードは8文字以上にしてください。","auth/invalid-credential":"メールアドレスかパスワードが違います。","auth/wrong-password":"メールアドレスかパスワードが違います。","auth/user-not-found":"このメールアドレスは登録されていません。","auth/too-many-requests":"試行が多すぎます。しばらくしてからお試しください。","auth/network-request-failed":"通信できませんでした。通信を確認してください。","auth/popup-closed-by-user":"ログインの画面が閉じられました。もう一度お試しください。","auth/popup-blocked":"ポップアップが止められました。ブラウザの設定でこのサイトのポップアップを許可してください。","auth/account-exists-with-different-credential":"このメールアドレスは別の方法（メール・Google・Microsoft のどれか）で登録済みです。登録したときの方法でログインしてください。"};
 const authMsg=e=>AUTH_ERR[e&&e.code]||"うまくいきませんでした。もう一度お試しください。";
+/* 参加の受付期間（config.js の OSHIFIT_SIGNUP_UNTIL、日本時間のその日の終わりまで）。過ぎたら新規登録を出さない。登録済みの人はログインして続けられる */
+function signupClosed(){const u=window.OSHIFIT_SIGNUP_UNTIL;return !!(STUDY&&u&&Date.now()>=Date.parse(u+"T24:00:00+09:00"))}
 function vSignup(){const opts=QN.sections[0].items.find(i=>i.id==="Q2").opts, logged=STUDY&&OFStore.email;
+  if(signupClosed()){const [y,m,d]=window.OSHIFIT_SIGNUP_UNTIL.split("-").map(Number);app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">SIGN UP</p><h2>参加の受付は終了しました</h2><p class="small">新しい参加の受付は${y}年${m}月${d}日で終わりました。ご関心をお寄せいただき、ありがとうございました。</p><p class="small muted">すでに登録している方は、ログインして続きから答えられます。</p></div><a class="btn primary" href="#login">ログインする</a></main>`;wire();return}
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">SIGN UP</p><h2>${logged?"登録の続き":"新規登録"}</h2><p class="small muted">登録すると、質問 → アバター → 分析 → 2つの未来 の順に進みます。途中でやめても、ログインすれば続きから答えられます。</p></div>
    <section class="card">${logged?`<p class="small">ログイン中：<b>${esc(OFStore.email)}</b></p>`:`
     <label class="stack" style="gap:4px"><b class="small">メールアドレス</b><input class="field" id="su-mail" type="email" autocomplete="email" inputmode="email"></label>

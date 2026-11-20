@@ -19,6 +19,7 @@ service cloud.firestore {
     match /participants/{uid} {
       allow read: if owner(uid) || isAdmin();
       allow create: if owner(uid)
+        && request.time < timestamp.date(2027, 1, 20) + duration.value(15, 'h')   // 受付は 2027-01-20 の日本時間の終わりまで（config.js の OSHIFIT_SIGNUP_UNTIL と同じ）
         && request.resource.data.mode == 'study'
         && request.resource.data.pid is string && request.resource.data.pid.size() == 9
         && !('group' in request.resource.data) && !('final' in request.resource.data);

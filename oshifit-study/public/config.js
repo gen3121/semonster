@@ -24,5 +24,8 @@ window.OSHIFIT_MS_TENANT = "636389c0-b95c-4828-b98f-f9fcb8d9383a";
 //   appCheckKey：reCAPTCHA v3 のサイトキー（公開してよい値）。App Check に登録すると、このサイト以外から無料枠を使われない
 //   使えないとき（設定前・上限・時間切れ）は、承認済みの固定の文を出す。enabled:false で AI を使わない
 window.OSHIFIT_AI = { enabled: true, model: "gemini-4-hydrogen", appCheckKey: "" };
+// 参加の受付の最終日（日本時間でこの日の終わりまで）。過ぎると新規登録の画面に「受付は終了しました」と出る（登録済みの人は続けられる）
+//   AI の提案文（App Check）が 2027-01-21 から使えなくなるため、全員が同じ条件になるようにここで区切る
+window.OSHIFIT_SIGNUP_UNTIL = "2027-01-20";
 // テスト用：エミュレーターにつなぐ（本番では null のまま）
 window.OSHIFIT_EMULATOR = null; // 例 { auth: "http://127.0.0.1:9099", firestore: ["127.0.0.1", 8080] }
