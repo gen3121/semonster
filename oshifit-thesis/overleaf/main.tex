@@ -1,0 +1,97 @@
+% =====================================================================
+% 2026年度 修士論文（日本語版）
+% OshiFit：個人の性格特性に適した推し活方法を提案するシステムの構築と検証
+% コンパイル：upLaTeX → upBibTeX → upLaTeX ×2 → dvipdfmx
+%   （Overleaf：Menu → Compiler を「LaTeX」にし、同梱の latexmkrc を使う）
+% 体裁は2024年度卒業論文（表紙→概要→Abstract→目次→本文→参考文献→研究業績）に合わせた。
+% 【要記入】【要確認】の箇所は、実験後・提出前に必ず埋める／確認すること。
+% =====================================================================
+\documentclass[uplatex,dvipdfmx,a4paper,11pt,openany]{jsreport}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\usepackage{pxjahyper}
+\usepackage{caption}
+\captionsetup{labelsep=colon}
+\renewcommand{\thefigure}{\thechapter.\arabic{figure}}
+\renewcommand{\thetable}{\thechapter.\arabic{table}}
+\renewcommand{\bibname}{参考文献}
+
+% 図表のキャプションを「図 1.1: 日本語 / Fig. 1.1: English」の2行にする（2024年度卒論の体裁）
+\newcommand{\jecaption}[2]{\caption[#1]{#1\\{\small Fig.~\thefigure: #2}}}
+\newcommand{\jetcaption}[2]{\caption[#1]{#1\\{\small Table~\thetable: #2}}}
+% 実験後に埋める箇所
+\newcommand{\todo}[1]{\textbf{【#1】}}
+\newcommand{\placeholderfig}[2]{\fbox{\parbox[c][#1][c]{0.9\linewidth}{\centering\small #2}}}
+
+% ---- 無料版Overleafでコンパイル時間が足りないとき ----
+% 編集中の章だけをコンパイルする場合は，下の行の先頭の % を消して章のファイル名を指定する．
+% （ページ番号・相互参照は前回の全体コンパイルの値が使われる．提出前は % を戻して全体をコンパイルする）
+%\includeonly{chap3_survey}
+% 図の読み込みを省いて速くする場合は，\documentclass の [ ] の中に draft を加える．
+\begin{document}
+
+% ---------------------------------------------------------------- 表紙
+\begin{titlepage}
+\begin{center}
+{\Large 2026年度 修士論文}\\[34mm]
+{\LARGE\bfseries OshiFit：個人の性格特性に適した\\[2mm]推し活方法を提案するシステムの構築と検証}\\[12mm]
+{\large\bfseries OshiFit: Development and Evaluation of a System\\That Proposes Fan Activities (Oshi-katsu)\\Suited to Individual Personality Traits}\\[20mm]
+{\large 指導教員}\\[2mm]
+{\large 大井 翔 講師}\todo{要確認：職名}\\[14mm]
+{\large M02530106\quad 今井 元}\\[6mm]
+{\large 提出日：2027年1月}\\[30mm]
+{大阪工業大学大学院 情報科学研究科\\メディアインタラクション研究室}\\[3mm]
+{\small Media Interaction Laboratory, Graduate School of Information Science and Technology\\Osaka Institute of Technology}
+\end{center}
+\end{titlepage}
+
+\pagenumbering{roman}
+\input{abstract_ja}
+\input{abstract_en}
+
+\tableofcontents
+\listoffigures
+\listoftables
+\clearpage
+\pagenumbering{arabic}
+
+\include{chap1_intro}
+\include{chap2_related}
+\include{chap3_survey}
+\include{chap4_system}
+\include{chap5_experiment}
+\include{chap6_discussion}
+\include{chap7_conclusion}
+
+\chapter*{謝辞}
+\addcontentsline{toc}{chapter}{謝辞}
+本研究を進めるにあたり，終始ご指導をいただいた大阪工業大学 大井翔先生に心より感謝申し上げます．研究の方向付けから調査・システム開発・論文執筆に至るまで，多くの助言をいただきました．また，大阪工業大学 情報科学部 データサイエンス学科 濱田悦夫教授には，データサイエンスと統計解析の観点から，調査データの分析方法（構造方程式モデリング，因果構造の探索，効果の推定）や検証実験の分析計画について貴重なご助言をいただきました．深く感謝申し上げます．また，調査に協力してくださった回答者の皆様，検証実験に参加してくださった皆様，日頃から議論に付き合ってくださったメディアインタラクション研究室の皆様に深く感謝いたします．
+\todo{要記入：研究費（科研費等）や協力者があれば記載}
+
+\bibliographystyle{junsrt}
+\bibliography{references}
+\addcontentsline{toc}{chapter}{参考文献}
+
+\chapter*{研究業績}
+\addcontentsline{toc}{chapter}{研究業績}
+\section*{国際会議}
+\begin{enumerate}
+\item Gen Imai, Sho Ooi: ``OshiFit: Study on Proposal System with `Oshi-katsu' based on Individual Characteristics Predicted by One's Own Avatar,'' IEVC 2026（ポスター発表）．
+\item Gen Imai, Sho Ooi: ``OshiFit: Showing Fans Two Futures of Their Fan Activities with a Self-Resembling Avatar,'' CHIIR 2027 Short Paper（投稿中，Submission 321）．\todo{採否が決まり次第更新}
+\end{enumerate}
+\section*{国内学会}
+\begin{enumerate}
+\item 今井元，大井翔：推し活時の心拍とストレスとの関連性に関する研究，ウェルビーイング学会 第3回年次大会，2025．
+\item 今井元，大井翔：2026年度 情報処理学会関西支部 支部大会，G-43，2026．\todo{要確認：題目}
+\end{enumerate}
+
+\appendix
+\input{appendix}
+
+\end{document}

@@ -1,0 +1,4 @@
+$pdf_mode = 4;          # LuaLaTeX
+$bibtex = 'upbibtex %O %B';
+$max_repeat = 5;
+@default_files = ('main.tex');

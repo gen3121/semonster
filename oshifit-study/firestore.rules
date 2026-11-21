@@ -1,0 +1,109 @@
+rules_version = '2';
+// OshiFit 研究版の Firestore ルール。参加者（メールアドレスでログイン）は自分の記録だけ読み書きでき、開発者（admins に登録した大学アカウント）は全件を閲覧できる。
+// 3つの層：①参加者のデータ（participants。開発者も書き換えられない）／②実験の条件（study/protocol・plans。版と履歴、固定）／③運用（ops・notices・notes）
+// 参加をやめても記録は消さない（倫理審査の同意どおり）。やめたあとは書き込めない。
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function owner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() {
+      // Microsoft のアカウントは email_verified が付かないことがあるため、Google・Microsoft でのログインも認める
+      return signedIn()
+        && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider in ['google.com', 'microsoft.com'])
+        && exists(/databases/$(db)/documents/admins/$(request.auth.token.email));
+    }
+    function unchanged(f) {   // 一度入れた値は変えられない
+      return !(f in resource.data) || (f in request.resource.data && request.resource.data[f] == resource.data[f]);
+    }
+
+    match /participants/{uid} {
+      allow read: if owner(uid) || isAdmin();
+      allow create: if owner(uid)
+        && request.time < timestamp.date(2027, 1, 20) + duration.value(15, 'h')   // 受付は 2027-01-20 の日本時間の終わりまで（config.js の OSHIFIT_SIGNUP_UNTIL と同じ）
+        && request.resource.data.mode == 'study'
+        && request.resource.data.pid is string && request.resource.data.pid.size() == 9
+        && !('group' in request.resource.data) && !('final' in request.resource.data);
+      allow update: if owner(uid)
+        && !(resource.data.get('withdrawn', false) == true)                 // やめたあとは書き込めない
+        && (!('withdrawn' in request.resource.data) || request.resource.data.withdrawn == true)
+        && unchanged('pid') && unchanged('mode') && unchanged('createdAt') && unchanged('consentedAt')
+        // 選んだ群・提案・見込み・決めた時刻は変えられない
+        && unchanged('group') && unchanged('planIds') && unchanged('decidedAt') && unchanged('pred') && unchanged('cfgVersion') && unchanged('cfgUsed')
+        // 群が決まるまでは、開始時の回答を見直せる（アバターの画面から質問に戻れる）。群が決まったら、回答・示した提案は変えられない。最後の調査も一度だけ
+        && (!('group' in resource.data) || (unchanged('answers') && unchanged('baselineAt') && unchanged('baselineDone') && unchanged('plansOffered')))
+        && unchanged('final')
+        && (!('group' in request.resource.data) || request.resource.data.group in ['A', 'B', 'C'])
+        && (('group' in resource.data) || !('group' in request.resource.data) || request.resource.data.decidedAt == request.time)
+        && (!('final' in request.resource.data) || 'group' in resource.data);
+      allow delete: if false;        // 記録は消さない（参加をやめても研究に使う）
+
+      // 毎日のアンケート：群が決まったあと、1日1回（文書IDは日付）。書き換え・削除はしない
+      match /daily/{date} {
+        allow read: if owner(uid) || isAdmin();
+        allow create: if owner(uid)
+          && date.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$') && request.resource.data.date == date
+          && request.resource.data.mood is int && request.resource.data.mood >= 1 && request.resource.data.mood <= 7
+          && request.resource.data.yen is number && request.resource.data.yen >= 0 && request.resource.data.yen <= 1000000
+          && request.resource.data.minutes is number && request.resource.data.minutes >= 0 && request.resource.data.minutes <= 1440
+          && get(/databases/$(db)/documents/participants/$(uid)).data.get('group', '') in ['A', 'B', 'C']
+          && !(get(/databases/$(db)/documents/participants/$(uid)).data.get('withdrawn', false) == true);
+        allow update, delete: if false;
+      }
+      match /checkins/{week} {
+        allow read: if owner(uid) || isAdmin();
+        allow create: if owner(uid)
+          && week in ['1', '2', '3', '4', '5', '6']
+          && request.resource.data.week == int(week)
+          && get(/databases/$(db)/documents/participants/$(uid)).data.get('group', '') in ['B', 'C']
+          && !(get(/databases/$(db)/documents/participants/$(uid)).data.get('withdrawn', false) == true);
+        allow update, delete: if false;   // 振り返りはあとから書き換えない・消さない
+      }
+    }
+    match /{path=**}/checkins/{week} { allow read: if isAdmin(); }
+    match /{path=**}/daily/{date} { allow read: if isAdmin(); }
+    match /admins/{email} { allow read: if isAdmin(); allow write: if false; }
+    match /pilots/{pid} { allow read: if isAdmin(); allow write: if false; }   // プレ実験の参加ID（コンソールから研究者が入れる）
+    // ---------- ②実験の条件（版で管理。実験が始まったら locked:true で固定）
+    // 注意：Firebase のコンソールからの書き込みはルールを通らない。条件の変更は開発者ページから行う（版と履歴が残る）
+    function protoLocked() { return exists(/databases/$(db)/documents/study/protocol) && get(/databases/$(db)/documents/study/protocol).data.get('locked', false) == true; }
+    match /study/protocol {
+      allow read: if true;
+      // 作る：版1で、同じ書き込みで履歴の版1も作る
+      allow create: if isAdmin() && request.resource.data.version == 1 && request.resource.data.get('locked', false) == false
+        && existsAfter(/databases/$(db)/documents/study/protocol/history/1);
+      allow update: if isAdmin() && (
+        // 固定する・外す：locked まわりの項目だけが変わる。外すときは理由が要る
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['locked', 'lockedAt', 'lockedBy', 'lockReason'])
+          && (request.resource.data.locked == true || (request.resource.data.get('lockReason', '') is string && request.resource.data.get('lockReason', '').size() > 0)))
+        ||
+        // 条件を変える：固定されていないときだけ。版を1つ上げ、同じ書き込みでその版の履歴を作る
+        (resource.data.get('locked', false) == false && request.resource.data.get('locked', false) == false
+          && request.resource.data.version == resource.data.version + 1
+          && existsAfter(/databases/$(db)/documents/study/protocol/history/$(string(request.resource.data.version))))
+      );
+      allow delete: if false;
+      match /history/{v} {          // 変更の履歴（前の値・新しい値・理由・誰が・いつ）。消せない・書き換えられない
+        allow read: if isAdmin();
+        allow create: if isAdmin() && request.resource.data.version == int(v)
+          && getAfter(/databases/$(db)/documents/study/protocol).data.version == int(v)
+          && request.resource.data.reason is string && request.resource.data.reason.size() > 0;
+        allow update, delete: if false;
+      }
+      match /events/{id} {          // 固定する・外すの記録
+        allow read: if isAdmin();
+        allow create: if isAdmin();
+        allow update, delete: if false;
+      }
+    }
+    // 提案：固定中は「出す・出さない」（active）だけ変えられる
+    match /plans/{id} {
+      allow read: if true;
+      allow create, delete: if isAdmin() && !protoLocked();
+      allow update: if isAdmin() && (!protoLocked() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'updatedAt', 'updatedBy']));
+    }
+    // ---------- ③運用（いつでも変えてよい）
+    match /ops/{doc} { allow read, write: if isAdmin(); }                       // ops/alerts：「確認が必要」の基準
+    match /notices/{id} { allow read: if true; allow write: if isAdmin(); }     // お知らせ（はじめに・ホーム・マイページに出す）
+    match /notes/{pid} { allow read, write: if isAdmin(); }                     // 参加者ごとのメモ・分析から除外（研究者だけが見る）
+  }
+}

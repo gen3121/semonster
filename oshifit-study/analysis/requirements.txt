@@ -1,0 +1,10 @@
+# OshiFit 分析パイプライン（Python 3.13 で動作確認、2026-11-12）
+numpy==2.5.4
+pandas==3.1.1
+scipy==1.18.1
+scikit-learn==1.9.1
+statsmodels==0.15.0
+semopy==2.3.11
+causal-learn==0.1.4.8
+matplotlib==3.11.2
+pytest==9.2.0
