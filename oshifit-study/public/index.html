@@ -1536,7 +1536,7 @@ function finalItems(){const ids=["W1","W2","W3","W4","W5","H1","H2","H3","H4",..
   const L=ids.map(itemOf);if(S.group!=="A")USE.forEach(([id,text])=>L.push({id,text,sec:"OshiFitを使ってみて",lead:"",kind:"list",labels:AGREE5U,vals:AGREE5U.map((_,j)=>j+1)}));
   if(S.group==="B")L.push({id:"how",text:"提案（プランB）を行ってみて、どのように変わりましたか（任意）",sec:"最後に",lead:"",kind:"text",optional:true});return L}
 
-let ADV=null;const ADV_MS=800;   // 選んでから次の質問へ進むまで（ミリ秒）
+let ADV=null;const ADV_MS=500;   // 選んでから次の質問へ進むまで（ミリ秒）
 function vSurvey(key,items,store,title,ctx,onDone,stepIdx){clearTimeout(ADV);ADV=null;
   const st=SV[key]||(SV[key]={i:0}); st.i=clamp(st.i,0,items.length-1);
   const it=items[st.i], n=items.length, newSec=st.i===0||items[st.i-1].sec!==it.sec, val=store[it.id], has=val!=null&&val!=="";
@@ -1553,7 +1553,7 @@ function vSurvey(key,items,store,title,ctx,onDone,stepIdx){clearTimeout(ADV);ADV
   app.innerHTML=header(ctx)+`<main class="stack" style="padding-top:14px">${stepIdx!=null?stepper(stepIdx):""}
    <div class="qprog"><div class="meta"><span>${esc(it.sec)}</span><span class="mono">${st.i+1} / ${n}</span></div><div class="bar"><i style="width:${r0((st.i)/n*100)}%"></i></div><div class="meta"><span>${esc(title)}</span><span>あと約${left}分</span></div>${STUDY&&key==="q"?`<p class="xs muted" id="autosave" style="margin:2px 0 0">回答は自動で保存されています。途中でやめても、ログインすれば続きから答えられます。</p>`:""}</div>
    <article class="card qcard ${DIR}">
-     <div class="row" style="justify-content:space-between"><span class="qid" data-qid="${esc(it.id)}">問${st.i+1}${STUDY?"":`・${esc(it.id)}`}</span><span class="xs muted">${auto?"選ぶと自動で次の質問へ進みます（約1秒は選び直せます）":it.optional?"空欄のままでも進めます":"入力して「次へ」"}</span></div>
+     <div class="row" style="justify-content:space-between"><span class="qid" data-qid="${esc(it.id)}">問${st.i+1}${STUDY?"":`・${esc(it.id)}`}</span><span class="xs muted">${auto?"選ぶと自動で次の質問へ進みます（約0.5秒は選び直せます）":it.optional?"空欄のままでも進めます":"入力して「次へ」"}</span></div>
      <div class="qhead${newSec?" isnew":""}">${newSec&&st.i>0?`<p class="secnew">ここから質問が変わります：${esc(it.sec)}</p>`:""}${it.lead?`<p class="qlead">${esc(it.lead)}</p>`:""}<h2 class="qtext">${esc(it.text)}</h2></div><div class="ans">${input}</div>
    </article></main>
    <div class="dock"><div class="in"><button class="btn back" id="sv-prev" ${st.i===0?"disabled":""}>前の質問</button>${auto?(has?`<button class="btn primary" id="sv-next">回答を変えずに次へ</button>`:""):`<button class="btn primary" id="sv-next" ${has||it.optional?"":"disabled"}>${st.i===n-1?"回答を終える":"次へ"}</button>`}</div></div>`;
@@ -1821,13 +1821,12 @@ function vAvatar(){const A=window.OFAvatar,gender=S.answers.Q2;
   else if(COLORS[AVTAB])grid=`<div class="swgrid">${COLORS[AVTAB].map((c,i)=>`<button class="sw" data-k="${AVTAB}" data-v="${i}" aria-pressed="${av[AVTAB]===i}" aria-label="${TABS.find(t=>t[0]===AVTAB)[1]} ${i+1}" style="background:${c}"></button>`).join("")}</div>`;
   else grid=`<div class="avgrid">${LISTS[AVTAB].map((n,i)=>`<button class="avopt" data-k="${AVTAB}" data-v="${i}" aria-pressed="${(av[AVTAB]??0)===i}">${A.render({...av,[AVTAB]:i},"neutral",62)}<span>${esc(n)}</span></button>`).join("")}</div>`;
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px">${stepper(1)}<div><p class="eyebrow view-eyebrow">AVATAR</p><h2>アバターを作る</h2><p class="small muted">自分に似せて作ってください。28日後の2つの未来を、この分身で見比べます。</p></div>
-   <section class="card avstage"><div class="avprev">${A.render(av,"neutral",150)}</div><button class="btn sm" id="av-rand">おまかせ</button></section>
+   <section class="card avstage"><div class="avprev">${A.render(av,"neutral",150)}</div></section>
    <section class="card" style="gap:10px"><div class="avtabs" role="tablist">${TABS.map(([k,l])=>`<button class="avtab" role="tab" data-tab="${k}" aria-selected="${AVTAB===k}">${l}</button>`).join("")}</div>${grid}</section></main>
    ${dock("av-back","結果を見る","av-go",false,"",S.group?"戻る":"質問に戻る")}`;
   {const t=app.querySelector(".avtabs");if(t){t.scrollLeft=AVTAB_SX;const a=t.querySelector('[aria-selected="true"]');if(a&&(a.offsetLeft<t.scrollLeft||a.offsetLeft+a.offsetWidth>t.scrollLeft+t.clientWidth))t.scrollLeft=Math.max(0,a.offsetLeft-24);AVTAB_SX=t.scrollLeft;t.addEventListener("scroll",()=>{AVTAB_SX=t.scrollLeft},{passive:true})}}
   app.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{AVTAB=b.dataset.tab;keep(vAvatar)});
   app.querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>{const k=b.dataset.k;av[k]=k==="hair"?b.dataset.v:+b.dataset.v;keep(vAvatar)});
-  $("#av-rand").onclick=()=>{const r=n=>Math.floor(Math.random()*n);Object.assign(av,{face:r(A.FACE.length),skin:r(A.SKIN.length),hair:styles[r(styles.length)][0],hairColor:r(18),brow:r(A.BROW.length),eye:r(A.EYE.length),eyeColor:r(3),nose:r(A.NOSE.length-1),mouth:r(A.MOUTH.length),shirt:r(36)});keep(vAvatar)};
   $("#av-back").onclick=()=>{if(!S.group&&S.baselineDone){S.baselineDone=false;S.plans=null;SV.q={i:BASE_ITEMS.length-1};if(STUDY)OFStore.reopen();toast("回答を見直せます。最後の質問で「回答を終える」を押すと、アバターの画面に戻ります")}go("q")};$("#av-go").onclick=()=>{S.avatarDone=true;if(STUDY)OFStore.avatar(S);go("analysis")};wire()}
 /* レーダーは幸福度とストレスを決める5つの要素。幸福度・ストレス度は結果として下の横棒で示す */
 const FACTORS=()=>SC.axes.filter(a=>a.key!=="wb");const FV=sc=>FACTORS().map(a=>sc[a.key]),FN=()=>FACTORS().map(a=>a.name);
