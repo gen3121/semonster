@@ -31,6 +31,6 @@ window.OSHIFIT_AI = { enabled: true, providers: ["openai", "gemini"], backend: "
 //   AI の提案文（App Check）が 2027-01-21 から使えなくなるため、全員が同じ条件になるようにここで区切る
 window.OSHIFIT_SIGNUP_UNTIL = "2027-01-20";
 // LINE でお知らせを受け取る：LINE 公式アカウントの友だち追加の URL（https://lin.ee/… など）。空ならボタンを出さない
-window.OSHIFIT_LINE_URL = "";
+window.OSHIFIT_LINE_URL = "https://line.me/R/ti/p/@315hokbp";   // 今井の LINE 公式アカウント（OshiFit（推し活の研究））
 // テスト用：エミュレーターにつなぐ（本番では null のまま）
 window.OSHIFIT_EMULATOR = null; // 例 { auth: "http://127.0.0.1:9099", firestore: ["127.0.0.1", 8080] }
