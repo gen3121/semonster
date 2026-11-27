@@ -7,3 +7,4 @@ fonts/.venv/
 fonts/out/
 fonts/node_modules/
 fonts/package*.json
+!template_mixlab_jp4-3.pptx
