@@ -148,6 +148,7 @@ button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,te
 .qid{white-space:nowrap;flex:none;font:600 12px var(--mono);color:var(--primary);background:var(--good-bg);border-radius:6px;padding:1px 8px}
 .qtext{font:700 18px/1.55 var(--head);letter-spacing:-.01em}
 .lead{font-size:12px;line-height:1.6;color:var(--muted)}
+.dock .btn.back{white-space:nowrap;flex:0 0 auto;padding-inline:16px}
 /* 質問のまとまりの説明（答え方が変わるので目立たせる）。まとまりの最初の質問では「ここから」の印と色の帯を付ける */
 .qhead .qlead{font-size:13px;line-height:1.65;color:var(--ink,inherit);background:color-mix(in srgb,var(--primary) 7%,transparent);border-left:4px solid var(--primary);border-radius:8px;padding:8px 10px;margin:0}
 .qhead .secnew{align-self:flex-start;font-size:12px;font-weight:700;color:var(--primary);background:color-mix(in srgb,var(--primary) 12%,transparent);border-radius:999px;padding:3px 10px;margin:0}
@@ -1342,9 +1343,11 @@ function predictMulti(sc,ids){let B={...sc};const ps=ids.map(planById).sort((x,y
 function aiClashes(ids){const out=[],seen=new Set();(S.plans||[]).forEach(x=>((x.ai&&x.ai.avoid)||[]).forEach(v=>{const k=[x.id,v.with].sort().join("+");if(!seen.has(k)&&ids.includes(x.id)&&ids.includes(v.with)){seen.add(k);out.push([x.id,v.with,v.why])}}));return out}
 function combos(sc,ids){const out=[];for(let m=1;m<1<<ids.length;m++){const c=ids.filter((_,i)=>m>>i&1),pr=predictMulti(sc,c);
     out.push({ids:c,pr,dWb:pr.B.wb-sc.wb,dBurn:pr.B.burnout-sc.burnout,score:(pr.B.wb-sc.wb)-(pr.B.burnout-sc.burnout)})}
-  const best=Math.max(...out.map(o=>o.score));
-  out.forEach(o=>{o.ai=aiClashes(o.ids);o.best=o.score===best;o.near=!o.best&&best-o.score<2;o.bad=o.pr.clashes.length>0||o.ai.length>0});
-  return out.sort((a,b)=>b.score-a.score)}
+  // 「一緒に選ばない方がよい」組み合わせは、おすすめにしない（おすすめは、注意のない組み合わせの中で一番よいもの）
+  out.forEach(o=>{o.ai=aiClashes(o.ids);o.bad=o.pr.clashes.length>0||o.ai.length>0});
+  const ok=out.filter(o=>!o.bad),best=Math.max(...(ok.length?ok:out).map(o=>o.score));
+  out.forEach(o=>{o.best=!o.bad&&o.score===best;o.near=!o.best&&!o.bad&&best-o.score<2});
+  return out.sort((a,b)=>(b.best-a.best)||(a.bad-b.bad)||(b.score-a.score))}   // おすすめ → 注意のないもの → 注意のあるもの
 const planIds=()=>!S.plan?[]:(S.plan.ids&&S.plan.ids.length?S.plan.ids:[S.plan.id]);
 function predict(sc,planId){const p=planById(planId);const B={...sc};
   B[p.axis]=clamp(sc[p.axis]+p.eff,0,100); if(p.axis!=="wb") B.wb=clamp(sc.wb+p.eff/4,0,100);

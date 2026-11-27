@@ -37,7 +37,7 @@
     });
     // 1つめのモデルが断られたとき（混雑・お支払いの条件）は、次のモデルで頼み直す
     const names = [conf().model || "gemini-4-hydrogen", ...(conf().fallbackModels || ["gemini-3.8-flash"])];
-    return names.map((name) => ({ name, m: ai.getGenerativeModel(g, { model: name, generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0.7 } }) }));
+    return names.map((name) => ({ name, m: ai.getGenerativeModel(g, { model: name, generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0.7, thinkingConfig: { thinkingLevel: conf().thinkingLevel || "LOW" } } }) }));   // 考える量を少なく：約15秒→約6秒で、文の質はほぼ同じ（11/27 に確かめた）
   }
 
   // ctx: { plans:[{id,title,how,axisName,score,cap}], genre, oshi, multi, spend, axes }

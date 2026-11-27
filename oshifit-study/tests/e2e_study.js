@@ -184,6 +184,7 @@ async function answerAll(page, stop) {
   if (await page.locator("#pickB").count().then((n) => n > 0).catch(() => false) || (await page.waitForSelector("#pickB", { timeout: 4000 }).catch(() => null))) {
     if (await page.locator("#combos").count()) {
       assert.equal(await page.locator("#combos .chip.good").count(), 1, "おすすめの組み合わせは1つ");
+      assert.equal(await page.locator("#combos .combo.best.bad").count(), 0, "「おすすめしない」組み合わせを、おすすめにしない");
       await page.screenshot({ path: path.join(OUT, "03_combos.png"), fullPage: true });
     }
     await page.waitForFunction(() => document.querySelector(".aimark") && /あなたに合う理由/.test(document.querySelector(".aimark").textContent), null, { timeout: 8000 });
