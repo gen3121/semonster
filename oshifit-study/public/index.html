@@ -1939,6 +1939,7 @@ function vHome(){if(!S.group)ensureGroup();const sc=S.sc,g=grp(),ps=planIds().ma
    ${predCard()}
    <section class="card"><div class="sec"><h3>回答の予定をカレンダーに入れる</h3></div><p class="small muted">毎日のアンケートの時刻（通知つき）と、振り返り・最後の調査の日を、カレンダーに追加できます。ファイルは端末の中で作られ、どこにも送信されません。</p>
     <label class="row small">毎日の通知の時刻 <input class="field" id="ics-time" type="time" value="21:00" style="width:auto"></label><button class="btn" id="ics">カレンダーに追加（.ics）</button></section>
+   ${lineCard()}
    <p class="xs muted">つらい状態が続くときは、振り返りを休んでかまいません。<button type="button" class="infolink" data-help style="display:inline;padding:0;font-size:inherit">相談先を見る</button></p></main>${tabbar("home")}`;
   $("#ics").onclick=()=>{const d0=S.decidedAt||now(),f=t=>new Date(t).toISOString().slice(0,10).replace(/-/g,""),ev=[];
     if(g!=="A")for(let i=1;i<=N_CHECK;i++)ev.push([d0+GAP*i*DAY,`OshiFit ${i}回目の振り返り（約2分）`]);
@@ -1974,6 +1975,10 @@ function vResult(){if(STUDY&&!S.final)return go("home");if(!S.final){ensureGroup
    ${S.final.tot?(()=>{const t=S.final.tot,days=Math.max(1,dayNo()||FINAL_DAY);return`<section class="card"><div class="sec"><h3>28日間の推し活の記録</h3></div><p class="small">記録した日：<b>${t.n}</b>日　お金：<b>${t.yen.toLocaleString("ja-JP")}</b>円　時間：<b>${f1(t.min/60)}</b>時間</p><p class="xs muted">記録した日の平均から、30日あたりにすると お金 約${Math.round(t.n?t.yen/t.n*30:0).toLocaleString("ja-JP")}円・時間 約${f1(t.n?t.min/t.n*30/60:0)}時間（開始時の回答：${esc(S.answers.Q6||"–")}）。記録しなかった日は、記録した日と同じくらいと見なした目安です。</p></section>`})():""}
    ${b.who5raw<=7?`<p class="callout bad">最近、つらい気持ちが続いていませんか。一人で抱えずに、相談してみてください。<button type="button" class="infolink" data-help style="display:inline;padding:0;font-size:inherit">相談先を見る</button></p>`:""}<p class="callout ${dw>=10?"good":""}">${dw>=10?"幸福度は、意味のある変化とされる大きさ（10点以上）で上がりました。":dw<=-10?"幸福度は10点以上下がりました。つらい状態が続くときは、相談先を利用してください。":"幸福度の変化は10点未満でした。"}</p>
    <section class="card"><h3>ご協力ありがとうございました</h3><p class="small muted">${grp()==="B"?"プランB「最適化された推し活」に取り組んだ、約28日間の変化です。":grp()==="A"?"順調な推し活を続けられたかを、開始時と比べて示しています。":"プランA「現在のままの推し活」で続けた、約28日間の変化です。"}研究の結果は全員分を集計し、OshiFitの提案の改善に使います。</p></section></main>${tabbar("home")}`;wire()}
+/* LINE でお知らせを受け取る（config.js の OSHIFIT_LINE_URL に、今井の LINE 公式アカウントの友だち追加の URL。空なら出さない）
+   友だち追加は本人が選ぶ。研究の記録と LINE はつながない（研究用の番号を LINE で聞かない） */
+function lineCard(){const u=window.OSHIFIT_LINE_URL;if(!u||!/^https:\/\/(lin\.ee|line\.me)\//.test(u))return"";
+  return`<section class="card"><div class="sec"><h3>LINE でお知らせを受け取る（任意）</h3></div><p class="small muted">毎日のアンケートや振り返りのお知らせを、研究者の LINE 公式アカウントから受け取れます。友だち追加するかどうかは自由です。LINE の名前と研究の回答は結びつけません。</p><a class="btn" href="${esc(u)}" target="_blank" rel="noopener">LINE で友だち追加</a></section>`}
 function vMypage(){if(!S.group)ensureGroup();const g=grp(),ps=planIds().map(planById),p=ps[0]||null;
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">MY PAGE</p><h2>マイページ</h2></div>
    <section class="card"><div class="sec"><h3>アカウント</h3>${STUDY?'<button class="btn sm" id="logout">ログアウト</button>':""}</div>
@@ -1987,6 +1992,7 @@ function vMypage(){if(!S.group)ensureGroup();const g=grp(),ps=planIds().map(plan
     <div class="kv"><span>最後の調査</span><b>${S.final?"回答済み":"28日目以降"}</b></div></div></section>
    <section class="card"><div class="sec"><h3>データの扱い</h3></div><ul class="facts">
     <li>アバターに写真は使いません</li><li>メールアドレスはログインのためだけに使い、回答は研究用の番号で、研究用のサーバーに保存します</li><li>研究の目的以外には使いません</li></ul></section>
+   ${lineCard()}
    <section class="card" id="help"><div class="sec"><h3>つらいとき（相談先）</h3></div>${helpHTML()}</section>
    <section class="card"><div class="sec"><h3>問い合わせ先</h3></div><div class="idbox"><span class="small" id="mail" style="font-weight:600;word-break:break-all">m1m02530106@oit.ac.jp</span><button class="btn sm" id="copymail">コピー</button></div><p class="xs muted">問い合わせのときは、研究用の番号も書いてください。</p></section></main>${tabbar("mypage")}`;
   if($("#logout"))$("#logout").onclick=async()=>{await OFStore.logout();S=blank();SV={};go("start")};
