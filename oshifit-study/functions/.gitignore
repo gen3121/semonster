@@ -1,0 +1,6 @@
+node_modules/
+# public/ai_prompt.js の写し（公開の前に自動で写す）
+ai_prompt.js
+# 秘密の値（エミュレーター用）はコミットしない
+.secret.local
+.env*

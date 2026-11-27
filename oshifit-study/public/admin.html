@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OshiFit 開発者ページ</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
+<style>
+:root{--bg:#f9f9ff;--card:#fff;--line:#e5e7eb;--fg:#141b2b;--muted:#424754;--primary:#0058be;--bad:#ba1a1a;--bad-bg:#ffdad6;--warn:#825100;--warn-bg:#ffddb8;--low:#f1f3ff}
+@media (prefers-color-scheme:dark){:root{--bg:#0b1120;--card:#141b2b;--line:#2a3550;--fg:#edf0ff;--muted:#c2c6d6;--primary:#adc6ff;--bad:#ffb4ab;--bad-bg:#3d1515;--warn:#ffb95f;--warn-bg:#33230a;--low:#1a2234}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.7 "BIZ UDPGothic",sans-serif;padding:16px}
+main{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+h1{font-size:22px;margin:0}h2{font-size:16px;margin:0 0 8px}
+.btn{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:999px;padding:8px 16px;font:inherit;font-weight:700;cursor:pointer}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.kpi b{display:block;font-size:26px}
+.kpi span{font-size:12px;color:var(--muted)}
+.alert{padding:8px 0;border-top:1px solid var(--line)}.alert:first-child{border-top:0}.alert.bad{color:var(--bad)}.alert.w{color:var(--warn)}
+.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:760px;font-size:13px}th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--low);color:var(--muted);font-size:12px}.mono{font-family:ui-monospace,Menlo,monospace}.muted{color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;min-width:260px;background:var(--card);color:var(--fg)}
+</style>
+<script src="config.js"></script>
+<script src="settings.js"></script>
+<script src="plans.js"></script>
+</head><body><main id="app"><p class="muted">読み込んでいます…</p></main>
+<script type="module">
+// 開発者ページ（閲覧のみ）。admins/{メールアドレス} に登録した大学アカウントだけが全件を読める（firestore.rules）。
+// CSV の形は DATA_SCHEMA_ja.md。参加者の実データをリポジトリに入れないこと。
+const V = "10.14.1", CDN = (m) => `https://www.gstatic.com/firebasejs/${V}/firebase-${m}.js`;
+const [{ initializeApp }, A, F] = await Promise.all([import(CDN("app")), import(CDN("auth")), import(CDN("firestore"))]);
+const app = initializeApp(window.OSHIFIT_FIREBASE), auth = A.getAuth(app), db = F.getFirestore(app);
+if (window.OSHIFIT_EMULATOR) { A.connectAuthEmulator(auth, window.OSHIFIT_EMULATOR.auth, { disableWarnings: true }); F.connectFirestoreEmulator(db, ...window.OSHIFIT_EMULATOR.firestore); }
+const QN = await (await fetch("questionnaire.json")).json();
+const $ = (s) => document.querySelector(s), el = $("#app"), DAY = 864e5;
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const ms = (t) => (t && t.toMillis ? t.toMillis() : null);
+let PLANS = window.OSHIFIT_PLANS.map((p) => p.id);   // Firestore の plans で足した提案も、読み込んだあとに加える
+const ST = window.OSHIFIT_SETTINGS;
+let CFG = ST.apply({}).cfg, MG = { proto: null, ops: null, history: [], events: [], cfgRejected: [], plans: ST.mergePlans(window.OSHIFIT_PLANS, []).plans, planDocs: new Set(), planRejected: [], notices: [], notes: {} };
+const SC = ["wb", "joy", "sleep", "money", "duty", "compare", "burnout", "who5raw", "shs", "pss"];
+const items = (ids) => QN.sections.filter((s) => ids.includes(s.id)).flatMap((s) => s.items.map((i) => i.id));
+const BASE_ITEMS = QN.sections.flatMap((s) => s.items.map((i) => i.id)).filter((id) => id !== "Q62" && id !== "Q4b"); // 自由記述は free.csv
+const FINAL_ITEMS = [...items(["who5", "shs", "pss"]), "Q29", "Q30", "Q31", "Q32", "Q33", "Q34", "Q39", "Q44", "Q45", "Q46", "Q47", "Q48", "Q49", "Q50", "Q51", "J1", "J2", "K1", "K2", "K3", "K4", "K5"];
+
+const ERR = { "auth/operation-not-allowed": "このログイン方法が Firebase で有効になっていません（Authentication →「ログイン方法」で有効にしてください）", "auth/popup-blocked": "ポップアップが止められました。このサイトのポップアップを許可してください", "auth/popup-closed-by-user": "ログインの画面が閉じられました", "auth/unauthorized-domain": "このドメインが Firebase の「承認済みドメイン」にありません", "auth/account-exists-with-different-credential": "このメールアドレスは別のログイン方法で登録済みです", "auth/invalid-action-code": "ログイン用のリンクが古いか、使用済みです。もう一度送ってください" };
+const errMsg = (e) => (ERR[e && e.code] || "ログインできませんでした") + `（${e && e.code}）`;
+function login() {
+  el.innerHTML = `<section class="card"><h1>開発者ページ</h1><p class="muted">登録した大学アカウントでログインしてください（閲覧のみ）。</p>
+   <div class="row"><button class="btn primary" id="g">Google でログイン</button><button class="btn primary" id="ms">Microsoft（大学のアカウント）でログイン</button></div>
+   <div class="row" style="margin-top:10px"><input id="mail" type="email" placeholder="大学のメールアドレス"><button class="btn" id="m">ログイン用のリンクを送る</button></div><p id="msg" class="muted"></p></section>`;
+  $("#g").onclick = () => A.signInWithPopup(auth, new A.GoogleAuthProvider()).catch((e) => ($("#msg").textContent = errMsg(e)));
+  $("#ms").onclick = () => { const p = new A.OAuthProvider("microsoft.com"); p.setCustomParameters({ prompt: "select_account", ...(window.OSHIFIT_MS_TENANT ? { tenant: window.OSHIFIT_MS_TENANT } : {}) }); A.signInWithPopup(auth, p).catch((e) => ($("#msg").textContent = errMsg(e))); };
+  $("#m").onclick = async () => {
+    const mail = $("#mail").value.trim(); if (!mail) return;
+    try { await A.sendSignInLinkToEmail(auth, mail, { url: location.href, handleCodeInApp: true }); localStorage.setItem("oshifit.adminMail", mail); $("#msg").textContent = "メールを送りました。届いたリンクをこの端末で開いてください。"; }
+    catch (e) { $("#msg").textContent = errMsg(e); }
+  };
+}
+if (A.isSignInWithEmailLink(auth, location.href)) {
+  const mail = localStorage.getItem("oshifit.adminMail") || prompt("ログインに使ったメールアドレスを入力してください");
+  await A.signInWithEmailLink(auth, mail, location.href).catch((e) => console.error(e));
+  history.replaceState(null, "", location.pathname);
+}
+
+A.onAuthStateChanged(auth, async (u) => {
+  if (!u || u.isAnonymous) return login();
+  try { const me = await F.getDoc(F.doc(db, "admins", u.email)); if (!me.exists()) throw new Error("not admin"); }
+  catch (e) { el.innerHTML = `<section class="card"><h1>開発者ページ</h1><p>このアカウント（${esc(u.email || "メールアドレスなし")}）には閲覧の権限がありません。</p><p class="muted" style="font-size:12px">Firestore の admins に、このメールアドレスと同じ名前のドキュメントがあるか確認してください（大文字・小文字も同じにします）。</p><button class="btn" id="out">ログアウト</button></section>`; $("#out").onclick = () => A.signOut(auth); return; }
+  el.innerHTML = `<p class="muted">データを読み込んでいます…</p>`;
+  const [ps, cks, pil, dly, cf, pl, nt, nn] = await Promise.all([F.getDocs(F.collection(db, "participants")), F.getDocs(F.collectionGroup(db, "checkins")), F.getDocs(F.collection(db, "pilots")), F.getDocs(F.collectionGroup(db, "daily")),
+    F.getDoc(F.doc(db, "study", "protocol")), F.getDocs(F.collection(db, "plans")), F.getDocs(F.collection(db, "notices")), F.getDocs(F.collection(db, "notes"))]);
+  const [hs, ev, op, jn] = await Promise.all([F.getDocs(F.collection(db, "study", "protocol", "history")), F.getDocs(F.collection(db, "study", "protocol", "events")), F.getDoc(F.doc(db, "ops", "alerts")), F.getDoc(F.doc(db, "ops", "join"))]);
+  MG.proto = cf.exists() ? cf.data() : null; MG.ops = op.exists() ? op.data() : null; MG.join = jn.exists() ? jn.data() : null;
+  MG.history = hs.docs.map((d) => d.data()).sort((a, b) => a.version - b.version); MG.events = ev.docs.map((d) => d.data()).sort((a, b) => (ms(a.at) || 0) - (ms(b.at) || 0));
+  const ap = ST.apply(MG.proto || {}, MG.ops || {}); CFG = ap.cfg; MG.cfgRejected = ap.rejected; MG.planDocs = new Set(pl.docs.map((d) => d.id));
+  const mp = ST.mergePlans(window.OSHIFIT_PLANS, pl.docs.map((d) => ({ ...d.data(), id: d.id }))); MG.plans = mp.plans; MG.planRejected = mp.rejected; PLANS = MG.plans.map((p) => p.id);
+  MG.notices = nt.docs.map((d) => ({ ...d.data(), id: d.id })); MG.notes = Object.fromEntries(nn.docs.map((d) => [d.id, d.data()]));
+  const dByUid = {}; dly.docs.forEach((c) => { const uid = c.ref.parent.parent.id; (dByUid[uid] = dByUid[uid] || []).push(c.data()); });
+  const pilots = new Set(pil.docs.map((d) => d.id));
+  const P = ps.docs.map((d) => ({ uid: d.id, ...d.data() }));
+  const byUid = {}; cks.docs.forEach((c) => { const uid = c.ref.parent.parent.id; (byUid[uid] = byUid[uid] || []).push(c.data()); });
+  P.forEach((p) => { p.cks = (byUid[p.uid] || []).sort((a, b) => a.week - b.week); p.daily = (dByUid[p.uid] || []).sort((a, b) => a.day - b.day); p.pilot = pilots.has(p.pid) ? 1 : 0; p.note = MG.notes[p.pid] || null; });
+  render(u, P);
+});
+
+function alerts(P) {
+  const out = [], now = Date.now();
+  for (const p of P) {
+    const dec = ms(p.decidedAt);
+    if (dec && !p.withdrawn && (p.group === "B" || p.group === "C") && !p.final && p.cks.length < CFG.nChecks) {
+      const last = p.cks.length ? Math.max(...p.cks.map((c) => ms(c.at) || 0)) : dec;
+      const gap = Math.floor((now - last) / DAY);
+      if (gap >= CFG.alerts.noCheckDays) out.push(["bad", `${p.pid}：振り返りが${CFG.alerts.noCheckDays}日以上ない（${gap}日。開始から${Math.floor((now - dec) / DAY)}日目・${p.cks.length}回済み）`]);
+    }
+    if (dec && !p.withdrawn && !p.final) { const lastD = p.daily.length ? Math.max(...p.daily.map((x) => ms(x.at) || 0)) : dec; const gapD = Math.floor((now - lastD) / DAY); if (gapD >= CFG.alerts.noDailyDays) out.push(["w", `${p.pid}：毎日のアンケートが${gapD}日ない（記録 ${p.daily.length}日）`]); }
+    const w0 = p.scores && p.scores.who5raw; if (w0 != null && w0 <= CFG.alerts.who5Max) out.push(["bad", `${p.pid}：開始時のWHO-5が${w0}点（${CFG.alerts.who5Max}点以下）`]);
+    const c3 = p.cks.find((c) => c.week === 3); if (c3 && c3.W1 != null) { const r = ["W1", "W2", "W3", "W4", "W5"].reduce((a, k) => a + (c3[k] ?? 0), 0); if (r <= CFG.alerts.who5Max) out.push(["bad", `${p.pid}：3回目のWHO-5が${r}点（${CFG.alerts.who5Max}点以下）`]); }
+    const wf = p.final && p.final.scores && p.final.scores.who5raw; if (wf != null && wf <= CFG.alerts.who5Max) out.push(["bad", `${p.pid}：最後の調査のWHO-5が${wf}点（${CFG.alerts.who5Max}点以下）`]);
+    if (p.answers && p.answers.Q42 != null && p.answers.Q42 !== 2) out.push(["w", `${p.pid}：注意確認（Q42）の誤答`]);
+  }
+  return out;
+}
+
+function render(u, P) {
+  const al = alerts(P), cnt = (f) => P.filter(f).length, d = (t) => (ms(t) ? new Date(ms(t)).toLocaleDateString("ja-JP") : "–");
+  const k = [["同意して開始", P.length], ["質問紙を完了", cnt((p) => p.baselineDone)], ["群A（順調）", cnt((p) => p.group === "A")], ["群B（プランB）", cnt((p) => p.group === "B")], ["群C（プランA）", cnt((p) => p.group === "C")], ["最後の調査まで完了", cnt((p) => p.final)], ["注意確認の誤答", cnt((p) => p.answers && p.answers.Q42 != null && p.answers.Q42 !== 2)], ["プレ実験の参加者", cnt((p) => p.pilot)], ["参加をやめた人", cnt((p) => p.withdrawn)]];
+  el.innerHTML = `<div class="row" style="justify-content:space-between"><div><h1>開発者ページ</h1><p class="muted">${esc(u.email)} でログイン中。参加者の回答は閲覧のみ（書き換え・削除はできません）。実験の条件・提案・運用の値・お知らせ・メモは下の「設定と管理」で管理します</p></div><button class="btn" id="out">ログアウト</button></div>
+   <section class="kpis">${k.map(([l, v]) => `<div class="card kpi"><span>${l}</span><b>${v}</b></div>`).join("")}</section>
+   <section class="card"><h2>確認が必要（${al.length}件）</h2>${al.length ? al.map(([c, t]) => `<div class="alert ${c}">${esc(t)}</div>`).join("") : '<p class="muted">ありません</p>'}
+    <p class="muted" style="font-size:12px">連絡先は集めていないため、相談先の表示はアプリが自動で行います。</p></section>
+   ${extractHTML(P)}
+   <section class="card"><div class="row" style="justify-content:space-between"><h2>参加者（${P.length}人）</h2><div class="row">
+     <button class="btn primary" id="zip-all">分析用にまとめて書き出す（ZIP）</button><button class="btn" data-csv="baseline">開始時（baseline.csv）</button><button class="btn" data-csv="weekly">振り返りごと（weekly.csv）</button><button class="btn" data-csv="trial">最後の調査まで（trial.csv）</button><button class="btn" data-csv="daily">毎日（daily.csv）</button><button class="btn" data-csv="free">自由記述（free.csv）</button></div></div>
+    <div class="tablewrap"><table><thead><tr><th>参加ID</th><th>開始日</th><th>群</th><th>提案</th><th>振り返り</th><th>開始からの日数</th><th>WHO-5 開始→最後</th><th>プレ実験</th><th>設定の版</th><th>メモ</th></tr></thead><tbody>
+    ${P.map((p) => { const dec = ms(p.decidedAt); return `<tr><td class="mono">${esc(p.pid)}</td><td>${d(p.createdAt)}</td><td>${p.group ? "群" + p.group : "未決定"}${p.withdrawn ? "（やめた）" : ""}</td><td>${esc((p.planIds || []).join("・") || "–")}</td><td>${p.group === "A" ? "–" : p.cks.length + " / " + CFG.nChecks}</td><td>${dec ? Math.floor((Date.now() - dec) / DAY) + "日目" : "–"}</td><td>${p.scores?.who5raw ?? "–"} → ${p.final?.scores?.who5raw ?? "–"}</td><td>${p.pilot ? "はい" : ""}</td><td>${p.cfgVersion ?? "–"}</td><td>${p.note?.exclude ? '<b style="color:#b3261e">分析から除外</b> ' : ""}${esc(p.note?.text || "")} <button class="btn" data-note="${esc(p.pid)}" style="padding:2px 8px">メモ</button></td></tr>`; }).join("")}
+    </tbody></table></div></section>
+   ${manageHTML()}`;
+  $("#out").onclick = () => A.signOut(auth);
+  el.querySelectorAll("[data-note]").forEach((b) => (b.onclick = () => editNote(b.dataset.note, u)));
+  el.querySelectorAll("[data-seed]").forEach((b) => (b.onclick = () => seed(b.dataset.seed, u)));
+  el.querySelectorAll("[data-plan]").forEach((b) => (b.onclick = () => togglePlan(b.dataset.plan, u)));
+  const on = (id, f) => { const x = $("#" + id); if (x) x.onclick = f; };
+  on("pr-create", () => saveProto(u, true)); on("pr-save", () => saveProto(u, false)); on("pr-lock", () => lockProto(u, true)); on("pr-unlock", () => lockProto(u, false)); on("op-save", () => saveOps(u)); on("jn-save", () => saveJoin(u));
+  el.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => download(b.dataset.csv, P)));
+  $("#zip-all").onclick = () => downloadZip(P);
+  wireExtract(P);
+}
+
+// ---------- データを選んで書き出す（種類・期間・参加者・群・除外を選び、表示中の行だけを CSV に保存）
+const KINDS = { daily: "毎日のアンケート（daily）", weekly: "振り返り（weekly）", baseline: "開始時（baseline）", trial: "最後の調査（trial）", free: "自由記述（free）" };
+// 行の日付（日本時間の YYYY-MM-DD）。毎日のアンケートは端末の日付（date）、ほかは記録の時刻から
+const jstDay = (isoStr) => { if (!isoStr) return ""; const t = Date.parse(isoStr); return isNaN(t) ? "" : new Date(t + 9 * 3600e3).toISOString().slice(0, 10); };
+const jstTime = (isoStr) => { if (!isoStr) return ""; const t = Date.parse(isoStr); return isNaN(t) ? "" : new Date(t + 9 * 3600e3).toISOString().slice(0, 19).replace("T", " "); };
+function rowDay(kind, r, P) {
+  if (kind === "daily") return r.date || jstDay(r.at);
+  if (kind === "weekly") return jstDay(r.at);
+  if (kind === "baseline") return jstDay(r.created_at);
+  if (kind === "trial") return jstDay(r.final_at);
+  const p = P.find((x) => x.pid === r.pid); return p ? jstDay(iso(p.createdAt)) : "";   // free：その人の開始日
+}
+function extract(P, f) {
+  const [rows, cols] = tables(P)[f.kind];
+  const byPid = Object.fromEntries(P.map((p) => [p.pid, p]));
+  const out = rows.filter((r) => {
+    const p = byPid[r.pid] || {}, day = rowDay(f.kind, r, P);
+    if (f.from && (!day || day < f.from)) return false;
+    if (f.to && (!day || day > f.to)) return false;
+    if (f.pid && r.pid !== f.pid) return false;
+    if (f.group && p.group !== f.group) return false;
+    if (!f.excluded && p.note?.exclude) return false;
+    return true;
+  }).map((r) => ({ ...r, _day: rowDay(f.kind, r, P) })).sort((a, b) => (a._day < b._day ? 1 : a._day > b._day ? -1 : 0));
+  return { rows: out, cols, total: rows.length };
+}
+function extractHTML(P) {
+  const pids = [...new Set(P.map((p) => p.pid))].sort();
+  return `<section class="card" id="extract"><h2>データを選んで書き出す</h2>
+   <div class="row" style="align-items:flex-end">
+    <label style="display:flex;flex-direction:column;font-size:12px">データ<select id="ex-kind">${Object.entries(KINDS).map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></label>
+    <label style="display:flex;flex-direction:column;font-size:12px">開始日<input type="date" id="ex-from" style="min-width:0"></label>
+    <label style="display:flex;flex-direction:column;font-size:12px">終了日<input type="date" id="ex-to" style="min-width:0"></label>
+    <label style="display:flex;flex-direction:column;font-size:12px">研究用の番号<select id="ex-pid"><option value="">すべて</option>${pids.map((x) => `<option>${esc(x)}</option>`).join("")}</select></label>
+    <label style="display:flex;flex-direction:column;font-size:12px">群<select id="ex-group"><option value="">すべて</option><option>A</option><option>B</option><option>C</option></select></label>
+    <label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="ex-excl" checked style="min-width:0">分析から除外した人も含める</label>
+    <button class="btn primary" id="ex-show">表示</button><button class="btn" id="ex-csv">表示中のデータを CSV 保存</button></div>
+   <p class="muted" id="ex-count" style="margin:4px 0">条件を選んで「表示」を押してください（日付は日本時間。毎日のアンケートは回答した日、振り返り・最後の調査は記録の時刻、開始時と自由記述は開始した日）。</p>
+   <div class="tablewrap" id="ex-table"></div></section>`;
+}
+function readExtract() {
+  return { kind: $("#ex-kind").value, from: $("#ex-from").value, to: $("#ex-to").value, pid: $("#ex-pid").value, group: $("#ex-group").value, excluded: $("#ex-excl").checked };
+}
+const PREVIEW_COLS = { daily: ["pid", "group", "date", "day", "mood", "yen", "minutes", "joy", "Q44", "Q45", "Q47", "Q48"], weekly: ["pid", "group", "week", "day", "at", "stress", "happy", "dBurn", "dMood", "dExec", "sumYen", "sumMin", "W1"],
+  baseline: ["pid", "group", "exclude", "created_at", "decided_at", "plans_chosen", "wb", "burnout", "pss", "cfg_version"], trial: ["pid", "group", "final_day", "final_at", "wb_post", "burnout_post", "pss_post", "exec_rate", "total_yen"], free: ["pid", "where", "text"] };
+let EX = null;
+function wireExtract(P) {
+  if (!$("#ex-show")) return;
+  const show = () => {
+    const f = readExtract();
+    if (f.from && f.to && f.from > f.to) { $("#ex-count").textContent = "開始日が終了日より後になっています。"; return; }
+    EX = { f, ...extract(P, f) };
+    const pc = PREVIEW_COLS[f.kind].filter((c) => EX.cols.includes(c) || c === "group"), shown = EX.rows.slice(0, 200);
+    $("#ex-count").textContent = `表示中 ${EX.rows.length}件／全 ${EX.total}件${EX.rows.length > 200 ? "（表は先頭200件まで。CSV にはすべて入ります）" : ""}。CSV には全部の列（${EX.cols.length}列）が入ります。`;
+    $("#ex-table").innerHTML = EX.rows.length ? `<table><thead><tr><th>日付（日本時間）</th>${pc.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${shown.map((r) => `<tr><td>${esc(r._day)}</td>${pc.map((c) => { let v = r[c]; if (["at", "created_at", "decided_at", "final_at"].includes(c)) v = jstTime(v); return `<td>${esc(v ?? "")}</td>`; }).join("")}</tr>`).join("")}</tbody></table>` : '<p class="muted">条件に合うデータはありません。</p>';
+  };
+  $("#ex-show").onclick = show;
+  $("#ex-csv").onclick = () => {
+    if (!EX) show();
+    if (!EX || !EX.rows.length) { $("#ex-count").textContent = "書き出すデータがありません。条件を変えて「表示」を押してください。"; return; }
+    const f = EX.f, tag = [f.kind, f.from || "", f.to ? "to" + f.to : "", f.pid, f.group ? "group" + f.group : "", f.excluded ? "" : "noexcl"].filter(Boolean).join("_");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv(EX.rows, EX.cols)], { type: "text/csv" }));
+    a.download = `oshifit_${tag}.csv`; document.body.append(a); a.click(); a.remove();
+  };
+}
+window.__oshifitExtract = (P, f) => { const r = extract(P, f); return { n: r.rows.length, total: r.total, pids: r.rows.map((x) => x.pid), days: r.rows.map((x) => x._day) }; };   // 試験用
+
+// ---------- 設定と管理（3つの層：①参加者のデータ ②実験の条件 study/protocol・plans ③運用 ops・notices・notes） ----------
+const CFG_LABEL = {
+  gapDays: "振り返りの間隔（日）", nChecks: "振り返りの回数（最大6）", finalDay: "最後の調査が開く日", finalMaxDay: "振り返りが残っていても最後の調査を開く日",
+  "groupA.axisMin": "群A：軸の点数の基準", "groupA.axisCount": "群A：基準を満たす軸の数", "groupA.who5Min": "群A：WHO-5 素点の下限",
+  "weights.trait": "提案の点数：性格の重み", "weights.act": "提案の点数：活動の重み", diminish: "複数の提案の倍率（1つめ,2つめ,3つめ）", clashFactor: "相性の悪い組み合わせの倍率", burden: "提案1つ増えるごとの負担（推し疲れ＋）",
+  "interval.hw": "推し疲れの見込みの幅（±）", "interval.hwWb": "幸福度の見込みの幅（±）", "interval.hwStep": "提案1つ増えるごとに広げる幅（推し疲れ）", "interval.hwWbStep": "提案1つ増えるごとに広げる幅（幸福度）",
+  "ref.wb": "目安：幸福度", "ref.joy": "目安：充実", "ref.sleep": "目安：睡眠・生活", "ref.money": "目安：お金", "ref.duty": "目安：義務感", "ref.compare": "目安：SNS・比較",
+  "pc.burnout.su": "個人補正：推し疲れ σu", "pc.burnout.se": "個人補正：推し疲れ σe", "pc.wb.su": "個人補正：幸福度 σu", "pc.wb.se": "個人補正：幸福度 σe",
+  noCheckDays: "振り返りがない日数", noDailyDays: "毎日のアンケートがない日数", who5Max: "WHO-5 素点がこの値以下",
+};
+const flat = (o, pre = "") => Object.entries(o).flatMap(([k, v]) => (v && typeof v === "object" && !Array.isArray(v) ? flat(v, pre + k + ".") : [[pre + k, v]]));
+const setPath = (o, path, v) => { const ks = path.split("."); let c = o; ks.slice(0, -1).forEach((k) => (c = c[k] = c[k] || {})); c[ks[ks.length - 1]] = v; };
+const protoNow = () => { const p = ST.protocolOf(CFG); delete p.version; return p; };
+// 値が同じか（Firestore は項目を名前の順に並べ替えて返すので、並び順を無視して比べる）
+const canon = (v) => (Array.isArray(v) ? v.map(canon) : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canon(v[k])])) : v);
+const same = (a, b) => JSON.stringify(canon(a)) === JSON.stringify(canon(b));
+function protoWarn() {
+  if (!MG.proto) return "";
+  const last = MG.history[MG.history.length - 1];
+  if (!last || last.version !== MG.proto.version) return `<div class="alert bad">今の版（${esc(MG.proto.version)}）の変更の記録がありません。Firestore のコンソールで直接変えた可能性があります。開発者ページから変更し直してください。</div>`;
+  const after = { ...(last.after || {}) }; delete after.version;
+  if (!same(after, protoNow())) return `<div class="alert bad">今の値が、版 ${esc(last.version)} の記録と違います。Firestore のコンソールで直接変えた可能性があります（記録が残らないため、開発者ページから変えてください）。</div>`;
+  return "";
+}
+function manageHTML() {
+  const locked = !!MG.proto?.locked, D = Object.fromEntries(flat(protoNowDefault())), today = new Date().toISOString().slice(0, 10);
+  const rows = flat(protoNow()).map(([k, v]) => `<tr><td class="mono">${esc(k)}</td><td>${esc(CFG_LABEL[k] || "")}</td><td><input class="pf" data-k="${esc(k)}" value="${esc(Array.isArray(v) ? v.join(",") : v)}" ${locked || !MG.proto ? "disabled" : ""} style="width:110px${same(v, D[k]) ? "" : ";font-weight:700;color:#b3261e"}"></td><td>${esc(Array.isArray(D[k]) ? D[k].join(",") : D[k])}</td></tr>`).join("");
+  const A = CFG.alerts;
+  return `<section class="card" id="manage"><h2>設定と管理</h2>
+   <p class="muted" style="font-size:12px">Firestore は3つの層に分けています。<b>①参加者のデータ</b>（participants。だれも書き換えられない）／<b>②実験の条件</b>（study/protocol と plans。版で管理し、変えると履歴が残る。実験が始まったら「固定する」）／<b>③運用</b>（ops・notices・notes。いつでも変えてよい）。<br>②は、Firebase のコンソールで直接変えると履歴が残らないので、<b>必ずこのページから</b>変えてください。提案の題名・やり方は倫理委員会で承認済みです。</p>
+
+   <h3>② 実験の条件（study/protocol）　${MG.proto ? `版 ${esc(MG.proto.version)}・${locked ? '<b style="color:#b3261e">固定中</b>（変えられません）' : "変更できます（実験が始まったら固定してください）"}` : "まだありません（初期値で動いています）"}</h3>
+   ${protoWarn()}${MG.cfgRejected.length ? `<div class="alert bad">受け付けなかった項目（範囲外か型の違い。初期値を使っています）：${esc(MG.cfgRejected.join("、"))}</div>` : ""}
+   <div class="tablewrap"><table><thead><tr><th>項目</th><th>説明</th><th>今の値</th><th>初期値</th></tr></thead><tbody>${rows}</tbody></table></div>
+   ${!MG.proto ? `<div class="row"><button class="btn primary" id="pr-create">初期値で実験の条件を作る（版 1）</button></div>`
+     : locked ? `<div class="row"><button class="btn" id="pr-unlock">固定を外す（理由が必要）</button></div>`
+     : `<div class="row"><input id="pr-reason" placeholder="変更の理由（必須。例：大井先生と相談し、間隔を5日に）" style="flex:1;min-width:260px"><button class="btn primary" id="pr-save">変更を保存（版 ${esc((MG.proto.version || 0) + 1)} にする）</button><button class="btn" id="pr-lock">固定する（実験の開始時に）</button></div>`}
+   <details><summary>変更の記録（${MG.history.length}件）・固定の記録（${MG.events.length}件）</summary>
+    <div class="tablewrap"><table><thead><tr><th>版</th><th>日時</th><th>だれが</th><th>理由</th><th>変えた項目（前 → 後）</th></tr></thead><tbody>
+     ${MG.history.slice().reverse().map((h) => `<tr><td>${esc(h.version)}</td><td>${h.at ? new Date(ms(h.at)).toLocaleString("ja-JP") : ""}</td><td>${esc(h.by || "")}</td><td>${esc(h.reason || "")}</td><td style="font-size:12px">${esc((h.changed || []).map((c) => `${c.k}：${JSON.stringify(c.before)} → ${JSON.stringify(c.after)}`).join("／") || "（作成）")}</td></tr>`).join("")}
+    </tbody></table></div>
+    <ul style="font-size:12px">${MG.events.map((e) => `<li>${e.at ? new Date(ms(e.at)).toLocaleString("ja-JP") : ""}　${esc(e.by || "")}　${e.type === "lock" ? "固定した" : "固定を外した"}${e.reason ? "（" + esc(e.reason) + "）" : ""}</li>`).join("")}</ul></details>
+
+   <h3>② 提案（plans）　${MG.plans.filter((p) => p.active !== false).length}件を出す・全${MG.plans.length}件　${locked ? "（固定中：出す・出さないだけ変えられます）" : ""}</h3>
+   ${MG.planRejected.length ? `<div class="alert bad">受け付けなかった提案：${esc(MG.planRejected.join("、"))}</div>` : ""}
+   <div class="tablewrap"><table><thead><tr><th>id</th><th>題名</th><th>軸</th><th>効果（eff）</th><th>性格</th><th>出す</th><th>元</th></tr></thead><tbody>
+    ${MG.plans.map((p) => `<tr><td class="mono">${esc(p.id)}</td><td>${esc(p.title)}</td><td>${esc(p.axis)}</td><td>${esc(p.eff)}</td><td>${esc(p.trait || "–")}</td><td>${p.active === false ? "出さない" : "出す"} ${MG.planDocs.has(p.id) ? `<button class="btn" data-plan="${esc(p.id)}" style="padding:2px 8px">${p.active === false ? "出す" : "出さない"}にする</button>` : ""}</td><td>${esc(p.source)}</td></tr>`).join("")}
+   </tbody></table></div>
+   <p class="muted" style="font-size:12px">固定する前に「今の提案を plans に書き込む」を押してください（固定中は新しい文書を作れません）。題名・やり方・効果の値を変えたり、新しい提案を足したりするのは、固定する前に Firestore の plans/{id} で行います。書ける項目：title・how・axis（wb・joy・sleep・money・duty・compare）・eff（0〜40）・trait（E・E-・O・C・N・A か空）・act（sns・watch・goods・event・-event）・multi・active。</p>
+   <div class="row"><button class="btn" data-seed="plans" ${locked ? "disabled" : ""}>今の提案を plans に書き込む（まだない id だけ）</button></div>
+
+   <h3>③ 運用：確認が必要の基準（ops/alerts）　${MG.ops ? "Firestore にあり" : "初期値"}</h3>
+   <div class="row">${["noCheckDays", "noDailyDays", "who5Max"].map((k) => `<label style="font-size:13px">${esc(CFG_LABEL[k])} <input class="of" data-k="${k}" value="${esc(A[k])}" style="width:60px"></label>`).join("")}<button class="btn" id="op-save">保存</button></div>
+
+   <h3>③ 運用：参加コード（ops/join）　${MG.join ? "設定あり" : "<span style='color:#b42318'>未設定：URL を知っていれば誰でも登録できます</span>"}</h3>
+   <p class="muted" style="font-size:12px">研究室で同意書をいただいた人に渡すコードです。登録の画面で入力し、同じでないと登録できません（Firestore のルールで確かめます）。変えると、それ以降の登録は新しいコードが必要です。英数字4〜12文字（大文字で保存）。</p>
+   <div class="row"><input id="jn-code" value="${esc((MG.join && MG.join.code) || "")}" style="width:140px;font-family:monospace" placeholder="例：AB12CD"><button class="btn" id="jn-save">保存</button></div>
+
+   <h3>③ お知らせ（notices）　${MG.notices.length}件</h3>
+   ${MG.notices.length ? `<div class="tablewrap"><table><thead><tr><th>id</th><th>文</th><th>出す</th><th>期間</th><th>対象</th><th>種類</th></tr></thead><tbody>${MG.notices.map((n) => `<tr><td class="mono">${esc(n.id)}</td><td>${esc(n.text)}</td><td>${n.active === true && (!n.from || n.from <= today) && (!n.to || today <= n.to) ? "<b>表示中</b>" : "出さない"}</td><td>${esc(n.from || "")}〜${esc(n.to || "")}</td><td>${esc(n.target || "all")}</td><td>${esc(n.level || "info")}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">ありません</p>'}
+   <p class="muted" style="font-size:12px">Firestore の notices/{id} で追加・編集します。項目：text・active（true で出す）・from・to（YYYY-MM-DD、省略可）・target（all／participants）・level（info／warn＝赤）。はじめに・ホーム・マイページの上に出ます。</p>
+   <div class="row"><button class="btn" data-seed="notice">見本のお知らせを書き込む（active:false）</button></div>
+
+   <h3>③ 参加者ごとのメモ（notes）</h3>
+   <p class="muted" style="font-size:12px">参加者の表の「メモ」から書けます（notes/{研究用の番号}：text・exclude）。exclude にした人は CSV の exclude 列が 1 になり、分析の本分析から外れます（感度分析には入る）。参加者には見えません。</p></section>`;
+}
+const protoNowDefault = () => { const p = ST.protocolOf(ST.DEFAULT); delete p.version; return p; };
+function readProtoForm() {
+  const o = protoNow(), bad = [];
+  document.querySelectorAll(".pf").forEach((i) => {
+    const k = i.dataset.k, t = i.value.trim();
+    const v = k === "diminish" ? t.split(",").map((x) => Number(x.trim())) : Number(t);
+    if ((Array.isArray(v) ? v.some((x) => !isFinite(x)) : !isFinite(v)) || t === "") bad.push(k); else setPath(o, k, v);
+  });
+  const chk = ST.apply(o); if (chk.rejected.length) bad.push(...chk.rejected);
+  return { o, bad };
+}
+async function saveProto(u, create) {
+  const by = u.email, at = F.serverTimestamp(), b = F.writeBatch(db);
+  const pref = F.doc(db, "study", "protocol");
+  if (create) {
+    const after = protoNowDefault();
+    b.set(pref, { ...after, version: 1, locked: false, updatedAt: at, updatedBy: by });
+    b.set(F.doc(db, "study", "protocol", "history", "1"), { version: 1, reason: "初期値で作成", before: null, after, changed: [], at, by });
+  } else {
+    const reason = $("#pr-reason").value.trim(); if (!reason) return alert("変更の理由を書いてください");
+    const { o, bad } = readProtoForm(); if (bad.length) return alert("受け付けられない値があります：" + bad.join("、"));
+    const before = protoNow(), changed = flat(o).filter(([k, v]) => !same(v, Object.fromEntries(flat(before))[k])).map(([k, v]) => ({ k, before: Object.fromEntries(flat(before))[k], after: v }));
+    if (!changed.length) return alert("変わった項目がありません");
+    const v = (MG.proto.version || 0) + 1;
+    if (!confirm(`版 ${v} にします。\n${changed.map((c) => `${c.k}：${JSON.stringify(c.before)} → ${JSON.stringify(c.after)}`).join("\n")}\n\nこの版より前に群を決めた参加者は、前の条件のままです。よろしいですか？`)) return;
+    b.update(pref, { ...o, version: v, updatedAt: at, updatedBy: by });
+    b.set(F.doc(db, "study", "protocol", "history", String(v)), { version: v, reason, before, after: o, changed, at, by });
+  }
+  try { await b.commit(); alert("保存しました。読み込み直します。"); location.reload(); } catch (e) { alert("保存できませんでした：" + (e.code || e.message)); }
+}
+async function lockProto(u, lock) {
+  const by = u.email, at = F.serverTimestamp();
+  let reason = "";
+  if (lock) { if (!confirm("実験の条件を固定します。固定中は条件と提案の内容を変えられません（出す・出さないは変えられます）。よろしいですか？")) return; }
+  else { reason = (prompt("固定を外す理由（必須）") || "").trim(); if (!reason) return; }
+  try {
+    await F.updateDoc(F.doc(db, "study", "protocol"), lock ? { locked: true, lockedAt: at, lockedBy: by } : { locked: false, lockReason: reason });
+    await F.addDoc(F.collection(db, "study", "protocol", "events"), { type: lock ? "lock" : "unlock", reason, at, by, version: MG.proto.version });
+    location.reload();
+  } catch (e) { alert("できませんでした：" + (e.code || e.message)); }
+}
+async function saveJoin(u) {
+  const code = document.getElementById("jn-code").value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,12}$/.test(code)) return alert("参加コードは英数字4〜12文字にしてください");
+  try { await F.setDoc(F.doc(db, "ops", "join"), { code, updatedAt: F.serverTimestamp(), updatedBy: u.email }); alert("保存しました"); location.reload(); } catch (e) { alert("保存できませんでした：" + (e.code || e.message)); }
+}
+async function saveOps(u) {
+  const o = {}; let bad = [];
+  document.querySelectorAll(".of").forEach((i) => { const v = Number(i.value.trim()); if (!isFinite(v)) bad.push(i.dataset.k); else o[i.dataset.k] = v; });
+  const chk = ST.apply({}, o); bad = bad.concat(chk.rejected); if (bad.length) return alert("受け付けられない値があります：" + bad.join("、"));
+  try { await F.setDoc(F.doc(db, "ops", "alerts"), { ...o, updatedAt: F.serverTimestamp(), updatedBy: u.email }); alert("保存しました"); location.reload(); } catch (e) { alert("保存できませんでした：" + (e.code || e.message)); }
+}
+async function togglePlan(id, u) {
+  const p = MG.plans.find((x) => x.id === id), next = p.active === false;
+  if (!confirm(`「${p.title}」を${next ? "出す" : "出さない"}にします。すでに選んだ参加者の記録には影響しません。`)) return;
+  try { await F.updateDoc(F.doc(db, "plans", id), { active: next, updatedAt: F.serverTimestamp(), updatedBy: u.email }); location.reload(); } catch (e) { alert("できませんでした：" + (e.code || e.message)); }
+}
+async function seed(kind, u) {
+  const by = u.email, at = F.serverTimestamp();
+  try {
+    if (kind === "plans") {
+      const have = new Set((await F.getDocs(F.collection(db, "plans"))).docs.map((d) => d.id));
+      const add = window.OSHIFIT_PLANS.filter((p) => !have.has(p.id));
+      if (!add.length) return alert("すべての提案が、すでに plans にあります");
+      if (!confirm(`${add.length}件の提案を plans に書き込みます。よろしいですか？`)) return;
+      for (const p of add) await F.setDoc(F.doc(db, "plans", p.id), { title: p.title, how: p.how, axis: p.axis, eff: p.eff, trait: p.trait || "", multi: !!p.multi, active: true, updatedAt: at, updatedBy: by });
+    }
+    if (kind === "notice") await F.setDoc(F.doc(db, "notices", "sample"), { text: "（見本）メンテナンスのため、11月30日の夜はつながりにくくなります。", active: false, from: "", to: "", target: "all", level: "info", updatedAt: at, updatedBy: by });
+    alert("書き込みました。読み込み直します。"); location.reload();
+  } catch (e) { alert("書き込めませんでした：" + (e.code || e.message)); }
+}
+async function editNote(pid, u) {
+  const cur = MG.notes[pid] || {};
+  const text = prompt(`${pid} のメモ（研究者だけが見ます。空でもよい）`, cur.text || "");
+  if (text === null) return;
+  const exclude = confirm(`${pid} を分析から除外しますか？\n（OK＝除外する／キャンセル＝除外しない）`);
+  try { await F.setDoc(F.doc(db, "notes", pid), { text: text.trim(), exclude, updatedAt: F.serverTimestamp(), updatedBy: u.email }); MG.notes[pid] = { text: text.trim(), exclude }; alert("保存しました。ページを読み込み直すと表に反映されます。"); }
+  catch (e) { alert("保存できませんでした：" + (e.code || e.message)); }
+}
+
+// ---------- CSV（DATA_SCHEMA_ja.md と同じ列） ----------
+const iso = (t) => (ms(t) ? new Date(ms(t)).toISOString() : "");
+function csv(rows, cols) {
+  const q = (v) => { if (v == null) return ""; const s = String(v); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  return "﻿" + [cols.join(","), ...rows.map((r) => cols.map((c) => q(r[c])).join(","))].join("\r\n");
+}
+export function tables(P) {
+  const baseCols = ["pid", "uid", "pilot", "exclude", "note", "cfg_version", "qset", "withdrawn", "withdrawn_at", "created_at", "decided_at", "group", "plans_offered", "plans_chosen", "avatar_source", ...BASE_ITEMS, ...SC,
+    ...["wb", "joy", "sleep", "money", "duty", "compare", "burnout", "pss"].map((k) => "pred_B_" + k), "pred_hw", "pred_hwWb"];
+  const baseline = P.filter((p) => p.baselineDone).map((p) => {
+    const r = { pid: p.pid, uid: p.uid, pilot: p.pilot, exclude: p.note?.exclude ? 1 : 0, note: p.note?.text || "", cfg_version: p.cfgVersion ?? "", qset: p.qset || "", withdrawn: p.withdrawn ? 1 : 0, withdrawn_at: iso(p.withdrawnAt), created_at: iso(p.createdAt), decided_at: iso(p.decidedAt), group: p.group || "", plans_offered: (p.plansOffered || []).map((x) => x.id).join(";"), plans_ai: (p.plansOffered || []).map((x) => (x.ai ? 1 : 0)).join(";"), ai_model: ((p.plansOffered || []).find((x) => x.ai) || {}).ai?.model || "", plans_chosen: (p.planIds || []).join(";"), avatar_source: p.avatar?.source || "" };
+    BASE_ITEMS.forEach((id) => (r[id] = p.answers?.[id])); SC.forEach((k) => (r[k] = p.scores?.[k]));
+    if (p.pred) { Object.keys(p.pred.B || {}).forEach((k) => (r["pred_B_" + k] = p.pred.B[k])); r.pred_hw = p.pred.hw; r.pred_hwWb = p.pred.hwWb; }
+    return r;
+  });
+  const wkCols = ["pid", "group", "week", "day", "at", "sumYen", "sumMin", "nDaily", ...PLANS.map((x) => "did_" + x), "Q44", "Q45", "Q47", "Q48", "joy", "stress", "happy", "W1", "W2", "W3", "W4", "W5", "burn", "joyN", "dBurn", "dJoy", "dMood", "dExec", "dExecDays", ...PLANS.map((x) => "exec_" + x), "adjBurn", "adjBurnHw", "adjWb", "adjWbHw", "adjN", "adjNWb"];
+  const weekly = P.flatMap((p) => p.cks.map((c) => ({ ...c, pid: p.pid, group: p.group, at: iso(c.at) })));
+  const trCols = ["pid", "pilot", "exclude", "withdrawn", "group", "final_day", "final_at", ...FINAL_ITEMS, ...SC.map((k) => k + "_post"), "n_checkins", "exec_rate", "total_yen", "total_min", "n_daily"];
+  const trial = P.filter((p) => p.final).map((p) => {
+    const r = { pid: p.pid, pilot: p.pilot, exclude: p.note?.exclude ? 1 : 0, withdrawn: p.withdrawn ? 1 : 0, group: p.group, final_day: p.final.day, final_at: iso(p.final.at), n_checkins: p.cks.length, total_yen: p.final.totals?.yen, total_min: p.final.totals?.min, n_daily: p.final.totals?.n };
+    FINAL_ITEMS.forEach((id) => (r[id] = p.final.answers?.[id])); SC.forEach((k) => (r[k + "_post"] = p.final.scores?.[k]));
+    if (p.group === "B") { const src = (p.daily || []).length ? p.daily : p.cks; const v = src.flatMap((c) => Object.keys(c).filter((x) => x.startsWith("did_")).map((x) => [1, 0.5, 0][c[x]])).filter((x) => x != null); /* 実行率は毎日のアンケートから（旧版の振り返りしかなければ振り返りから） */ r.exec_rate = v.length ? v.reduce((a, b) => a + b, 0) / v.length : ""; }
+    return r;
+  });
+  const dCols = ["pid", "group", "date", "day", "at", "mood", "yen", "minutes", "joy", "Q44", "Q45", "Q47", "Q48", ...PLANS.map((x) => "did_" + x)];
+  const daily = P.flatMap((p) => (p.daily || []).map((c) => ({ ...c, pid: p.pid, group: p.group, at: iso(c.at) })));
+  const free = P.flatMap((p) => [p.answers?.Q4b ? { pid: p.pid, where: "baseline_Q4b", text: p.answers.Q4b } : null, ...(p.plansOffered || []).filter((x) => x.ai).map((x) => ({ pid: p.pid, where: "ai_plan_" + x.id, text: x.ai.title + "／" + x.ai.how })), p.answers?.Q62 ? { pid: p.pid, where: "baseline_Q62", text: p.answers.Q62 } : null, p.final?.answers?.how ? { pid: p.pid, where: "final_how", text: p.final.answers.how } : null].filter(Boolean));
+  return { daily: [daily, dCols], baseline: [baseline, baseCols], weekly: [weekly, wkCols], trial: [trial, trCols], free: [free, ["pid", "where", "text"]] };
+}
+function download(name, P) {
+  const [rows, cols] = tables(P)[name];
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv(rows, cols)], { type: "text/csv" }));
+  a.download = `${name}_${new Date().toISOString().slice(0, 10)}.csv`; document.body.append(a); a.click(); a.remove();
+}
+// ---------- 分析用にまとめて書き出す（ZIP）：5つの CSV と書き出しの記録を1つのファイルに。
+// そのまま python -m analysis.run --data <この ZIP> に渡せる（展開しなくてよい）。ZIP は無圧縮（store）で、外部のライブラリを使わない
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = (u8) => { let c = 0xffffffff; for (const b of u8) c = CRC[(c ^ b) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+function zipStore(files) {
+  const enc = new TextEncoder(), parts = [], central = []; let off = 0;
+  const dt = new Date(), dosT = (dt.getHours() << 11) | (dt.getMinutes() << 5) | (dt.getSeconds() >> 1), dosD = ((dt.getFullYear() - 1980) << 9) | ((dt.getMonth() + 1) << 5) | dt.getDate();
+  for (const [name, text] of files) {
+    const nm = enc.encode(name), data = enc.encode(text), crc = crc32(data);
+    const h = new DataView(new ArrayBuffer(30)); h.setUint32(0, 0x04034b50, true); h.setUint16(4, 20, true); h.setUint16(6, 0x0800, true); h.setUint16(8, 0, true);
+    h.setUint16(10, dosT, true); h.setUint16(12, dosD, true); h.setUint32(14, crc, true); h.setUint32(18, data.length, true); h.setUint32(22, data.length, true); h.setUint16(26, nm.length, true); h.setUint16(28, 0, true);
+    parts.push(new Uint8Array(h.buffer), nm, data);
+    const c = new DataView(new ArrayBuffer(46)); c.setUint32(0, 0x02014b50, true); c.setUint16(4, 20, true); c.setUint16(6, 20, true); c.setUint16(8, 0x0800, true); c.setUint16(10, 0, true);
+    c.setUint16(12, dosT, true); c.setUint16(14, dosD, true); c.setUint32(16, crc, true); c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, nm.length, true); c.setUint32(42, off, true);
+    central.push(new Uint8Array(c.buffer), nm); off += 30 + nm.length + data.length;
+  }
+  const size = central.reduce((a, b) => a + b.length, 0), e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, files.length, true); e.setUint16(10, files.length, true); e.setUint32(12, size, true); e.setUint32(16, off, true);
+  return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type: "application/zip" });
+}
+function exportFiles(P) {
+  const t = tables(P), now = new Date();
+  const files = ["baseline", "weekly", "daily", "trial", "free"].map((k) => [`${k}.csv`, csv(...t[k])]);
+  const n = (k) => t[k][0].length;
+  const info = [
+    "OshiFit 研究版 データの書き出し（分析用）",
+    `書き出した日時：${now.toISOString()}（${now.toLocaleString("ja-JP")}）`,
+    `参加者：${P.length}人（開始時の質問を終えた人 ${n("baseline")}人）`,
+    `baseline.csv ${n("baseline")}行／weekly.csv ${n("weekly")}行／daily.csv ${n("daily")}行／trial.csv ${n("trial")}行／free.csv ${n("free")}行。config.json（使った設定）・plans.json（提案の一覧）`,
+    `分析から除外（notes の exclude）：${P.filter((p) => p.note?.exclude).length}人`,
+    "列の意味：oshifit-study/DATA_SCHEMA_ja.md",
+    "分析：python -m analysis.run --data <この ZIP> --out <結果のフォルダ>（ZIP のまま渡せる）",
+    "注意：参加者の実データです。リポジトリにコミットしない。free.csv（自由記述）は個人が特定される内容がないか確認してから使う。",
+  ].join("\r\n");
+  const cfgOut = { 実験の条件_今の値: protoNow(), 版: MG.proto?.version ?? 0, 固定中: !!MG.proto?.locked, 運用_確認が必要の基準: CFG.alerts, 変更の記録: MG.history.map((h) => ({ ...h, at: iso(h.at) })), 固定の記録: MG.events.map((e) => ({ ...e, at: iso(e.at) })), 受け付けなかった項目: MG.cfgRejected, 参加者ごとの版: "baseline.csv の cfg_version（群を決めたときの版）。各参加者の cfgUsed は Firestore に残る" };
+  return [...files, ["config.json", JSON.stringify(cfgOut, null, 2)], ["plans.json", JSON.stringify(MG.plans, null, 2)], ["README_export.txt", "\ufeff" + info + "\r\n"]];
+}
+function downloadZip(P) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(zipStore(exportFiles(P)));
+  a.download = `oshifit_data_${new Date().toISOString().slice(0, 10)}.zip`; document.body.append(a); a.click(); a.remove();
+}
+window.__oshifitZip = async (P) => { const b = await zipStore(exportFiles(P)).arrayBuffer(); let s = ""; new Uint8Array(b).forEach((x) => (s += String.fromCharCode(x))); return btoa(s); };
+window.__oshifitManage = () => manageHTML();   // 試験用（ログインせずに表示を確かめる）
+window.__oshifitTables = (P) => { const t = tables(P); return Object.fromEntries(Object.entries(t).map(([k, [r, c]]) => [k, csv(r, c)])); };
+</script>
+</body></html>
