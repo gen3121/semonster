@@ -114,7 +114,7 @@ def test_holm_known():
 EXPECTED = ["分析レポート.md", "run_log.json", "s0_summary.json", "s0_score_mismatches.csv", "s1_alpha.csv",
             "s1_cfa.json", "s1_validity_checks.csv", "s2_kmeans.json", "s2_sem.json", "s2_pc.json", "s2_dml.json",
             "s3_ridge_cv.csv", "s3_ridge_coefficients.json", "s4_paired.csv", "s4_ancova.csv",
-            "s4_propensity.json", "s4_ipw_regression.csv", "s4_ancova_sensitivity.csv",
+            "s4_propensity.json", "s4_ipw_regression.csv", "s4_ancova_sensitivity.csv", "s0_participation.csv", "s0_attrition.csv", "s4_ancova_daily14.csv",
             "s5_improved_logit.json", "s5_mixed_who5.json", "s5_dose_response.csv", "s5_mediation.json",
             "s6_interactions.csv", "s6_stability_selection.csv", "s7_plan_effects.csv",
             "plan_effects_updated.json", "prediction_interval_updated.json"]
@@ -210,3 +210,14 @@ def test_load_plans_reads_plans_js_and_export(tmp_path):
     (tmp_path / "plans.json").write_text(json.dumps([{"id": "mute", "axis": "compare", "eff": 13}, {"id": "walk", "axis": "wb", "eff": 8}]), encoding="utf-8")
     plans2, src2 = load_plans(data_dir=tmp_path)
     assert plans2["mute"]["eff"] == 13 and "walk" in plans2 and "plans.json" in src2
+
+
+def test_participation_categories(synth_run):
+    """参加の区分（ア〜エ）が出て、人数の合計が本分析の人数と同じ"""
+    import pandas as pd
+    out = synth_run[0]
+    flow = pd.read_csv(out / "s0_participation.csv")
+    assert set(flow["区分"]) == {"未決定", "ア_開始のみ", "イ_途中まで", "ウ_最後まで_記録少", "エ_最後まで"}
+    main = pd.read_csv(out / "s0_clean_main.csv")
+    assert flow["人数"].sum() == len(main)
+    assert (main.loc[main["part_cat"] == "エ_最後まで", "n_daily"] >= 14).all()

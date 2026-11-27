@@ -21,6 +21,8 @@ service cloud.firestore {
       allow create: if owner(uid)
         && request.time < timestamp.date(2027, 1, 20) + duration.value(15, 'h')   // 受付は 2027-01-20 の日本時間の終わりまで（config.js の OSHIFIT_SIGNUP_UNTIL と同じ）
         && request.resource.data.mode == 'study'
+        // 参加コード：研究室で同意書をもらった人に渡す。ops/join があれば、その code と同じでないと登録できない
+        && (!exists(/databases/$(db)/documents/ops/join) || request.resource.data.get('joinCode', '') == get(/databases/$(db)/documents/ops/join).data.code)
         && request.resource.data.pid is string && request.resource.data.pid.size() == 9
         && !('group' in request.resource.data) && !('final' in request.resource.data);
       allow update: if owner(uid)

@@ -179,3 +179,10 @@ def run(ctx: Ctx):
     ctx.save_csv("s4_ancova_sensitivity.csv", sens)
     ctx.md("### 4-4 感度分析（注意確認に合わなかった人・プレ実験の人を含めた ANCOVA、主要2変数）", "",
            *md_table(sens, 2), "")
+    # 感度分析：毎日の記録が14日以上（半分以上）の人だけ（参加の区分「ウ」を外す。2026-11-27 決定）
+    m14 = ctx.store["main"]
+    if "daily_ge14" in m14.columns:
+        s14 = add_holm(ancova(m14[m14["daily_ge14"] == 1], False))
+        s14 = s14[s14["変数"].isin(PRIMARY)]
+        ctx.save_csv("s4_ancova_daily14.csv", s14)
+        ctx.md("### 4-5 感度分析（毎日の記録が14日以上の人だけの ANCOVA、主要2変数）", "", *md_table(s14, 2), "")

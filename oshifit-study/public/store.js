@@ -74,7 +74,7 @@
     const { fs, db, au } = await load();
     if (!au.currentUser) throw new Error("not_signed_in");
     uid = au.currentUser.uid; email = au.currentUser.email; ref = fs.doc(db, "participants", uid);
-    await fs.setDoc(ref, { pid: S.id, mode: "study", appVersion: window.OSHIFIT_APP_VERSION || null, qset: window.OSHIFIT_QSET || "short", consentedAt: fs.serverTimestamp(), createdAt: fs.serverTimestamp(), answers: { Q2: S.answers.Q2 }, baselineDone: false });
+    await fs.setDoc(ref, { pid: S.id, mode: "study", appVersion: window.OSHIFIT_APP_VERSION || null, qset: window.OSHIFIT_QSET || "short", consentedAt: fs.serverTimestamp(), createdAt: fs.serverTimestamp(), answers: { Q2: S.answers.Q2 }, joinCode: String(S.joinCode || "").trim(), baselineDone: false });
   }
   const upd = (data) => { if (!ref) return Promise.reject(new Error("not_started")); return fb.fs.updateDoc(ref, data).catch(report); };
 

@@ -68,8 +68,8 @@ A.onAuthStateChanged(auth, async (u) => {
   el.innerHTML = `<p class="muted">データを読み込んでいます…</p>`;
   const [ps, cks, pil, dly, cf, pl, nt, nn] = await Promise.all([F.getDocs(F.collection(db, "participants")), F.getDocs(F.collectionGroup(db, "checkins")), F.getDocs(F.collection(db, "pilots")), F.getDocs(F.collectionGroup(db, "daily")),
     F.getDoc(F.doc(db, "study", "protocol")), F.getDocs(F.collection(db, "plans")), F.getDocs(F.collection(db, "notices")), F.getDocs(F.collection(db, "notes"))]);
-  const [hs, ev, op] = await Promise.all([F.getDocs(F.collection(db, "study", "protocol", "history")), F.getDocs(F.collection(db, "study", "protocol", "events")), F.getDoc(F.doc(db, "ops", "alerts"))]);
-  MG.proto = cf.exists() ? cf.data() : null; MG.ops = op.exists() ? op.data() : null;
+  const [hs, ev, op, jn] = await Promise.all([F.getDocs(F.collection(db, "study", "protocol", "history")), F.getDocs(F.collection(db, "study", "protocol", "events")), F.getDoc(F.doc(db, "ops", "alerts")), F.getDoc(F.doc(db, "ops", "join"))]);
+  MG.proto = cf.exists() ? cf.data() : null; MG.ops = op.exists() ? op.data() : null; MG.join = jn.exists() ? jn.data() : null;
   MG.history = hs.docs.map((d) => d.data()).sort((a, b) => a.version - b.version); MG.events = ev.docs.map((d) => d.data()).sort((a, b) => (ms(a.at) || 0) - (ms(b.at) || 0));
   const ap = ST.apply(MG.proto || {}, MG.ops || {}); CFG = ap.cfg; MG.cfgRejected = ap.rejected; MG.planDocs = new Set(pl.docs.map((d) => d.id));
   const mp = ST.mergePlans(window.OSHIFIT_PLANS, pl.docs.map((d) => ({ ...d.data(), id: d.id }))); MG.plans = mp.plans; MG.planRejected = mp.rejected; PLANS = MG.plans.map((p) => p.id);
@@ -119,7 +119,7 @@ function render(u, P) {
   el.querySelectorAll("[data-seed]").forEach((b) => (b.onclick = () => seed(b.dataset.seed, u)));
   el.querySelectorAll("[data-plan]").forEach((b) => (b.onclick = () => togglePlan(b.dataset.plan, u)));
   const on = (id, f) => { const x = $("#" + id); if (x) x.onclick = f; };
-  on("pr-create", () => saveProto(u, true)); on("pr-save", () => saveProto(u, false)); on("pr-lock", () => lockProto(u, true)); on("pr-unlock", () => lockProto(u, false)); on("op-save", () => saveOps(u));
+  on("pr-create", () => saveProto(u, true)); on("pr-save", () => saveProto(u, false)); on("pr-lock", () => lockProto(u, true)); on("pr-unlock", () => lockProto(u, false)); on("op-save", () => saveOps(u)); on("jn-save", () => saveJoin(u));
   el.querySelectorAll("[data-csv]").forEach((b) => (b.onclick = () => download(b.dataset.csv, P)));
   $("#zip-all").onclick = () => downloadZip(P);
   wireExtract(P);
@@ -246,6 +246,10 @@ function manageHTML() {
    <h3>③ 運用：確認が必要の基準（ops/alerts）　${MG.ops ? "Firestore にあり" : "初期値"}</h3>
    <div class="row">${["noCheckDays", "noDailyDays", "who5Max"].map((k) => `<label style="font-size:13px">${esc(CFG_LABEL[k])} <input class="of" data-k="${k}" value="${esc(A[k])}" style="width:60px"></label>`).join("")}<button class="btn" id="op-save">保存</button></div>
 
+   <h3>③ 運用：参加コード（ops/join）　${MG.join ? "設定あり" : "<span style='color:#b42318'>未設定：URL を知っていれば誰でも登録できます</span>"}</h3>
+   <p class="muted" style="font-size:12px">研究室で同意書をいただいた人に渡すコードです。登録の画面で入力し、同じでないと登録できません（Firestore のルールで確かめます）。変えると、それ以降の登録は新しいコードが必要です。英数字4〜12文字（大文字で保存）。</p>
+   <div class="row"><input id="jn-code" value="${esc((MG.join && MG.join.code) || "")}" style="width:140px;font-family:monospace" placeholder="例：AB12CD"><button class="btn" id="jn-save">保存</button></div>
+
    <h3>③ お知らせ（notices）　${MG.notices.length}件</h3>
    ${MG.notices.length ? `<div class="tablewrap"><table><thead><tr><th>id</th><th>文</th><th>出す</th><th>期間</th><th>対象</th><th>種類</th></tr></thead><tbody>${MG.notices.map((n) => `<tr><td class="mono">${esc(n.id)}</td><td>${esc(n.text)}</td><td>${n.active === true && (!n.from || n.from <= today) && (!n.to || today <= n.to) ? "<b>表示中</b>" : "出さない"}</td><td>${esc(n.from || "")}〜${esc(n.to || "")}</td><td>${esc(n.target || "all")}</td><td>${esc(n.level || "info")}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted">ありません</p>'}
    <p class="muted" style="font-size:12px">Firestore の notices/{id} で追加・編集します。項目：text・active（true で出す）・from・to（YYYY-MM-DD、省略可）・target（all／participants）・level（info／warn＝赤）。はじめに・ホーム・マイページの上に出ます。</p>
@@ -294,6 +298,11 @@ async function lockProto(u, lock) {
     await F.addDoc(F.collection(db, "study", "protocol", "events"), { type: lock ? "lock" : "unlock", reason, at, by, version: MG.proto.version });
     location.reload();
   } catch (e) { alert("できませんでした：" + (e.code || e.message)); }
+}
+async function saveJoin(u) {
+  const code = document.getElementById("jn-code").value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4,12}$/.test(code)) return alert("参加コードは英数字4〜12文字にしてください");
+  try { await F.setDoc(F.doc(db, "ops", "join"), { code, updatedAt: F.serverTimestamp(), updatedBy: u.email }); alert("保存しました"); location.reload(); } catch (e) { alert("保存できませんでした：" + (e.code || e.message)); }
 }
 async function saveOps(u) {
   const o = {}; let bad = [];

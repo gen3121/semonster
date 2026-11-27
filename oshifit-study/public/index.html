@@ -1726,6 +1726,8 @@ const AUTH_ERR={"auth/email-already-in-use":"このメールアドレスは登�
 const authMsg=e=>AUTH_ERR[e&&e.code]||"うまくいきませんでした。もう一度お試しください。";
 /* 参加の受付期間（config.js の OSHIFIT_SIGNUP_UNTIL、日本時間のその日の終わりまで）。過ぎたら新規登録を出さない。登録済みの人はログインして続けられる */
 function signupClosed(){const u=window.OSHIFIT_SIGNUP_UNTIL;return !!(STUDY&&u&&Date.now()>=Date.parse(u+"T24:00:00+09:00"))}
+/* 登録で記録を作れなかったとき：ルールで断られた（参加コードが違う・受付期間外）ときは、そのことを伝える */
+const codeMsg=e=>e&&/permission/i.test(e.code||e.message||"")?(signupClosed()?"参加の受付は終了しました。":"参加コードが違います。研究室でお渡ししたコードを確かめてください。（アカウントはできているので、コードを直して、もう一度「登録して質問へ」を押してください）"):authMsg(e);
 function vSignup(){const opts=QN.sections[0].items.find(i=>i.id==="Q2").opts, logged=STUDY&&OFStore.email;
   if(signupClosed()){const [y,m,d]=window.OSHIFIT_SIGNUP_UNTIL.split("-").map(Number);app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">SIGN UP</p><h2>参加の受付は終了しました</h2><p class="small">新しい参加の受付は${y}年${m}月${d}日で終わりました。ご関心をお寄せいただき、ありがとうございました。</p><p class="small muted">すでに登録している方は、ログインして続きから答えられます。</p></div><a class="btn primary" href="#login">ログインする</a></main>`;wire();return}
   app.innerHTML=header()+`<main class="stack" style="padding-top:14px"><div><p class="eyebrow view-eyebrow">SIGN UP</p><h2>${logged?"登録の続き":"新規登録"}</h2><p class="small muted">登録すると、質問 → アバター → 分析 → 2つの未来 の順に進みます。途中でやめても、ログインすれば続きから答えられます。</p></div>
@@ -1735,22 +1737,23 @@ function vSignup(){const opts=QN.sections[0].items.find(i=>i.id==="Q2").opts, lo
     <p class="xs muted">または、性別を選んで同意したあと、下のボタンで Google・Microsoft のアカウントで登録できます。</p>`}
     <div class="stack" style="gap:6px"><b class="small">性別（アバターで選べる髪型が変わります）</b><div class="olist" role="radiogroup" aria-label="性別">${opts.map((o,j)=>`<button class="obtn" role="radio" data-g="${esc(o)}" aria-checked="${S.answers.Q2===o}"><span class="dot" aria-hidden="true"></span><span>${j+1}　${esc(o)}</span></button>`).join("")}</div></div>
     <p class="xs muted">メールアドレスはログインのためだけに使い、回答とは別に管理します。研究の結果に名前やメールアドレスが出ることはありません。</p>
+    ${STUDY?`<label class="stack" style="gap:4px"><b class="small">参加コード（研究室で同意書をいただいたときにお渡しします）</b><input class="field" id="su-code" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(S.joinCode||"")}" placeholder="例：AB12CD"></label>`:""}
     <label class="consent card" for="agree"><input type="checkbox" id="agree">説明を読み、研究への参加に同意します</label>
     <button type="button" class="infolink" id="su-info">研究の説明はこちら${ARROW}</button>
     ${logged?"":`<div class="row" style="flex-wrap:wrap"><button class="btn sm" id="su-google" disabled>Google で登録</button><button class="btn sm" id="su-ms" disabled>Microsoft で登録</button></div>`}
     <p class="small" id="su-msg" role="alert" style="color:var(--bad)"></p></section></main>
    ${dock("su-back","登録して質問へ","su-go",true)}`;
   $("#su-info").onclick=()=>consentInfo();
-  const ok=()=>{const base=$("#agree").checked&&!!S.answers.Q2;$("#su-go").disabled=!(base&&(logged||($("#su-mail").value.includes("@")&&$("#su-pw").value.length>=8)));["#su-google","#su-ms"].forEach(id=>{if($(id))$(id).disabled=!base})};
+  const ok=()=>{if($("#su-code"))S.joinCode=$("#su-code").value.trim().toUpperCase();const base=$("#agree").checked&&!!S.answers.Q2&&(!STUDY||!!S.joinCode);$("#su-go").disabled=!(base&&(logged||($("#su-mail").value.includes("@")&&$("#su-pw").value.length>=8)));["#su-google","#su-ms"].forEach(id=>{if($(id))$(id).disabled=!base})};
   const soc=async kind=>{if(!STUDY){S.consented=true;return go("q")}$("#su-msg").textContent="";
     try{const saved=await OFStore.social(kind);if(saved){Object.assign(S,saved);if(S.baselineDone&&!S.sc)S.sc=scores(S.answers);return render()}await OFStore.begin(S);S.consented=true;go("q")}
-    catch(e){console.error(e);$("#su-msg").textContent=authMsg(e)}};
+    catch(e){console.error(e);$("#su-msg").textContent=codeMsg(e)}};
   if($("#su-google")){$("#su-google").onclick=()=>soc("google");$("#su-ms").onclick=()=>soc("microsoft")}
   app.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>{S.answers.Q2=b.dataset.g;app.querySelectorAll("[data-g]").forEach(x=>x.setAttribute("aria-checked",String(x===b)));ok()});
   app.querySelectorAll("input").forEach(x=>x.oninput=x.onchange=ok);
   $("#su-back").onclick=()=>go("start");
   $("#su-go").onclick=async()=>{const b=$("#su-go");b.disabled=true;$("#su-msg").textContent="";
-    if(STUDY){try{if(!logged)await OFStore.signup($("#su-mail").value.trim(),$("#su-pw").value);await OFStore.begin(S)}catch(e){console.error(e);$("#su-msg").textContent=authMsg(e);b.disabled=false;return}}
+    if(STUDY){try{if(!OFStore.email)await OFStore.signup($("#su-mail").value.trim(),$("#su-pw").value);await OFStore.begin(S)}catch(e){console.error(e);$("#su-msg").textContent=codeMsg(e);b.disabled=false;return}}
     S.consented=true;go("q")};wire()}
 /* 相談先（ホーム・結果・マイページから開く）。番号は厚生労働省のページで確認（2026-11-19）。受付時間は地域や日によって変わる */
 const HELP=[["こころの健康相談統一ダイヤル","0570-064-556","かけた所の都道府県・政令指定都市の、心の健康の電話相談につながります（受付時間は地域で違います。通話料がかかります）"],

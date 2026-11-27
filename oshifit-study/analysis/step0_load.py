@@ -134,6 +134,32 @@ def run(ctx: Ctx):
     wide["is_B"] = (wide["group"] == "B").astype(int)
     wide = wide.copy()
 
+    # 参加の区分（2026-11-27 決定）。途中でやめた人・毎日の記録が少ない人を、どの分析に使うかを分ける
+    #   ア 開始のみ：群は決まったが、毎日の記録0〜6日・振り返りなし → 開始時の記述と群の選択だけ
+    #   イ 途中まで：最後の調査なし。振り返り1回以上か毎日の記録7日以上 → 上に加えて毎日の記録の混合モデル
+    #   ウ 最後まで（記録が少ない）：最後の調査あり・毎日の記録13日以下 → 主な分析に入れ、感度分析で外す
+    #   エ 最後まで：最後の調査あり・毎日の記録14日以上（半分以上）
+    dl = read_csv(d / "daily.csv") if (d / "daily.csv").exists() else pd.DataFrame()
+    if len(dl) and "pid" in dl.columns:
+        key = "date" if "date" in dl.columns else ("day" if "day" in dl.columns else None)
+        nd = dl.groupby("pid")[key].nunique() if key else dl.groupby("pid").size()
+        wide["n_daily"] = wide["pid"].map(nd).fillna(0).astype(int)
+    else:
+        wide["n_daily"] = 0
+    nck = weekly.groupby("pid")["week"].nunique() if len(weekly) and "week" in weekly.columns else pd.Series(dtype=float)
+    wide["n_reflect"] = wide["pid"].map(nck).fillna(0).astype(int)
+    has_final = wide["wb_post"].notna() if "wb_post" in wide.columns else pd.Series(False, index=wide.index)
+    def _cat(i):
+        if not isinstance(wide.at[i, "group"], str) or not wide.at[i, "group"]:
+            return "未決定"
+        if has_final[i]:
+            return "エ_最後まで" if wide.at[i, "n_daily"] >= 14 else "ウ_最後まで_記録少"
+        if wide.at[i, "n_reflect"] >= 1 or wide.at[i, "n_daily"] >= 7:
+            return "イ_途中まで"
+        return "ア_開始のみ"
+    wide["part_cat"] = [_cat(i) for i in wide.index]
+    wide["daily_ge14"] = (wide["n_daily"] >= 14).astype(int)
+
     # 研究者のメモで「分析から除外」にした人（baseline.csv の exclude = 1）は本分析から外す。感度分析には入れる
     wide["exclude"] = pd.to_numeric(base["exclude"], errors="coerce").fillna(0).values if "exclude" in base.columns else 0
     main = wide[(wide["att_ok"] == 1) & (wide["pilot"].fillna(0) == 0) & (wide["exclude"] == 0)].reset_index(drop=True)
@@ -151,6 +177,16 @@ def run(ctx: Ctx):
         row["最後の調査あり"] = int(d_["wb_post"].notna().sum())
         counts.append(row)
     cdf = pd.DataFrame(counts)
+    # 参加の区分ごとの人数（参加者の流れ図に使う）と、最後まで続けた人・やめた人の開始時の比較
+    cats = ["未決定", "ア_開始のみ", "イ_途中まで", "ウ_最後まで_記録少", "エ_最後まで"]
+    flow = pd.DataFrame([{"区分": c, "人数": int((main["part_cat"] == c).sum()),
+                          **{f"群{g}": int(((main["part_cat"] == c) & (main["group"] == g)).sum()) for g in "ABC"}} for c in cats])
+    ctx.save_csv("s0_participation.csv", flow)
+    done = main["part_cat"].isin(["ウ_最後まで_記録少", "エ_最後まで"])
+    att = pd.DataFrame([{"得点": k, "最後まで（平均）": main.loc[done, k].mean(), "途中でやめた（平均）": main.loc[~done & main["group"].notna(), k].mean(),
+                         "最後まで n": int(done.sum()), "途中でやめた n": int((~done & main["group"].notna()).sum())}
+                        for k in ["wb", "burnout"] if k in main.columns])
+    ctx.save_csv("s0_attrition.csv", att)
     summary = {"n_baseline": len(base), "duplicated_pid_removed": int(dup), "n_weekly_rows": len(weekly),
                "n_trial_rows": len(trial), "n_trial_with_who5": int(has_post), "n_free": free_n,
                "attention_failed": int((wide["att_ok"] == 0).sum()), "pilot": int((wide["pilot"] == 1).sum()),
@@ -165,6 +201,10 @@ def run(ctx: Ctx):
            f"食い違い（差が0.5より大きい、または片方が空）：{len(mm)} 件（s0_score_mismatches.csv）。"
            "以後の分析は計算し直した値を使う。", "")
     ctx.md(*md_table(cdf), "")
+    ctx.md("### 参加の区分（本分析の標本）", "",
+           "ア＝開始のみ（毎日の記録0〜6日・振り返りなし）、イ＝途中まで（最後の調査なし）、ウ＝最後まで・毎日の記録13日以下、エ＝最後まで・14日以上。"
+           "開始時と最後の比較（手順4）はウとエを使い、ウを外した結果も示す。毎日の記録の混合モデル（手順8）はイ・ウ・エの記録をすべて使う。", "",
+           *md_table(flow), "", "最後まで続けた人と途中でやめた人の、開始時の値：", "", *md_table(att, 1), "")
     if len(mm):
         ctx.md("食い違いの内訳（得点ごとの件数）：" +
                "、".join(f"{k} {v}" for k, v in mm["得点"].value_counts().items()), "")

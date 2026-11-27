@@ -168,3 +168,13 @@ test("群を決めたときの設定の版と値は、あとから変えられ�
   await assertFails(updateDoc(r, { cfgVersion: 3 }));
   await assertFails(updateDoc(r, { cfgUsed: { gapDays: 2 } }));
 });
+test("参加コード：ops/join があると、同じコードでないと参加者の記録を作れない。コードは研究者だけが読み書きできる", async () => {
+  await assertSucceeds(setDoc(doc(other(), "participants", "u2"), base));              // 設定前は誰でも
+  await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), "ops", "join"), { code: "OSHI42" }); });
+  await assertFails(setDoc(doc(me(), "participants", "u1"), base));
+  await assertFails(setDoc(doc(me(), "participants", "u1"), { ...base, joinCode: "WRONG" }));
+  await assertSucceeds(setDoc(doc(me(), "participants", "u1"), { ...base, joinCode: "OSHI42" }));
+  await assertFails(getDoc(doc(me(), "ops", "join")));                                  // 参加者はコードを読めない
+  await assertSucceeds(getDoc(doc(admin(), "ops", "join")));
+  await assertSucceeds(setDoc(doc(admin(), "ops", "join"), { code: "NEW123" }));
+});

@@ -99,6 +99,14 @@ async function answerAll(page, stop) {
   await page.locator("[data-g='男性']").click();
   assert.equal(await page.locator("#su-go").isDisabled(), true, "同意しないと登録できない");
   await page.locator("#agree").check();
+  assert.equal(await page.locator("#su-go").isDisabled(), true, "参加コードがないと登録できない");
+  // 参加コード：研究者が ops/join に設定したコードと違うと、記録を作れない。直してもう一度押すと登録できる
+  await read((db) => setDoc(doc(db, "ops", "join"), { code: "OSHI42" }));
+  await page.locator("#su-code").fill("wrong1");
+  await page.locator("#su-go").click();
+  await page.getByText("参加コードが違います").waitFor({ timeout: 10000 });
+  await page.locator("#su-code").fill("oshi42");
+  step("参加コードが違うと登録できず、そのことが出る（研究室で同意書をもらった人だけが登録できる）");
   await page.screenshot({ path: path.join(OUT, "00_signup.png") });
   await page.locator("#su-go").click();
   await page.locator(".qid").waitFor();
@@ -320,7 +328,8 @@ async function answerAll(page, stop) {
   assert.equal(await page.getByText("参加をやめますか").count(), 0);
   step("マイページに「参加をやめる」の欄がない");
 
-  assert.deepEqual(errors.filter((e) => !/auth\/|Firestore|offline|unavailable/i.test(e)), [], "ページのエラー: " + errors.join(" / "));
+  assert.deepEqual(errors.filter((e) => !/auth\/|Firestore|offline|unavailable/i.test(e) && !(/PERMISSION_DENIED/.test(e) && /for 'create' @ L21/.test(e))), [],   // 参加コードの確かめで、わざと断られた1回は除く
+    "ページのエラー: " + errors.join(" / "));
   await browser.close(); await env.cleanup();
   console.log("OK");
 })().catch((e) => { console.error(e); process.exit(1); });
