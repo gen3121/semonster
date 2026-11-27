@@ -59,9 +59,11 @@ exports.proposal = onRequest({ secrets: [OPENAI_API_KEY], timeoutSeconds: 60, me
     if (!(await countToday())) return res.status(429).json({ error: "今日の上限に達しました" });
     const ids = ctx.plans.map((p) => p.id);
     const schema = {
-      type: "object", additionalProperties: false, required: ["items"],
+      type: "object", additionalProperties: false, required: ["items", "avoid"],
       properties: { items: { type: "array", items: { type: "object", additionalProperties: false, required: ["id", "title", "how", "fit"],
-        properties: { id: { type: "string", enum: ids }, title: { type: "string" }, how: { type: "string" }, fit: { type: "string" } } } } },
+        properties: { id: { type: "string", enum: ids }, title: { type: "string" }, how: { type: "string" }, fit: { type: "string" } } } },
+        avoid: { type: "array", items: { type: "object", additionalProperties: false, required: ["a", "b", "why"],
+          properties: { a: { type: "string", enum: ids }, b: { type: "string", enum: ids }, why: { type: "string" } } } } },
     };
     const r = await fetch(`${BASE()}/v1/chat/completions`, {
       method: "POST",
@@ -75,9 +77,9 @@ exports.proposal = onRequest({ secrets: [OPENAI_API_KEY], timeoutSeconds: 60, me
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { console.error("OpenAI", r.status, j.error && j.error.message); return res.status(502).json({ error: "ChatGPT から返事がありません", status: r.status }); }
     const text = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-    const byId = P.clean((JSON.parse(text || "{}") || {}).items, ids);
+    const got = JSON.parse(text || "{}") || {}, byId = P.clean(got.items, ids);
     if (!Object.keys(byId).length) return res.status(502).json({ error: "使える文がありませんでした" });
-    return res.status(200).json({ byId, model: j.model || MODEL(), version: P.PROMPT_VERSION });
+    return res.status(200).json({ byId, avoid: P.cleanAvoid(got.avoid, ids), model: j.model || MODEL(), version: P.PROMPT_VERSION });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: "サーバーの処理に失敗しました" });

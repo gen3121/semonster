@@ -31,7 +31,7 @@ async function setup(ctx) {
   await ctx.route("**/config.js", (r) => r.fulfill({ body: TEST_CONFIG, contentType: "text/javascript" }));
   // 端末の時計だけを進める（振り返りの4日ルールの確認用）。サーバーの時刻は進まない
   // 提案文の AI（ai.js）は外部に送らず、決まった文を返す見本に置き換える。送る文はあとで確かめる
-  await ctx.addInitScript(() => { window.OSHIFIT_AI_MOCK = async (prompt, ids) => { window.__aiPrompt = prompt; await new Promise((r) => setTimeout(r, 300)); return JSON.stringify({ items: ids.map((id) => ({ id, title: "阪神の試合の日の" + id + "をする", how: "甲子園の中継を見る日は、" + id + "のやり方で整える" })).concat([{ id: ids[0], title: "重複", how: "重複" }, { id: "x", title: "https://bad", how: "x" }]) }); }; });
+  await ctx.addInitScript(() => { window.OSHIFIT_AI_MOCK = async (prompt, ids) => { window.__aiPrompt = prompt; await new Promise((r) => setTimeout(r, 300)); return JSON.stringify({ items: ids.map((id) => ({ id, title: "阪神の試合の日の" + id + "をする", how: "甲子園の中継を見る日は、" + id + "のやり方で整える", fit: "試合を大切にしているあなただからこそ続けやすい形です" })).concat([{ id: ids[0], title: "重複", how: "重複" }, { id: "x", title: "https://bad", how: "x" }]), avoid: ids.length > 1 ? [{ a: ids[0], b: ids[1], why: "どちらも試合の夜の時間を使うので続けにくそう" }, { a: ids[0], b: ids[0], why: "同じ" }] : [] }); }; });
   await ctx.addInitScript(() => { const off = +(localStorage.getItem("__e2e_offset") || 0); const real = Date.now.bind(Date); Date.now = () => real() + off; });
 }
 
@@ -186,7 +186,9 @@ async function answerAll(page, stop) {
       assert.equal(await page.locator("#combos .chip.good").count(), 1, "おすすめの組み合わせは1つ");
       await page.screenshot({ path: path.join(OUT, "03_combos.png"), fullPage: true });
     }
-    await page.waitForFunction(() => document.querySelector(".aimark") && /AI/.test(document.querySelector(".aimark").textContent), null, { timeout: 8000 });
+    await page.waitForFunction(() => document.querySelector(".aimark") && /あなたに合う理由/.test(document.querySelector(".aimark").textContent), null, { timeout: 8000 });
+    assert.ok(!(await page.locator(".card.plan").innerText()).includes("が書いた文です"), "「AI が書いた文です」は出さない");
+    if (await page.locator("#combos").count()) assert.match(await page.locator("#combos").innerText(), /一緒に選ばない方がよさそうです：どちらも試合の夜の時間を使うので続けにくそう/, "AI が見つけた組み合わせの注意が出る");
     assert.match(await page.locator(".card.plan h3").innerText(), /^阪神の試合の日の/, "提案の題名が推しに合わせた文になる");
     const pr = await page.evaluate(() => window.__aiPrompt);
     assert.ok(pr.includes("阪神タイガース") && pr.includes("推しのジャンル"), "推しの名前とジャンルを送る");

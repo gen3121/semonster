@@ -10,7 +10,7 @@
   "use strict";
   const V = "13.2.0";
   const CDN = (m) => `https://www.gstatic.com/firebasejs/${V}/firebase-${m}.js`;
-  const P = window.OFAI_PROMPT, prompt = P.prompt, clean = P.clean, PROMPT_VERSION = P.PROMPT_VERSION;   // ai_prompt.js
+  const P = window.OFAI_PROMPT, prompt = P.prompt, clean = P.clean, cleanAvoid = P.cleanAvoid, PROMPT_VERSION = P.PROMPT_VERSION;   // ai_prompt.js
   let ready = null;
 
   const conf = () => window.OSHIFIT_AI || {};
@@ -32,6 +32,7 @@
         items: S.array({
           items: S.object({ properties: { id: S.enumString({ enum: ids }), title: S.string(), how: S.string(), fit: S.string() } }),
         }),
+        avoid: S.array({ items: S.object({ properties: { a: S.enumString({ enum: ids }), b: S.enumString({ enum: ids }), why: S.string() } }) }),
       },
     });
     // 1つめのモデルが断られたとき（混雑・お支払いの条件）は、次のモデルで頼み直す
@@ -55,7 +56,7 @@
             const j = await r.json().catch(() => ({}));
             if (r.ok && j.byId) {
               const byId = clean(Object.entries(j.byId).map(([id, v]) => ({ id, ...v })), ids);
-              if (Object.keys(byId).length) return { byId, model: j.model || "openai", version: PROMPT_VERSION };
+              if (Object.keys(byId).length) return { byId, avoid: cleanAvoid(j.avoid, ids), model: j.model || "openai", version: PROMPT_VERSION };
             }
             console.warn("[OshiFit AI] ChatGPT が使えませんでした", r.status, j.error || "");
           } catch (e) { console.warn("[OshiFit AI] ChatGPT につながりません", e && e.message); }
@@ -69,8 +70,8 @@
           catch (e) { if (k >= 2) throw e; await new Promise((res) => setTimeout(res, k ? 3000 : 1000)); }
         }
       }
-      const byId = clean((JSON.parse(text) || {}).items, ids);
-      return Object.keys(byId).length ? { byId, model: used, version: PROMPT_VERSION } : null;
+      const got = JSON.parse(text) || {}, byId = clean(got.items, ids);
+      return Object.keys(byId).length ? { byId, avoid: cleanAvoid(got.avoid, ids), model: used, version: PROMPT_VERSION } : null;
     };
     let timer;
     try {

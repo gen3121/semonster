@@ -1339,10 +1339,11 @@ function predictMulti(sc,ids){let B={...sc};const ps=ids.map(planById).sort((x,y
   if(sc.pss!=null&&sc.burnout!=null) B.pss=clamp(sc.pss*(1+(B.burnout-sc.burnout)/Math.max(sc.burnout,1)*.25),0,56); // 仮定：推し疲れの変化の1/4の割合でPSS-Jも動く
   const iv=CFG.interval;return{A:sc,B,hw:iv.hw+iv.hwStep*(ids.length-1),hwWb:iv.hwWb+iv.hwWbStep*(ids.length-1),plans:ps,clashes,synergies};}
 /* 示した提案のすべての組み合わせを見積もり、幸福度の上がり方と推し疲れの下がり方の合計が最も大きいものを「おすすめ」にする */
+function aiClashes(ids){const out=[],seen=new Set();(S.plans||[]).forEach(x=>((x.ai&&x.ai.avoid)||[]).forEach(v=>{const k=[x.id,v.with].sort().join("+");if(!seen.has(k)&&ids.includes(x.id)&&ids.includes(v.with)){seen.add(k);out.push([x.id,v.with,v.why])}}));return out}
 function combos(sc,ids){const out=[];for(let m=1;m<1<<ids.length;m++){const c=ids.filter((_,i)=>m>>i&1),pr=predictMulti(sc,c);
     out.push({ids:c,pr,dWb:pr.B.wb-sc.wb,dBurn:pr.B.burnout-sc.burnout,score:(pr.B.wb-sc.wb)-(pr.B.burnout-sc.burnout)})}
   const best=Math.max(...out.map(o=>o.score));
-  out.forEach(o=>{o.best=o.score===best;o.near=!o.best&&best-o.score<2;o.bad=o.pr.clashes.length>0});
+  out.forEach(o=>{o.ai=aiClashes(o.ids);o.best=o.score===best;o.near=!o.best&&best-o.score<2;o.bad=o.pr.clashes.length>0||o.ai.length>0});
   return out.sort((a,b)=>b.score-a.score)}
 const planIds=()=>!S.plan?[]:(S.plan.ids&&S.plan.ids.length?S.plan.ids:[S.plan.id]);
 function predict(sc,planId){const p=planById(planId);const B={...sc};
@@ -1403,7 +1404,7 @@ function aiStart(){if(AI_RUN||!window.OFAI||!OFAI.enabled()||(STUDY&&S.group)||!
   const ids=ctx.plans.map(p=>p.id).join(),at=now();
   AI_RUN=OFAI.tailor(ctx,45000).then(r=>{AI_RUN=null;
     if((STUDY&&S.group)||!S.plans||S.plans.map(x=>x.id).join()!==ids)return;   // 待っている間に群が決まった・提案が変わった（編集者用は群があっても入れる）
-    S.plans=S.plans.map(x=>r&&r.byId[x.id]?{...x,ai:{...r.byId[x.id],model:r.model,v:r.version,at}}:{...x,aiTried:true});
+    S.plans=S.plans.map(x=>{if(!(r&&r.byId[x.id]))return{...x,aiTried:true};const av=(r.avoid||[]).filter(v=>v.a===x.id||v.b===x.id).map(v=>({with:v.a===x.id?v.b:v.a,why:v.why}));return{...x,ai:{...r.byId[x.id],...(av.length?{avoid:av}:{}),model:r.model,v:r.version,at}}});
     if(STUDY&&OFStore.offer)OFStore.offer(S);
     if(location.hash==="#future"&&!(STUDY&&S.group))render()});}
 function ensureBase(){if(!STUDY)fillBase();S.sc=scores(S.answers);if(!S.plans)S.plans=plansFor(S.sc,S.answers);aiStart();return S.sc}
@@ -1870,7 +1871,7 @@ function pbar(name,a,b,hw,higher){const d=b-a,good=higher?d>=0:d<=0,col=good?"va
 let PSEL=new Set();
 /* AI の文のときは、そのことと、もとの型（根拠はこの型のもの）を示す（D4） */
 function aiNote(p){const a=aiOf(p),base=planById(p.id);
-  if(a)return`${a.fit?`<p class="small"><b>あなたに合う理由：</b>${esc(a.fit)}</p>`:""}<p class="xs muted aimark">あなたの推しと性格に合わせて、AI（${/^gpt|openai/i.test(a.model||"")?"OpenAI の ChatGPT":"Google の Gemini"}）が書いた文です。もとの提案：「${esc(base.title)}」。下の根拠は、もとの提案のものです。</p>`;
+  if(a)return a.fit?`<p class="small aimark"><b>あなたに合う理由：</b>${esc(a.fit)}</p>`:"";
   if(AI_RUN&&!(STUDY&&S.group))return`<p class="xs muted aimark" aria-live="polite">あなたの推しと性格に合わせた文を作っています…</p>`;
   const o=(S.plans||[]).find(x=>x.id===p.id);
   if(o&&o.aiTried)return`<p class="xs muted aimark">いまは推しに合わせた文を作れなかったため、もとの提案の文を表示しています。</p>`;return""}
@@ -1889,10 +1890,10 @@ function vFuture(){const sc=ensureBase(),A=S.answers;if(isGood(sc).ok){app.inner
      ${cs.map(o=>`<div class="combo ${o.best?"best":""} ${o.bad?"bad":""}"><div class="row" style="justify-content:space-between;flex-wrap:wrap"><b>${o.ids.map(nm).join(" × ")}</b>
        <span>${o.best?'<span class="chip good">おすすめ</span>':o.near?'<span class="chip">おすすめとほぼ同じ</span>':""}${o.bad?'<span class="chip bad">おすすめしない</span>':""}</span></div>
        <p class="xs">幸福度：${chgText(o.dWb,true)}　推し疲れ：${chgText(o.dBurn,false)}</p>
-       ${o.pr.clashes.map(c=>`<p class="xs" style="color:var(--bad)">${nm(c[0])}と${nm(c[1])}：${esc(c[4])}</p>`).join("")}${o.pr.synergies.map(c=>`<p class="xs muted">${nm(c[0])}と${nm(c[1])}：${esc(c[2])}</p>`).join("")}
+       ${o.pr.clashes.map(c=>`<p class="xs" style="color:var(--bad)">${nm(c[0])}と${nm(c[1])}：${esc(c[4])}</p>`).join("")}${o.ai.map(c=>`<p class="xs" style="color:var(--bad)">${nm(c[0])}と${nm(c[1])}は一緒に選ばない方がよさそうです：${esc(c[2])}</p>`).join("")}${o.pr.synergies.map(c=>`<p class="xs muted">${nm(c[0])}と${nm(c[1])}：${esc(c[2])}</p>`).join("")}
        <button class="btn sm" data-combo="${o.ids.join(",")}">この組み合わせを選ぶ</button></div>`).join("")}
      <p class="xs muted">提案が多いほど続けにくく負担も増えると考え、2つめ以降の効果は小さく見積もり、提案1つにつき推し疲れを3点ずつ足しています。向きが逆の提案を一緒に選ぶと、効果が打ち消し合うと考えています。どちらも仮の考え方で、研究の結果で確かめ直します。</p></section>`})():""}
-   ${pr.clashes.length&&chosen.length?`<p class="callout bad">いま選んでいる提案には、相性が悪い組み合わせがあります：${pr.clashes.map(c=>esc(c[4])).join("／")}</p>`:""}
+   ${(()=>{const ac=chosen.length?aiClashes(chosen):[],all=[...(chosen.length?pr.clashes.map(c=>c[4]):[]),...ac.map(c=>c[2])];return all.length?`<p class="callout bad">いま選んでいる提案には、一緒に選ばない方がよい組み合わせがあります：${all.map(esc).join("／")}</p>`:""})()}
    <section class="card"><div class="sec"><h3>5つの要素の見込み</h3><span class="xs muted">灰色の点線＝A、青＝B</span></div>
     ${radar([{v:FV(pr.A),fill:"var(--faint)",stroke:"var(--faint)",dash:true,op:.05},{v:FV(pr.B),fill:"var(--primary)",stroke:"var(--primary)",dots:true}],FN())}
     ${outBars([["幸福度（WHO-5）",[sc.wb,pr.B.wb],true,52,`±${pr.hwWb}の幅`],["ストレス度（PSS-J）",[pss100(sc),pss100(pr.B)],false,null,"仮の見込み"],["推し活のストレス（推し疲れ）",[sc.burnout,pr.B.burnout],false,null,`±${pr.hw}の幅`]],["プランA","プランB"])}
